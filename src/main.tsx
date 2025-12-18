@@ -24,6 +24,12 @@ window.onunhandledrejection = (event) => {
   document.body.appendChild(overlay);
 };
 
+const root = document.getElementById('root');
+if (root) {
+  root.innerHTML = '<div style="padding:12px;font-family:monospace;background:#fffbcc;border-bottom:1px solid #ddd">[BOOT] JS entry executed</div>';
+}
+console.log('[BOOT] main.tsx executed', window.location.href);
+
 // Wrap React bootstrap in try/catch
 try {
   ReactDOM.createRoot(document.getElementById('root')!).render(
