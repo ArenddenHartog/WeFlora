@@ -3,7 +3,7 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { MatrixColumn, DiscoveredStructure, ContextItem, MatrixRow, Matrix, MatrixColumnType, Report, ProjectInsights } from '../types';
 
 // Initialize the SDK
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GOOGLE_API_KEY });
 
 // -- Helper: File to Base64 --
 const fileToBase64 = (file: File): Promise<string> => {

@@ -11,7 +11,7 @@ interface AccountSettingsModalProps {
 }
 
 const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOpen, onClose }) => {
-    const { user } = useAuth();
+    const { user, signOut } = useAuth();
     const { showNotification } = useUI();
     const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'org'>('profile');
     const [loading, setLoading] = useState(false);
@@ -180,6 +180,15 @@ const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOpen, onC
                             </div>
                         </div>
                     )}
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-slate-200">
+                    <button 
+                        onClick={signOut}
+                        className="w-full px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium text-sm transition-colors border border-red-200"
+                    >
+                        Sign Out
+                    </button>
                 </div>
             </div>
         </BaseModal>

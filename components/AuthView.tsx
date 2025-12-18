@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { LogoIcon, SparklesIcon } from './icons';
 
@@ -9,26 +10,35 @@ const AuthView: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [mode, setMode] = useState<'signin' | 'signup'>('signin');
     const [error, setError] = useState<string | null>(null);
+    const [message, setMessage] = useState<string | null>(null);
+    const navigate = useNavigate();
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
+        setMessage(null);
 
         try {
             if (mode === 'signup') {
-                const { error } = await supabase.auth.signUp({
+                const { data, error } = await supabase.auth.signUp({
                     email,
                     password,
                 });
                 if (error) throw error;
-                alert('Check your email for the login link!');
+                if (data.session) {
+                    // Signed in immediately
+                    navigate('/');
+                } else {
+                    setMessage('Account created — check your email to confirm.');
+                }
             } else {
                 const { error } = await supabase.auth.signInWithPassword({
                     email,
                     password,
                 });
                 if (error) throw error;
+                navigate('/');
             }
         } catch (err: any) {
             setError(err.message);
@@ -81,6 +91,12 @@ const AuthView: React.FC = () => {
                     {error && (
                         <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
                             {error}
+                        </div>
+                    )}
+
+                    {message && (
+                        <div className="p-3 bg-green-50 text-green-600 text-sm rounded-lg border border-green-100">
+                            {message}
                         </div>
                     )}
 
