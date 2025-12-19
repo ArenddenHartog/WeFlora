@@ -294,7 +294,7 @@ const WorksheetWizard: React.FC<{
                     <div className="flex-1 flex flex-col min-h-0">
                         <div className="flex justify-between items-center mb-3">
                             <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Refine Schema</h4>
-                            <div className="flex gap-2"><button onClick={() => addSchemaColumn('text')} className="text-[10px] px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold rounded transition-colors">+ Text</button><button onClick={() => addSchemaColumn('ai')} className="text-[10px] px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold rounded transition-colors flex items-center gap-1"><SparklesIcon className="h-3 w-3"/> + AI</button></div>
+                            <div className="flex gap-2"><button onClick={() => addSchemaColumn('text')} className="text-[10px] px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold rounded transition-colors">+ Text</button><button onClick={() => addSchemaColumn('ai')} className="text-[10px] px-2 py-1 bg-weflora-teal/10 hover:bg-weflora-teal/20 text-weflora-dark font-bold rounded transition-colors flex items-center gap-1"><SparklesIcon className="h-3 w-3"/> + AI</button></div>
                         </div>
                         <div className="bg-slate-50 rounded-xl flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                             {schemaColumns.map((col, idx) => (
@@ -302,9 +302,9 @@ const WorksheetWizard: React.FC<{
                                      <div className="pt-3"><input type="radio" name="primaryKey" checked={!!col.isPrimaryKey} onChange={() => setPrimaryKey(col.id)} className="accent-weflora-teal cursor-pointer w-4 h-4" title="Set as Entity Name (Primary Key)" /></div>
                                      <div className="flex-1 space-y-2">
                                          <div className="flex gap-2"><input type="text" value={col.title} onChange={(e) => updateSchemaColumn(col.id, { title: e.target.value })} className="flex-1 text-sm font-bold text-slate-900 border-b border-transparent focus:border-slate-300 outline-none pb-1 bg-transparent placeholder-slate-300" placeholder="Column Name" /><select value={col.type} onChange={(e) => updateSchemaColumn(col.id, { type: e.target.value as MatrixColumnType })} className="text-xs bg-slate-100 rounded px-2 py-1 border-none outline-none text-slate-900 font-medium cursor-pointer hover:bg-slate-200"><option value="text">Text</option><option value="number">Number</option><option value="date">Date</option><option value="select">Select</option><option value="ai">FloraGPT Gen</option></select></div>
-                                         {col.type === 'ai' && <input type="text" value={col.aiPrompt || ''} onChange={(e) => updateSchemaColumn(col.id, { aiPrompt: e.target.value })} className="w-full text-xs bg-purple-50 text-purple-900 border-0 rounded px-3 py-2 outline-none placeholder:text-purple-300" placeholder="AI Prompt: e.g. Analyze {Entity Name}..." />}
+                                         {col.type === 'ai' && <input type="text" value={col.aiPrompt || ''} onChange={(e) => updateSchemaColumn(col.id, { aiPrompt: e.target.value })} className="w-full text-xs bg-weflora-teal/10 text-weflora-dark border-0 rounded px-3 py-2 outline-none placeholder:text-weflora-teal/40" placeholder="AI Prompt: e.g. Analyze {Entity Name}..." />}
                                      </div>
-                                     <button onClick={() => removeSchemaColumn(col.id)} className="text-slate-300 hover:text-red-500 pt-2 transition-colors"><XIcon className="h-4 w-4" /></button>
+                                     <button onClick={() => removeSchemaColumn(col.id)} className="text-slate-300 hover:text-weflora-red pt-2 transition-colors"><XIcon className="h-4 w-4" /></button>
                                 </div>
                             ))}
                             {schemaColumns.length === 0 && <div className="text-center py-10 text-slate-400 text-sm">No columns defined.</div>}
@@ -387,7 +387,7 @@ const WorksheetWizard: React.FC<{
                             return (
                                 <div key={id} className="flex items-center justify-between text-sm bg-slate-50 p-3 rounded-lg border border-slate-100 animate-fadeIn">
                                     <div className="flex items-center gap-3"><div className="h-8 w-8 bg-white rounded flex items-center justify-center border border-slate-200 text-weflora-teal font-bold text-xs">{sp.scientificName.charAt(0)}</div><div><div className="font-medium text-slate-900">{sp.scientificName}</div><div className="text-xs text-slate-500">{sp.commonName}</div></div></div>
-                                    <button onClick={() => { const next = new Set(selectedSpeciesIds); next.delete(id); setSelectedSpeciesIds(next); }} className="text-slate-400 hover:text-red-500 p-2 hover:bg-white rounded transition-colors"><XIcon className="h-4 w-4" /></button>
+                                    <button onClick={() => { const next = new Set(selectedSpeciesIds); next.delete(id); setSelectedSpeciesIds(next); }} className="text-slate-400 hover:text-weflora-red p-2 hover:bg-white rounded transition-colors"><XIcon className="h-4 w-4" /></button>
                                 </div>
                             );
                         })}

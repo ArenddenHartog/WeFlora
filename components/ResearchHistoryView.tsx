@@ -122,7 +122,7 @@ const ResearchHistoryView: React.FC<ResearchHistoryViewProps> = ({ onOpenMenu })
                                 </button>
                                 <button 
                                     onClick={(e) => handleDeleteThread(e, thread.id)}
-                                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                    className="p-2 text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                     title="Delete Thread"
                                 >
                                     <TrashIcon className="h-4 w-4" />

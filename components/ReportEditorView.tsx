@@ -97,7 +97,7 @@ export const ManageReportPanel: React.FC<{
                         {tags.map(tag => (
                             <span key={tag} className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded border border-slate-200 shadow-sm">
                                 #{tag}
-                                <button onClick={() => removeTag(tag)} className="text-slate-400 hover:text-red-500"><XIcon className="h-3 w-3" /></button>
+                                <button onClick={() => removeTag(tag)} className="text-slate-400 hover:text-weflora-red"><XIcon className="h-3 w-3" /></button>
                             </span>
                         ))}
                         <input type="text" value={newTagInput} onChange={(e) => setNewTagInput(e.target.value)} onKeyDown={handleAddTag} placeholder="Add tag..." className="bg-transparent text-xs outline-none min-w-[60px] flex-1 text-slate-900" />
@@ -282,7 +282,7 @@ const ReportEditorView: React.FC<ReportEditorViewProps> = ({
                             {reports && reports.map(r => (
                                 <div key={r.id} onClick={() => onActiveReportIdChange && onActiveReportIdChange(r.id)} className={`group relative flex items-center gap-2 pl-3 pr-2 py-2 text-sm font-bold rounded-t-lg transition-all border-t border-x cursor-pointer select-none ${activeReport.id === r.id ? 'bg-white border-slate-200 text-slate-800 border-b-white z-10 -mb-[1px]' : 'bg-transparent border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`} style={{ maxWidth: '200px' }} role="button">
                                     <span className="truncate flex-1">{r.title}</span>
-                                    {onDeleteReport && <button onClick={(e) => handleDeleteReport(e, r.id)} className={`p-0.5 rounded-md hover:bg-red-100 hover:text-red-500 transition-colors ${activeReport.id === r.id ? 'text-slate-300' : 'text-transparent group-hover:text-slate-300'}`}><XIcon className="h-3 w-3" /></button>}
+                                    {onDeleteReport && <button onClick={(e) => handleDeleteReport(e, r.id)} className={`p-0.5 rounded-md hover:bg-weflora-red/20 hover:text-weflora-red transition-colors ${activeReport.id === r.id ? 'text-slate-300' : 'text-transparent group-hover:text-slate-300'}`}><XIcon className="h-3 w-3" /></button>}
                                 </div>
                             ))}
                             {onCreateReport && <button onClick={onCreateReport} className="mb-2 ml-1 p-1.5 text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10 rounded-md transition-colors" title="New Report"><PlusIcon className="h-4 w-4" /></button>}

@@ -343,12 +343,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
     const getContextStyle = (source: string) => {
         switch (source) {
-            case 'knowledge': return 'bg-purple-50 text-purple-700 border-purple-200';
-            case 'project': return 'bg-blue-50 text-blue-700 border-blue-200';
+            case 'knowledge': return 'bg-weflora-teal/10 text-weflora-dark border-weflora-teal/20';
+            // NOTE: Use WeFlora tokens for project context (avoid Tailwind blue palette in AI-adjacent UI).
+            case 'project': return 'bg-weflora-mint/20 text-weflora-dark border-weflora-teal/20';
             case 'report': return 'bg-orange-50 text-orange-700 border-orange-200';
             case 'worksheet': return 'bg-weflora-mint/20 text-weflora-dark border-weflora-teal';
             case 'upload': return 'bg-slate-50 text-slate-700 border-slate-200';
-            case 'web': return 'bg-green-50 text-green-700 border-green-200';
+            case 'web': return 'bg-weflora-success/10 text-weflora-success border-weflora-success/20';
             default: return 'bg-slate-100 text-slate-700 border-slate-200';
         }
     };
@@ -387,7 +388,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             {(selectedContextItems.length > 0 || isDeepResearchEnabled || isReasoningEnabled) && (
                 <div className="flex flex-wrap gap-2 px-3 pt-3 pb-1 animate-fadeIn">
                      {isDeepResearchEnabled && <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-weflora-mint/20 text-weflora-dark border border-weflora-teal"><GlobeIcon className="h-3 w-3" /> Deep Research On</div>}
-                     {isReasoningEnabled && <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200"><SparklesIcon className="h-3 w-3" /> Thinking Mode</div>}
+                     {isReasoningEnabled && <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-weflora-teal/20 text-weflora-dark border border-weflora-teal/20"><SparklesIcon className="h-3 w-3" /> Thinking Mode</div>}
                      {selectedContextItems.map((item) => (
                         <div key={item.id} className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border ${getContextStyle(item.source)}`}>
                             {getIcon(item.source)}
@@ -413,7 +414,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     <button ref={addRefButtonRef} onClick={() => setIsContextPickerOpen(!isContextPickerOpen)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isContextPickerOpen ? 'bg-weflora-mint/20 text-weflora-dark' : 'text-slate-500 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Add files or context"><PlusIcon className="h-3.5 w-3.5" /> Add Context</button>
                     <div className="w-px h-4 bg-slate-300 mx-1"></div>
                     <button onClick={() => setIsDeepResearchEnabled(!isDeepResearchEnabled)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isDeepResearchEnabled ? 'bg-weflora-mint/20 text-weflora-dark' : 'text-slate-500 hover:bg-weflora-mint/10 hover:text-weflora-teal'}`} title="Enable Web Search"><GlobeIcon className="h-3.5 w-3.5" /> Research</button>
-                    <button onClick={() => setIsReasoningEnabled(!isReasoningEnabled)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isReasoningEnabled ? 'bg-purple-100 text-purple-700' : 'text-slate-500 hover:bg-purple-50 hover:text-purple-600'}`} title="Enable Complex Reasoning"><SparklesIcon className="h-3.5 w-3.5" /> Think</button>
+                    <button onClick={() => setIsReasoningEnabled(!isReasoningEnabled)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isReasoningEnabled ? 'bg-weflora-teal/20 text-weflora-dark' : 'text-slate-500 hover:bg-weflora-teal/10 hover:text-weflora-dark'}`} title="Enable Complex Reasoning"><SparklesIcon className="h-3.5 w-3.5" /> Think</button>
                     <div className="w-px h-4 bg-slate-300 mx-1"></div>
                     <button ref={templateButtonRef} onClick={() => setIsTemplatePickerOpen(!isTemplatePickerOpen)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isTemplatePickerOpen ? 'bg-weflora-mint/20 text-weflora-dark' : 'text-slate-500 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Prompts"><ChatBubbleIcon className="h-3.5 w-3.5" /> Prompts</button>
                 </div>
@@ -425,7 +426,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 <div ref={contextPickerRef} className="fixed bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden flex flex-col animate-fadeIn z-[10000]" style={{ ...popoverStyle }}>
                     <div className="p-3 border-b border-slate-100 bg-white">
                         <div className="flex gap-2 mb-2 pb-2 border-b border-slate-50">
-                            <button onClick={() => setContextTab('files')} className={`px-2 py-1 rounded text-xs font-bold ${contextTab === 'files' ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>Files</button>
+                            <button onClick={() => setContextTab('files')} className={`px-2 py-1 rounded text-xs font-bold ${contextTab === 'files' ? 'bg-weflora-teal/10 text-weflora-dark' : 'text-slate-500 hover:bg-slate-50'}`}>Files</button>
                             <button onClick={() => setContextTab('reports')} className={`px-2 py-1 rounded text-xs font-bold ${contextTab === 'reports' ? 'bg-orange-50 text-orange-600' : 'text-slate-500 hover:bg-slate-50'}`}>Reports</button>
                             <button onClick={() => setContextTab('worksheets')} className={`px-2 py-1 rounded text-xs font-bold ${contextTab === 'worksheets' ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-500 hover:bg-slate-50'}`}>Worksheets</button>
                         </div>
@@ -437,10 +438,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
                             <>
                                 <div onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer text-slate-700 transition-colors"><div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500"><UploadIcon className="h-4 w-4" /></div><div className="flex-1"><div className="text-xs font-bold">Upload Local File</div><div className="text-[10px] text-slate-400">PDF, Excel, CSV, Word</div></div></div>
                                 {filteredFiles.map(file => (
-                                    <div key={file.id} onClick={() => addContextItem(file, 'project')} className="flex items-center gap-3 p-2 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors group">
-                                        <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center"><FolderIcon className="h-4 w-4" /></div>
+                                    <div key={file.id} onClick={() => addContextItem(file, 'project')} className="flex items-center gap-3 p-2 hover:bg-weflora-teal/10 rounded-lg cursor-pointer transition-colors group">
+                                        <div className="w-8 h-8 rounded-lg bg-weflora-mint/20 text-weflora-teal flex items-center justify-center"><FolderIcon className="h-4 w-4" /></div>
                                         <div className="flex-1 min-w-0"><div className="text-xs font-bold text-slate-700 truncate">{file.name}</div><div className="text-[10px] text-slate-400">{file.date}</div></div>
-                                        {selectedContextItems.some(i => i.itemId === file.id) && <CheckIcon className="h-3 w-3 text-blue-600" />}
+                                        {selectedContextItems.some(i => i.itemId === file.id) && <CheckIcon className="h-3 w-3 text-weflora-teal" />}
                                     </div>
                                 ))}
                             </>

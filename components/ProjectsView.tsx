@@ -228,7 +228,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                                             </button>
                                             <button
                                                 onClick={(e) => handleDeleteProject(e, project.id)}
-                                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 last:rounded-b-lg flex items-center gap-2"
+                                                className="w-full text-left px-4 py-2 text-sm text-weflora-red hover:bg-weflora-red/10 last:rounded-b-lg flex items-center gap-2"
                                             >
                                                 <TrashIcon className="h-3.5 w-3.5" /> Delete
                                             </button>

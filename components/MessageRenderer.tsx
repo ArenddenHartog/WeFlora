@@ -7,23 +7,23 @@ const ReasoningBlock = ({ text }: { text: string }) => {
     const [isOpen, setIsOpen] = useState(true);
     if (!text) return null;
     return (
-        <div className="border border-purple-200 bg-purple-50 rounded-lg mb-3 overflow-hidden">
+        <div className="border border-weflora-teal/20 bg-weflora-teal/10 rounded-lg mb-3 overflow-hidden">
             {/* Header: Click bubbles to parent (Edit) except for the toggle button */}
-            <div className="w-full flex items-center justify-between p-2 text-xs font-bold text-purple-700 hover:bg-purple-100 transition-colors select-none">
+            <div className="w-full flex items-center justify-between p-2 text-xs font-bold text-weflora-dark hover:bg-weflora-teal/20 transition-colors select-none">
                 <div className="flex items-center gap-2 cursor-pointer flex-1">
                     <SparklesIcon className="h-3 w-3" />
                     AI Reasoning & Context
                 </div>
                 <button 
                     onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
-                    className="p-1 hover:bg-purple-200 rounded text-purple-600 focus:outline-none"
+                    className="p-1 hover:bg-weflora-teal/20 rounded text-weflora-dark focus:outline-none"
                     title={isOpen ? "Collapse" : "Expand"}
                 >
                     {isOpen ? <ChevronUpIcon className="h-3 w-3" /> : <ChevronDownIcon className="h-3 w-3" />}
                 </button>
             </div>
             {isOpen && (
-                <div className="p-3 text-xs text-purple-900 border-t border-purple-100 whitespace-pre-wrap leading-relaxed cursor-text">
+                <div className="p-3 text-xs text-weflora-dark border-t border-weflora-teal/20 whitespace-pre-wrap leading-relaxed cursor-text">
                     {text}
                 </div>
             )}

@@ -39,8 +39,8 @@ const ProjectOverview: React.FC<ProjectOverviewProps> = ({ project, matrices, re
     const getIcon = (type?: string) => {
         switch (type) {
             case 'chart': return <ChartPieIcon className="h-5 w-5 text-blue-500" />;
-            case 'alert': return <AlertTriangleIcon className="h-5 w-5 text-amber-500" />;
-            case 'check': return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
+            case 'alert': return <AlertTriangleIcon className="h-5 w-5 text-weflora-amber" />;
+            case 'check': return <CheckCircleIcon className="h-5 w-5 text-weflora-success" />;
             default: return <DatabaseIcon className="h-5 w-5 text-slate-500" />;
         }
     };
@@ -130,7 +130,7 @@ const ProjectOverview: React.FC<ProjectOverviewProps> = ({ project, matrices, re
                             <div className="divide-y divide-slate-100">
                                 {insights.actions.map((action, i) => (
                                     <div key={i} className="p-4 flex gap-4 hover:bg-slate-50 transition-colors">
-                                        <div className={`mt-0.5 ${action.type === 'missing_data' ? 'text-red-500' : 'text-blue-500'}`}>
+                                        <div className={`mt-0.5 ${action.type === 'missing_data' ? 'text-weflora-red' : 'text-blue-500'}`}>
                                             {action.type === 'missing_data' ? <AlertTriangleIcon className="h-5 w-5" /> : <ArrowUpIcon className="h-5 w-5" />}
                                         </div>
                                         <div>

@@ -184,7 +184,7 @@ const Header: React.FC = () => {
                                                 className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left border-l-2 ${index === 0 ? 'bg-slate-50 border-weflora-teal' : 'border-transparent'}`}
                                             >
                                                 <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                                                    result.type === 'action' ? 'bg-purple-100 text-purple-600' :
+                                                    result.type === 'action' ? 'bg-weflora-teal/20 text-weflora-dark' :
                                                     result.type === 'project' ? 'bg-weflora-mint/20 text-weflora-teal' :
                                                     result.type === 'file' ? 'bg-weflora-mint/20 text-weflora-teal' : 'bg-slate-100 text-slate-500'
                                                 }`}>
@@ -216,8 +216,8 @@ const Header: React.FC = () => {
             </div>
 
             <div className="flex items-center justify-end gap-2 w-auto ml-4 flex-shrink-0">
-                <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 rounded-full border border-green-200 text-[10px] font-bold uppercase tracking-wider mr-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 bg-weflora-success/10 text-weflora-success rounded-full border border-weflora-success/20 text-[10px] font-bold uppercase tracking-wider mr-2">
+                    <div className="w-2 h-2 rounded-full bg-weflora-success animate-pulse"></div>
                     Cloud Agent
                 </div>
                 <button 

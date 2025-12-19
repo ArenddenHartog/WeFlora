@@ -190,11 +190,11 @@ const PromptTemplatesView: React.FC<PromptTemplatesViewProps> = ({ items, onOpen
                             </div>
 
                             {viewingTemplate.systemInstruction && (
-                                <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
-                                    <div className="flex items-center gap-2 mb-2 text-xs font-bold text-purple-600 uppercase tracking-wider">
+                                <div className="p-4 bg-weflora-teal/10 rounded-xl border border-weflora-teal/20">
+                                    <div className="flex items-center gap-2 mb-2 text-xs font-bold text-weflora-dark uppercase tracking-wider">
                                         <EyeOffIcon className="h-4 w-4" /> System Instruction (Hidden)
                                     </div>
-                                    <pre className="text-sm text-purple-800 whitespace-pre-wrap font-mono bg-white/50 p-3 rounded-lg border border-purple-100">
+                                    <pre className="text-sm text-weflora-dark whitespace-pre-wrap font-mono bg-white/50 p-3 rounded-lg border border-weflora-teal/20">
                                         {viewingTemplate.systemInstruction}
                                     </pre>
                                 </div>
@@ -290,18 +290,18 @@ const PromptTemplatesView: React.FC<PromptTemplatesViewProps> = ({ items, onOpen
                             />
                         </div>
 
-                        <div className="bg-purple-50 p-4 rounded-xl border border-purple-200">
+                        <div className="bg-weflora-teal/10 p-4 rounded-xl border border-weflora-teal/20">
                             <div className="flex items-center gap-2 mb-2">
-                                <EyeOffIcon className="h-4 w-4 text-purple-600" />
-                                <label className="block text-xs font-bold text-purple-700 uppercase">System Instruction (Invisible)</label>
+                                <EyeOffIcon className="h-4 w-4 text-weflora-dark" />
+                                <label className="block text-xs font-bold text-weflora-dark uppercase">System Instruction (Invisible)</label>
                             </div>
-                            <p className="text-[10px] text-purple-600/70 mb-2">Technical rules passed silently to FloraGPT. Define output formats here.</p>
+                            <p className="text-[10px] text-weflora-dark/70 mb-2">Technical rules passed silently to FloraGPT. Define output formats here.</p>
                             <textarea
                                 value={newSystemInstruction}
                                 onChange={(e) => setNewSystemInstruction(e.target.value)}
                                 rows={6}
                                 placeholder="Output format: Return JSON with keys..."
-                                className="w-full px-3 py-2 bg-white border border-purple-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none font-mono text-slate-900"
+                                className="w-full px-3 py-2 bg-white border border-weflora-teal/20 rounded-lg text-sm outline-none focus:ring-2 focus:ring-weflora-teal/30 focus:border-weflora-teal resize-none font-mono text-slate-900"
                             />
                         </div>
                     </div>

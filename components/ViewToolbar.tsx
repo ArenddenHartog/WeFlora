@@ -61,11 +61,11 @@ const ViewToolbar: React.FC<ViewToolbarProps> = ({ rightPanel, setRightPanel, co
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
                     rightPanel === 'chat'
                     ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark' 
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200'
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-weflora-teal/10 hover:text-weflora-dark hover:border-weflora-teal/20'
                 }`}
                 title="Toggle AI Chat"
             >
-                <WeFloraAskIcon className={`h-4 w-4 ${rightPanel === 'chat' ? 'text-weflora-dark' : 'text-purple-600'}`} />
+                <WeFloraAskIcon className={`h-4 w-4 ${rightPanel === 'chat' ? 'text-weflora-dark' : 'text-weflora-dark'}`} />
                 <span className="hidden sm:inline">Ask FloraGPT</span>
             </button>
         </div>

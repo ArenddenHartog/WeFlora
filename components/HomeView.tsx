@@ -167,7 +167,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                     {/* Only show "Start Research" if NOT generating and NO messages */}
                     {messages.length === 0 && !isGenerating && (
                         <div className="text-center py-20 text-slate-400">
-                            <SparklesIcon className="h-12 w-12 mx-auto mb-4 text-purple-200" />
+                            <SparklesIcon className="h-12 w-12 mx-auto mb-4 text-weflora-teal/20" />
                             <p>Start your research...</p>
                         </div>
                     )}

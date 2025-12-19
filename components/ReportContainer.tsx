@@ -203,7 +203,7 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
                                 className="px-2 py-1 border border-weflora-teal rounded text-lg font-bold text-slate-900 outline-none focus:ring-2 focus:ring-weflora-mint/50 bg-white"
                                 autoFocus
                             />
-                            <button onClick={handleTitleSave} className="p-1 text-green-600 hover:bg-green-50 rounded"><CheckIcon className="h-4 w-4" /></button>
+                            <button onClick={handleTitleSave} className="p-1 text-weflora-success hover:bg-weflora-success/10 rounded"><CheckIcon className="h-4 w-4" /></button>
                         </div>
                     ) : (
                         <div className="group flex items-center gap-2 cursor-pointer" onClick={() => setIsEditingTitle(true)}>
@@ -234,13 +234,13 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
                             {isDownloadMenuOpen && (
                                 <div className="absolute top-full right-0 mt-2 w-40 bg-white rounded-lg shadow-xl border border-slate-200 z-[100] animate-fadeIn overflow-hidden">
                                     <button onClick={() => handleDownload('md')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                                        <FileCodeIcon className="h-4 w-4 text-blue-600" /> Markdown
+                                        <FileCodeIcon className="h-4 w-4 text-weflora-teal" /> Markdown
                                     </button>
                                     <button onClick={() => handleDownload('docx')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                                        <BookIcon className="h-4 w-4 text-blue-600" /> Word
+                                        <BookIcon className="h-4 w-4 text-weflora-teal" /> Word
                                     </button>
                                     <button onClick={() => handleDownload('pdf')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                                        <FilePdfIcon className="h-4 w-4 text-red-600" /> PDF (Print)
+                                        <FilePdfIcon className="h-4 w-4 text-weflora-red" /> PDF (Print)
                                     </button>
                                 </div>
                             )}
@@ -312,7 +312,7 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
                         {!editingTabId && (
                             <button 
                                 onClick={(e) => handleDeleteTab(e, tab.id)}
-                                className={`p-0.5 rounded hover:bg-red-100 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ${activeTabId === tab.id ? 'text-slate-300' : 'text-slate-400'}`}
+                                className={`p-0.5 rounded hover:bg-weflora-red/20 hover:text-weflora-red opacity-0 group-hover:opacity-100 transition-opacity ${activeTabId === tab.id ? 'text-slate-300' : 'text-slate-400'}`}
                             >
                                 <XIcon className="h-3 w-3" />
                             </button>

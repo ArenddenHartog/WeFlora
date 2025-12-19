@@ -155,7 +155,7 @@ const WritingAssistantPanel: React.FC<WritingAssistantPanelProps> = ({ content, 
                                     </button>
                                     <button 
                                         onClick={() => setMode('menu')}
-                                        className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+                                        className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-weflora-red/10 hover:text-weflora-red hover:border-weflora-red/20 transition-colors"
                                     >
                                         Discard
                                     </button>

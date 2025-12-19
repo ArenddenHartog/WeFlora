@@ -125,9 +125,9 @@ const Sidebar: React.FC<SidebarProps> = ({
               activeIcon: 'text-weflora-teal'
           },
           purple: {
-              activeBg: 'bg-purple-50',
-              activeText: 'text-purple-700',
-              activeIcon: 'text-purple-600'
+              activeBg: 'bg-weflora-teal/10',
+              activeText: 'text-weflora-dark',
+              activeIcon: 'text-weflora-dark'
           }
       };
 
@@ -278,7 +278,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       <div className="p-2">
                           <button 
                             onClick={signOut}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors"
                           >
                               <LogOutIcon className="h-4 w-4" />
                               Log out

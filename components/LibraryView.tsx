@@ -24,14 +24,14 @@ const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTempl
     const tabs: ('All' | TemplateType)[] = ['All', 'Prompt', 'Project', 'Workflow'];
 
     const getIcon = (type: TemplateType) => {
-        if (type === 'Prompt') return <ChatBubbleIcon className="h-5 w-5 text-purple-600" />;
-        if (type === 'Project') return <FolderIcon className="h-5 w-5 text-blue-600" />;
+        if (type === 'Prompt') return <ChatBubbleIcon className="h-5 w-5 text-weflora-dark" />;
+        if (type === 'Project') return <FolderIcon className="h-5 w-5 text-weflora-teal" />;
         return <LayoutGridIcon className="h-5 w-5 text-orange-600" />;
     };
 
     const getColor = (type: TemplateType) => {
-        if (type === 'Prompt') return 'bg-purple-50 border-purple-100 text-purple-700';
-        if (type === 'Project') return 'bg-blue-50 border-blue-100 text-blue-700';
+        if (type === 'Prompt') return 'bg-weflora-teal/10 border-weflora-teal/20 text-weflora-dark';
+        if (type === 'Project') return 'bg-weflora-mint/20 border-weflora-teal/20 text-weflora-dark';
         return 'bg-orange-50 border-orange-100 text-orange-700';
     };
 
@@ -43,7 +43,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTempl
                         <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
                             <MenuIcon className="h-6 w-6" />
                         </button>
-                        <div className="h-10 w-10 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
+                        <div className="h-10 w-10 bg-weflora-teal/20 rounded-xl flex items-center justify-center text-weflora-dark">
                             <MagicWandIcon className="h-6 w-6" />
                         </div>
                         <div>

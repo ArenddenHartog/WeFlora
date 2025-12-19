@@ -156,7 +156,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                     <div key={index} className="group p-4 bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-weflora-teal transition-all relative flex flex-col">
                         <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center gap-3 overflow-hidden">
-                                <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${item.source === 'knowledge' ? 'bg-purple-50 text-purple-600' : 'bg-slate-100 text-slate-500'}`}>
+                                <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${item.source === 'knowledge' ? 'bg-weflora-teal/10 text-weflora-dark' : 'bg-slate-100 text-slate-500'}`}>
                                     <item.icon className="h-5 w-5" />
                                 </div>
                                 <div className="min-w-0">
@@ -184,14 +184,14 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                             <div className="flex items-center gap-1">
                                 <button 
                                     onClick={() => onAskAI(item.original || item)}
-                                    className="p-1.5 text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
+                                    className="p-1.5 text-weflora-dark bg-weflora-teal/10 rounded-lg hover:bg-weflora-teal/20 transition-colors"
                                     title="Ask AI about this file"
                                 >
                                     <SparklesIcon className="h-3.5 w-3.5" />
                                 </button>
                                 <button 
                                     onClick={(e) => handleDelete(e, item)}
-                                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                    className="p-1.5 text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                 >
                                     <TrashIcon className="h-3.5 w-3.5" />
                                 </button>

@@ -185,7 +185,7 @@ const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOpen, onC
                 <div className="mt-6 pt-6 border-t border-slate-200">
                     <button 
                         onClick={signOut}
-                        className="w-full px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium text-sm transition-colors border border-red-200"
+                        className="w-full px-4 py-2 bg-weflora-red/10 text-weflora-red rounded-lg hover:bg-weflora-red/20 font-medium text-sm transition-colors border border-weflora-red/20"
                     >
                         Sign Out
                     </button>

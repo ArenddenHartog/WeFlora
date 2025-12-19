@@ -221,7 +221,7 @@ const ReportsHubView: React.FC<ReportsHubViewProps> = ({
                             {onDeleteReport && (
                                 <button 
                                     onClick={(e) => handleDelete(e, report.id)}
-                                    className="absolute top-4 right-4 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                    className="absolute top-4 right-4 p-1.5 text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                     title="Delete Report"
                                 >
                                     <TrashIcon className="h-4 w-4" />

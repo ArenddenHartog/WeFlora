@@ -92,7 +92,7 @@ const ChatItem: React.FC<ChatItemProps> = ({ chat, isSelected, onClick, onUpdate
              {editedTags.map(tag => (
                  <span key={tag} className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-200 text-xs rounded-md text-slate-700">
                      #{tag}
-                     <button onClick={() => handleRemoveTag(tag)} className="text-slate-400 hover:text-red-500"><XIcon className="h-3 w-3" /></button>
+                     <button onClick={() => handleRemoveTag(tag)} className="text-slate-400 hover:text-weflora-red"><XIcon className="h-3 w-3" /></button>
                  </span>
              ))}
              {editedTags.length < 3 && (
@@ -108,10 +108,10 @@ const ChatItem: React.FC<ChatItemProps> = ({ chat, isSelected, onClick, onUpdate
         </div>
 
         <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
-          <button onClick={handleSave} className="p-1.5 text-green-600 rounded-md hover:bg-green-100 bg-white border border-slate-200 shadow-sm" title="Save">
+          <button onClick={handleSave} className="p-1.5 text-weflora-success rounded-md hover:bg-weflora-success/20 bg-white border border-slate-200 shadow-sm" title="Save">
             <CheckIcon className="h-4 w-4" />
           </button>
-          <button onClick={handleCancel} className="p-1.5 text-red-600 rounded-md hover:bg-red-100 bg-white border border-slate-200 shadow-sm" title="Cancel">
+          <button onClick={handleCancel} className="p-1.5 text-weflora-red rounded-md hover:bg-weflora-red/20 bg-white border border-slate-200 shadow-sm" title="Cancel">
             <XIcon className="h-4 w-4" />
           </button>
         </div>

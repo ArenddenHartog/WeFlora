@@ -21,10 +21,10 @@ const GlobalToast = () => {
     return (
         <div className={`fixed bottom-6 right-6 z-[100] flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border animate-slideUp ${
             notification.type === 'error' 
-                ? 'bg-red-50 border-red-100 text-red-800' 
+                ? 'bg-weflora-red/10 border-weflora-red/20 text-weflora-red' 
                 : 'bg-slate-800 text-white border-slate-700'
         }`}>
-            {notification.type === 'error' ? <AlertTriangleIcon className="h-5 w-5" /> : <CheckCircleIcon className="h-5 w-5 text-green-400" />}
+            {notification.type === 'error' ? <AlertTriangleIcon className="h-5 w-5" /> : <CheckCircleIcon className="h-5 w-5 text-weflora-success" />}
             <span className="text-sm font-medium">{notification.message}</span>
             <button onClick={closeNotification} className="ml-2 opacity-70 hover:opacity-100">
                 <XIcon className="h-4 w-4" />

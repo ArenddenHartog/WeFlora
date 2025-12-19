@@ -25,9 +25,10 @@ const FORMAT_OPTIONS = [
 ];
 
 const COLORS = [
-    { value: 'green', bg: 'bg-green-500' },
-    { value: 'amber', bg: 'bg-amber-400' },
-    { value: 'red', bg: 'bg-red-500' },
+    { value: 'green', bg: 'bg-weflora-success' },
+    { value: 'amber', bg: 'bg-weflora-amber' },
+    { value: 'red', bg: 'bg-weflora-red' },
+    // NOTE: No WeFlora “info blue” token yet; keep Tailwind blue for user-selectable (non-status) color swatch.
     { value: 'blue', bg: 'bg-blue-500' },
     { value: 'slate', bg: 'bg-slate-400' },
 ];
@@ -119,8 +120,8 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
     };
 
     const getFileIcon = (name: string) => {
-        if (name.endsWith('.pdf')) return <FilePdfIcon className="h-4 w-4 text-red-500" />;
-        if (name.endsWith('.xlsx') || name.endsWith('.csv')) return <FileSheetIcon className="h-4 w-4 text-green-500" />;
+        if (name.endsWith('.pdf')) return <FilePdfIcon className="h-4 w-4 text-weflora-red" />;
+        if (name.endsWith('.xlsx') || name.endsWith('.csv')) return <FileSheetIcon className="h-4 w-4 text-weflora-success" />;
         return <FileCodeIcon className="h-4 w-4 text-slate-500" />;
     };
 
@@ -139,7 +140,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
             size="md" 
             footer={
                 <>
-                    <button onClick={() => onDelete(column.id)} className="flex-1 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors">Delete</button>
+                    <button onClick={() => onDelete(column.id)} className="flex-1 py-2 text-weflora-red hover:bg-weflora-red/10 rounded-lg text-sm font-medium transition-colors">Delete</button>
                     <button onClick={handleSave} className="flex-1 py-2 bg-weflora-teal text-white hover:bg-weflora-dark rounded-lg text-sm font-medium shadow-sm transition-colors">Save</button>
                 </>
             }
@@ -311,7 +312,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                                     <span className="bg-white px-1.5 py-0.5 rounded border border-weflora-teal/30 text-slate-800 font-mono max-w-[80px] truncate" title={rule.value}>"{rule.value}"</span>
                                                     <span className="text-slate-600">then</span>
                                                     <div className={`w-4 h-4 rounded-full ${COLORS.find(c => c.value === rule.style)?.bg}`}></div>
-                                                    <button onClick={() => handleRemoveRule(rule.id)} className="ml-auto text-slate-400 hover:text-red-500"><TrashIcon className="h-3.5 w-3.5" /></button>
+                                                    <button onClick={() => handleRemoveRule(rule.id)} className="ml-auto text-slate-400 hover:text-weflora-red"><TrashIcon className="h-3.5 w-3.5" /></button>
                                                 </div>
                                             ))}
                                             {(!skillConfig.conditionalFormatting || skillConfig.conditionalFormatting.length === 0) && (

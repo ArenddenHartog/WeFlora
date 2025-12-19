@@ -155,7 +155,7 @@ const ReportWizard: React.FC<ReportWizardProps> = ({ onClose, onCreate, template
                 </>
             ) : (
                 <>
-                    <CheckCircleIcon className="h-12 w-12 text-green-500 mb-4" />
+                    <CheckCircleIcon className="h-12 w-12 text-weflora-success mb-4" />
                     <h3 className="text-lg font-bold text-slate-800">Ready to Draft</h3>
                     <p className="text-sm text-slate-500 mt-2">Content extracted from {importFile?.name}</p>
                 </>

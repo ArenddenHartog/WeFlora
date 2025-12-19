@@ -350,7 +350,7 @@ const ProjectWorkspace: React.FC = () => {
                                         <div className="text-xs text-slate-400">{file.size} • {file.date}</div>
                                         <button 
                                             onClick={(e) => handleDeleteFile(e, file.id)}
-                                            className="absolute top-2 right-2 p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                            className="absolute top-2 right-2 p-1 text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded transition-colors opacity-0 group-hover:opacity-100"
                                             title="Delete File"
                                         >
                                             <TrashIcon className="h-3.5 w-3.5" />
