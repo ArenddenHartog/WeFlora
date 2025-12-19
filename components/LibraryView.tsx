@@ -66,7 +66,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTempl
                                 onClick={() => setActiveTab(tab)}
                                 className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
                                     activeTab === tab 
-                                    ? 'border-weflora-teal text-weflora-teal-dark' 
+                                    ? 'border-weflora-teal text-weflora-dark' 
                                     : 'border-transparent text-slate-500 hover:text-slate-800'
                                 }`}
                             >
@@ -100,7 +100,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTempl
                                 </span>
                             </div>
                             
-                            <h3 className="text-lg font-bold text-slate-800 mb-1 group-hover:text-weflora-teal-dark transition-colors">{item.title}</h3>
+                            <h3 className="text-lg font-bold text-slate-800 mb-1 group-hover:text-weflora-dark transition-colors">{item.title}</h3>
                             <p className="text-sm text-slate-500 line-clamp-2 mb-4">{item.description}</p>
                             
                             <div className="flex flex-wrap gap-2">

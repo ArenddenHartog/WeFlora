@@ -88,7 +88,7 @@ const WritingAssistantPanel: React.FC<WritingAssistantPanelProps> = ({ content, 
                                         className="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 rounded-xl hover:border-weflora-teal hover:bg-weflora-mint/10 transition-all group shadow-sm hover:shadow-md"
                                     >
                                         <action.icon className="h-5 w-5 mb-2 text-slate-400 group-hover:text-weflora-teal transition-colors" />
-                                        <span className="text-xs font-medium text-slate-700 group-hover:text-weflora-teal-dark">{action.label}</span>
+                                        <span className="text-xs font-medium text-slate-700 group-hover:text-weflora-dark">{action.label}</span>
                                     </button>
                                 ))}
                             </div>
@@ -107,7 +107,7 @@ const WritingAssistantPanel: React.FC<WritingAssistantPanelProps> = ({ content, 
                                 />
                                 <button 
                                     type="submit" 
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-weflora-mint/20 text-weflora-teal-dark rounded-lg hover:bg-weflora-mint/40 transition-colors"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-weflora-mint/20 text-weflora-dark rounded-lg hover:bg-weflora-mint/40 transition-colors"
                                     disabled={!customPrompt.trim()}
                                 >
                                     <SendIcon className="h-3.5 w-3.5" />
@@ -141,7 +141,7 @@ const WritingAssistantPanel: React.FC<WritingAssistantPanelProps> = ({ content, 
                             <div className="mt-4 space-y-3">
                                 <button 
                                     onClick={handleApply}
-                                    className="w-full py-2.5 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-teal-dark shadow-md transition-all flex items-center justify-center gap-2"
+                                    className="w-full py-2.5 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-dark shadow-md transition-all flex items-center justify-center gap-2"
                                 >
                                     <CheckCircleIcon className="h-4 w-4" />
                                     Replace Original

@@ -33,7 +33,7 @@ const ProjectNavTab: React.FC<{ label: string, active: boolean, onClick: () => v
         onClick={onClick}
         className={`px-3 py-1.5 rounded-md text-sm font-bold transition-all capitalize ${
             active 
-            ? 'bg-weflora-mint/20 text-weflora-teal-dark' 
+            ? 'bg-weflora-mint/20 text-weflora-dark' 
             : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
         }`}
     >
@@ -58,7 +58,7 @@ const EmptyState = ({
         <p className="text-sm text-slate-500 max-w-xs text-center mb-6">{description}</p>
         <button 
             onClick={onAction}
-            className="px-6 py-2.5 bg-weflora-teal text-white rounded-xl hover:bg-weflora-teal-dark font-bold transition-colors shadow-sm text-sm"
+            className="px-6 py-2.5 bg-weflora-teal text-white rounded-xl hover:bg-weflora-dark font-bold transition-colors shadow-sm text-sm"
         >
             {actionLabel}
         </button>
@@ -323,7 +323,7 @@ const ProjectWorkspace: React.FC = () => {
                             <h2 className="text-lg font-bold text-slate-800">Project Files</h2>
                             <button 
                                 onClick={() => fileInputRef.current?.click()}
-                                className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium transition-colors shadow-sm"
+                                className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium transition-colors shadow-sm"
                             >
                                 <UploadIcon className="h-4 w-4" />
                                 <span>Upload Files</span>
@@ -468,11 +468,11 @@ const ProjectWorkspace: React.FC = () => {
                             onClick={() => handleTabChange('files')}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
                                 activeTab === 'files'
-                                ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark'
+                                ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark'
                                 : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                             }`}
                         >
-                            <DatabaseIcon className={`h-4 w-4 ${activeTab === 'files' ? 'text-weflora-teal-dark' : 'text-weflora-teal'}`} />
+                            <DatabaseIcon className={`h-4 w-4 ${activeTab === 'files' ? 'text-weflora-dark' : 'text-weflora-teal'}`} />
                             <span>Project Files</span>
                         </button>
 
@@ -481,7 +481,7 @@ const ProjectWorkspace: React.FC = () => {
                                 onClick={toggleManage}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
                                     rightPanel === 'manage'
-                                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark' 
+                                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark' 
                                     : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                                 }`}
                             >
@@ -495,7 +495,7 @@ const ProjectWorkspace: React.FC = () => {
                                 onClick={toggleManage}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
                                     rightPanel === 'manage'
-                                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark' 
+                                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark' 
                                     : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                                 }`}
                             >
@@ -508,7 +508,7 @@ const ProjectWorkspace: React.FC = () => {
                             onClick={toggleChat}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
                                 rightPanel === 'chat'
-                                ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark'
+                                ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark'
                                 : 'bg-white border-slate-200 text-slate-600 hover:bg-weflora-mint/10 hover:text-weflora-teal hover:border-weflora-teal'
                             }`}
                         >

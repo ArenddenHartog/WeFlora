@@ -154,7 +154,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                                                 {onContinueInWorksheet && (
                                                     <button 
                                                         onClick={() => onContinueInWorksheet(msg)} 
-                                                        className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors hover:bg-weflora-mint/20 hover:text-weflora-teal-dark text-slate-400`}
+                                                        className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors hover:bg-weflora-mint/20 hover:text-weflora-dark text-slate-400`}
                                                         title="Extract Data to Worksheet"
                                                     >
                                                         <TableIcon className="h-3.5 w-3.5" />

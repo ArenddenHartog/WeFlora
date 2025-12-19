@@ -347,7 +347,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                     </div>
                     <div className="flex items-center gap-2">
                         {batchProgress && (
-                            <div className="flex items-center gap-2 px-3 py-1 bg-weflora-mint/10 text-weflora-teal-dark rounded-lg text-xs font-bold mr-2 border border-weflora-teal/20 animate-fadeIn"><RefreshIcon className="h-3 w-3 animate-spin text-weflora-teal" /> Processing {batchProgress.current}/{batchProgress.total}<button onClick={() => stopBatchRef.current = true} className="ml-2 p-1 bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-colors"><div className="w-2 h-2 bg-red-600 rounded-sm"></div></button></div>
+                            <div className="flex items-center gap-2 px-3 py-1 bg-weflora-mint/10 text-weflora-dark rounded-lg text-xs font-bold mr-2 border border-weflora-teal/20 animate-fadeIn"><RefreshIcon className="h-3 w-3 animate-spin text-weflora-teal" /> Processing {batchProgress.current}/{batchProgress.total}<button onClick={() => stopBatchRef.current = true} className="ml-2 p-1 bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-colors"><div className="w-2 h-2 bg-red-600 rounded-sm"></div></button></div>
                         )}
                         <button onClick={() => importInputRef.current?.click()} className="p-2"><UploadIcon className="h-4 w-4"/></button>
                         <input type="file" ref={importInputRef} className="hidden" />
@@ -400,7 +400,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                                                 ) : (
                                                     <div className="w-full h-full flex items-center">
                                                         {col.type === 'ai' && !cell?.value && !isProcessing ? (
-                                                            <button onClick={() => handleRunAICell(row.id, col.id)} className="mx-2 px-2 py-0.5 bg-weflora-mint/20 text-weflora-teal-dark rounded text-[10px] font-bold flex items-center gap-1"><SparklesIcon className="h-3 w-3"/> Run AI</button>
+                                                            <button onClick={() => handleRunAICell(row.id, col.id)} className="mx-2 px-2 py-0.5 bg-weflora-mint/20 text-weflora-dark rounded text-[10px] font-bold flex items-center gap-1"><SparklesIcon className="h-3 w-3"/> Run AI</button>
                                                         ) : (
                                                             <RichCellRenderer 
                                                                 value={cell?.value ?? ''} 
@@ -439,7 +439,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                     </button>
                     <button 
                         onClick={() => handleInitiateAddColumn('ai')} 
-                        className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm hover:bg-weflora-mint/10 text-slate-700 hover:text-weflora-teal-dark transition-colors border-t border-slate-100"
+                        className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm hover:bg-weflora-mint/10 text-slate-700 hover:text-weflora-dark transition-colors border-t border-slate-100"
                     >
                         <SparklesIcon className="h-4 w-4 text-weflora-teal" />
                         Select Skill

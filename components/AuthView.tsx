@@ -103,7 +103,7 @@ const AuthView: React.FC = () => {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-3 bg-weflora-teal text-white rounded-xl font-bold hover:bg-weflora-teal-dark transition-all shadow-lg shadow-weflora-teal/20 flex items-center justify-center gap-2"
+                        className="w-full py-3 bg-weflora-teal text-white rounded-xl font-bold hover:bg-weflora-dark transition-all shadow-lg shadow-weflora-teal/20 flex items-center justify-center gap-2"
                     >
                         {loading ? 'Processing...' : (mode === 'signin' ? 'Sign In' : 'Sign Up')}
                         {!loading && <SparklesIcon className="h-4 w-4" />}

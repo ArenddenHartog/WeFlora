@@ -140,7 +140,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
             footer={
                 <>
                     <button onClick={() => onDelete(column.id)} className="flex-1 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors">Delete</button>
-                    <button onClick={handleSave} className="flex-1 py-2 bg-weflora-teal text-white hover:bg-weflora-teal-dark rounded-lg text-sm font-medium shadow-sm transition-colors">Save</button>
+                    <button onClick={handleSave} className="flex-1 py-2 bg-weflora-teal text-white hover:bg-weflora-dark rounded-lg text-sm font-medium shadow-sm transition-colors">Save</button>
                 </>
             }
         >
@@ -181,9 +181,9 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                 {editedCol.type === 'ai' && (
                     <div className="bg-weflora-mint/20 border border-weflora-teal/20 rounded-xl overflow-hidden mt-4">
                         <div className="flex border-b border-weflora-teal/20 bg-weflora-mint/20">
-                            <button onClick={() => setActiveTab('logic')} className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${activeTab === 'logic' ? 'bg-white text-weflora-teal-dark border-b-2 border-weflora-teal' : 'text-slate-500 hover:text-weflora-teal'}`}>Logic</button>
-                            <button onClick={() => setActiveTab('files')} className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${activeTab === 'files' ? 'bg-white text-weflora-teal-dark border-b-2 border-weflora-teal' : 'text-slate-500 hover:text-weflora-teal'}`}>Files <span className="bg-weflora-mint text-weflora-teal-dark text-[10px] px-1.5 rounded-full ml-1">{skillConfig.attachedContextIds.length}</span></button>
-                            <button onClick={() => setActiveTab('display')} className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${activeTab === 'display' ? 'bg-white text-weflora-teal-dark border-b-2 border-weflora-teal' : 'text-slate-500 hover:text-weflora-teal'}`}>Format</button>
+                            <button onClick={() => setActiveTab('logic')} className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${activeTab === 'logic' ? 'bg-white text-weflora-dark border-b-2 border-weflora-teal' : 'text-slate-500 hover:text-weflora-teal'}`}>Logic</button>
+                            <button onClick={() => setActiveTab('files')} className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${activeTab === 'files' ? 'bg-white text-weflora-dark border-b-2 border-weflora-teal' : 'text-slate-500 hover:text-weflora-teal'}`}>Files <span className="bg-weflora-mint text-weflora-dark text-[10px] px-1.5 rounded-full ml-1">{skillConfig.attachedContextIds.length}</span></button>
+                            <button onClick={() => setActiveTab('display')} className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${activeTab === 'display' ? 'bg-white text-weflora-dark border-b-2 border-weflora-teal' : 'text-slate-500 hover:text-weflora-teal'}`}>Format</button>
                         </div>
 
                         <div className="p-4">
@@ -191,12 +191,12 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                             {activeTab === 'logic' && (
                                 <div className="space-y-3">
                                     <div>
-                                        <label className="block text-xs font-bold text-weflora-teal-dark mb-1">Skill Name</label>
+                                        <label className="block text-xs font-bold text-weflora-dark mb-1">Skill Name</label>
                                         <input type="text" value={skillConfig.name} onChange={e => setSkillConfig({...skillConfig, name: e.target.value})} className="w-full bg-white border border-weflora-teal/30 rounded-lg px-3 py-2 text-sm text-slate-900 focus:border-weflora-teal outline-none"/>
                                     </div>
                                     <div>
                                         <div className="flex justify-between items-center mb-1">
-                                            <label className="block text-xs font-bold text-weflora-teal-dark">Instruction (Prompt)</label>
+                                            <label className="block text-xs font-bold text-weflora-dark">Instruction (Prompt)</label>
                                             {skillConfig.outputType !== 'text' && (
                                                 <span className="text-[10px] bg-weflora-teal text-white px-2 py-0.5 rounded-full flex items-center gap-1" title="Output format is controlled by the Format tab">
                                                     <AdjustmentsHorizontalIcon className="h-3 w-3" />
@@ -240,7 +240,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                         </div>
                                         <button 
                                             onClick={() => fileInputRef.current?.click()} 
-                                            className="px-3 py-1.5 bg-weflora-mint/30 text-weflora-teal-dark rounded-lg text-xs font-bold hover:bg-weflora-mint/50 transition-colors flex items-center gap-1"
+                                            className="px-3 py-1.5 bg-weflora-mint/30 text-weflora-dark rounded-lg text-xs font-bold hover:bg-weflora-mint/50 transition-colors flex items-center gap-1"
                                         >
                                             <UploadIcon className="h-3 w-3" /> Upload
                                         </button>
@@ -284,7 +284,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                 <div className="space-y-4">
                                     {/* 1. Output Style */}
                                     <div>
-                                        <label className="block text-xs font-bold text-weflora-teal-dark mb-1">Output Style</label>
+                                        <label className="block text-xs font-bold text-weflora-dark mb-1">Output Style</label>
                                         <select 
                                             value={skillConfig.outputType} 
                                             onChange={(e) => handleFormatChange(e.target.value)}
@@ -301,7 +301,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
 
                                     {/* 2. Visual Rules Engine */}
                                     <div>
-                                        <label className="block text-xs font-bold text-weflora-teal-dark mb-2">Visual Rules (Conditional Formatting)</label>
+                                        <label className="block text-xs font-bold text-weflora-dark mb-2">Visual Rules (Conditional Formatting)</label>
                                         <div className="space-y-2 mb-3">
                                             {skillConfig.conditionalFormatting?.map((rule, idx) => (
                                                 <div key={rule.id} className="flex items-center gap-2 text-xs bg-weflora-mint/20 p-2 rounded border border-weflora-teal/20">
@@ -350,7 +350,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                             <button 
                                                 onClick={handleAddRule}
                                                 disabled={!newRuleValue.trim()}
-                                                className="p-1.5 bg-weflora-teal text-white rounded hover:bg-weflora-teal-dark disabled:opacity-50"
+                                                className="p-1.5 bg-weflora-teal text-white rounded hover:bg-weflora-dark disabled:opacity-50"
                                             >
                                                 <PlusIcon className="h-3.5 w-3.5" />
                                             </button>

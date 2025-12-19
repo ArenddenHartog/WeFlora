@@ -346,7 +346,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             case 'knowledge': return 'bg-purple-50 text-purple-700 border-purple-200';
             case 'project': return 'bg-blue-50 text-blue-700 border-blue-200';
             case 'report': return 'bg-orange-50 text-orange-700 border-orange-200';
-            case 'worksheet': return 'bg-weflora-mint/20 text-weflora-teal-dark border-weflora-teal';
+            case 'worksheet': return 'bg-weflora-mint/20 text-weflora-dark border-weflora-teal';
             case 'upload': return 'bg-slate-50 text-slate-700 border-slate-200';
             case 'web': return 'bg-green-50 text-green-700 border-green-200';
             default: return 'bg-slate-100 text-slate-700 border-slate-200';
@@ -386,7 +386,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             {/* Active Context Pills */}
             {(selectedContextItems.length > 0 || isDeepResearchEnabled || isReasoningEnabled) && (
                 <div className="flex flex-wrap gap-2 px-3 pt-3 pb-1 animate-fadeIn">
-                     {isDeepResearchEnabled && <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-weflora-mint/20 text-weflora-teal-dark border border-weflora-teal"><GlobeIcon className="h-3 w-3" /> Deep Research On</div>}
+                     {isDeepResearchEnabled && <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-weflora-mint/20 text-weflora-dark border border-weflora-teal"><GlobeIcon className="h-3 w-3" /> Deep Research On</div>}
                      {isReasoningEnabled && <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200"><SparklesIcon className="h-3 w-3" /> Thinking Mode</div>}
                      {selectedContextItems.map((item) => (
                         <div key={item.id} className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border ${getContextStyle(item.source)}`}>
@@ -410,14 +410,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
             <div className="flex items-center justify-between p-2 px-3 border-t border-slate-100 bg-slate-50/30 rounded-b-xl relative">
                 <div className="flex items-center gap-1">
-                    <button ref={addRefButtonRef} onClick={() => setIsContextPickerOpen(!isContextPickerOpen)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isContextPickerOpen ? 'bg-weflora-mint/20 text-weflora-teal-dark' : 'text-slate-500 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Add files or context"><PlusIcon className="h-3.5 w-3.5" /> Add Context</button>
+                    <button ref={addRefButtonRef} onClick={() => setIsContextPickerOpen(!isContextPickerOpen)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isContextPickerOpen ? 'bg-weflora-mint/20 text-weflora-dark' : 'text-slate-500 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Add files or context"><PlusIcon className="h-3.5 w-3.5" /> Add Context</button>
                     <div className="w-px h-4 bg-slate-300 mx-1"></div>
-                    <button onClick={() => setIsDeepResearchEnabled(!isDeepResearchEnabled)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isDeepResearchEnabled ? 'bg-weflora-mint/20 text-weflora-teal-dark' : 'text-slate-500 hover:bg-weflora-mint/10 hover:text-weflora-teal'}`} title="Enable Web Search"><GlobeIcon className="h-3.5 w-3.5" /> Research</button>
+                    <button onClick={() => setIsDeepResearchEnabled(!isDeepResearchEnabled)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isDeepResearchEnabled ? 'bg-weflora-mint/20 text-weflora-dark' : 'text-slate-500 hover:bg-weflora-mint/10 hover:text-weflora-teal'}`} title="Enable Web Search"><GlobeIcon className="h-3.5 w-3.5" /> Research</button>
                     <button onClick={() => setIsReasoningEnabled(!isReasoningEnabled)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isReasoningEnabled ? 'bg-purple-100 text-purple-700' : 'text-slate-500 hover:bg-purple-50 hover:text-purple-600'}`} title="Enable Complex Reasoning"><SparklesIcon className="h-3.5 w-3.5" /> Think</button>
                     <div className="w-px h-4 bg-slate-300 mx-1"></div>
-                    <button ref={templateButtonRef} onClick={() => setIsTemplatePickerOpen(!isTemplatePickerOpen)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isTemplatePickerOpen ? 'bg-weflora-mint/20 text-weflora-teal-dark' : 'text-slate-500 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Prompts"><ChatBubbleIcon className="h-3.5 w-3.5" /> Prompts</button>
+                    <button ref={templateButtonRef} onClick={() => setIsTemplatePickerOpen(!isTemplatePickerOpen)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isTemplatePickerOpen ? 'bg-weflora-mint/20 text-weflora-dark' : 'text-slate-500 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Prompts"><ChatBubbleIcon className="h-3.5 w-3.5" /> Prompts</button>
                 </div>
-                <button onClick={handleSend} disabled={isLoading || (!text.trim() && selectedContextItems.length === 0)} className="p-1.5 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"><ArrowUpIcon className="h-4 w-4" /></button>
+                <button onClick={handleSend} disabled={isLoading || (!text.trim() && selectedContextItems.length === 0)} className="p-1.5 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"><ArrowUpIcon className="h-4 w-4" /></button>
             </div>
 
             {/* Context Hub Picker */}

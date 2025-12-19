@@ -281,7 +281,7 @@ const ManageWorksheetPanel: React.FC<{
 
                 {/* 3. FloraGPT Skill Library */}
                 <section>
-                    <h3 className="text-xs font-bold text-weflora-teal-dark uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-weflora-dark uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
                         <SparklesIcon className="h-4 w-4" /> FloraGPT Skills
                     </h3>
                     <div className="space-y-2">
@@ -298,11 +298,11 @@ const ManageWorksheetPanel: React.FC<{
                                         : 'bg-white border-weflora-teal/20 hover:border-weflora-teal hover:shadow-sm cursor-pointer group'
                                     }`}
                                 >
-                                    <div className={`p-2 rounded-lg ${exists ? 'bg-weflora-mint/30 text-weflora-teal' : 'bg-weflora-mint/10 text-weflora-teal group-hover:bg-weflora-mint/30 group-hover:text-weflora-teal-dark'}`}>
+                                    <div className={`p-2 rounded-lg ${exists ? 'bg-weflora-mint/30 text-weflora-teal' : 'bg-weflora-mint/10 text-weflora-teal group-hover:bg-weflora-mint/30 group-hover:text-weflora-dark'}`}>
                                         {getCategoryIcon(tmpl.category)}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className={`text-sm font-bold ${exists ? 'text-weflora-teal-dark' : 'text-slate-800'}`}>{tmpl.name}</div>
+                                        <div className={`text-sm font-bold ${exists ? 'text-weflora-dark' : 'text-slate-800'}`}>{tmpl.name}</div>
                                         <div className="text-[10px] text-slate-500 line-clamp-1">{tmpl.description}</div>
                                     </div>
                                     {exists ? (

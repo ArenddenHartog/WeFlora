@@ -92,7 +92,7 @@ const ResearchHistoryView: React.FC<ResearchHistoryViewProps> = ({ onOpenMenu })
                                     {thread.isPinned ? <PinFilledIcon className="h-4 w-4" /> : <MessageSquareIcon className="h-4 w-4" />}
                                 </div>
                                 <div className="min-w-0">
-                                    <h3 className={`font-bold text-sm truncate pr-4 transition-colors ${thread.isPinned ? 'text-weflora-teal-dark' : 'text-slate-800 group-hover:text-weflora-teal'}`}>
+                                    <h3 className={`font-bold text-sm truncate pr-4 transition-colors ${thread.isPinned ? 'text-weflora-dark' : 'text-slate-800 group-hover:text-weflora-teal'}`}>
                                         {thread.title}
                                     </h3>
                                     <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">

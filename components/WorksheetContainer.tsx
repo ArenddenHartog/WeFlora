@@ -224,7 +224,7 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
                     <div className="flex items-center gap-1 mr-4">
                         <button 
                             onClick={() => setIsAnalyticsOpen(!isAnalyticsOpen)} 
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${isAnalyticsOpen ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark' : 'bg-white border-transparent text-slate-500 hover:bg-slate-50'}`}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${isAnalyticsOpen ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark' : 'bg-white border-transparent text-slate-500 hover:bg-slate-50'}`}
                             title="Visualize Data"
                         >
                             <ChartBarIcon className="h-4 w-4" /> Visualize

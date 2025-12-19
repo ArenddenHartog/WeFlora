@@ -121,7 +121,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       const colorStyles = {
           teal: {
               activeBg: 'bg-weflora-mint/30',
-              activeText: 'text-weflora-teal-dark',
+              activeText: 'text-weflora-dark',
               activeIcon: 'text-weflora-teal'
           },
           purple: {
@@ -309,7 +309,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </button>
                     <button
                         onClick={handleCreateProject}
-                        className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium text-sm shadow-sm transition-colors"
+                        className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium text-sm shadow-sm transition-colors"
                     >
                         Create Project
                     </button>
@@ -368,7 +368,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             footer={
                 <button
                     onClick={() => setIsMembersModalOpen(false)}
-                    className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium text-sm transition-colors shadow-sm"
+                    className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium text-sm transition-colors shadow-sm"
                 >
                     Done
                 </button>
@@ -397,7 +397,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       <button 
                         type="submit" 
                         disabled={!inviteEmail.trim()}
-                        className="px-3 py-1.5 bg-weflora-teal text-white text-sm font-medium rounded hover:bg-weflora-teal-dark disabled:opacity-50 transition-colors"
+                        className="px-3 py-1.5 bg-weflora-teal text-white text-sm font-medium rounded hover:bg-weflora-dark disabled:opacity-50 transition-colors"
                       >
                           Send
                       </button>

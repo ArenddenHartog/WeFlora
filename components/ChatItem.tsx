@@ -148,7 +148,7 @@ const ChatItem: React.FC<ChatItemProps> = ({ chat, isSelected, onClick, onUpdate
           {chat.tags && chat.tags.length > 0 && (
               <div className="flex gap-1 mt-1 flex-wrap">
                   {chat.tags.map(tag => (
-                      <span key={tag} className={`text-[10px] px-1.5 rounded-md ${isSelected ? 'bg-weflora-mint/20 text-weflora-teal-dark' : 'bg-slate-100 text-slate-500'}`}>
+                      <span key={tag} className={`text-[10px] px-1.5 rounded-md ${isSelected ? 'bg-weflora-mint/20 text-weflora-dark' : 'bg-slate-100 text-slate-500'}`}>
                           #{tag}
                       </span>
                   ))}

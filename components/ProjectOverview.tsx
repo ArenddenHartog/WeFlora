@@ -74,7 +74,7 @@ const ProjectOverview: React.FC<ProjectOverviewProps> = ({ project, matrices, re
                         <div className="bg-weflora-mint/10 border border-weflora-teal/20 rounded-xl p-4">
                             <div className="flex items-center gap-2 mb-2">
                                 <SparklesIcon className="h-4 w-4 text-weflora-teal" />
-                                <span className="text-xs font-bold text-weflora-teal-dark uppercase tracking-wider">AI Executive Summary</span>
+                                <span className="text-xs font-bold text-weflora-dark uppercase tracking-wider">AI Executive Summary</span>
                             </div>
                             <p className="text-sm text-slate-700 leading-relaxed">
                                 {isLoading ? "Analyzing project data..." : (insights?.summary || "No insights generated yet. Add worksheets or reports to get started.")}

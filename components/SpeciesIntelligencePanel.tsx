@@ -233,7 +233,7 @@ const SpeciesIntelligencePanel: React.FC<SpeciesIntelligencePanelProps> = ({ spe
                                         onClick={() => setActiveTab(tab)}
                                         className={`flex-1 pb-2 text-sm font-medium transition-colors ${
                                             activeTab === tab 
-                                            ? 'border-b-2 border-weflora-teal text-weflora-teal-dark' 
+                                            ? 'border-b-2 border-weflora-teal text-weflora-dark' 
                                             : 'text-slate-400 hover:text-slate-600'
                                         }`}
                                     >
@@ -315,7 +315,7 @@ const SpeciesIntelligencePanel: React.FC<SpeciesIntelligencePanelProps> = ({ spe
             <div className="p-4 bg-white border-t border-slate-200 shrink-0">
                 <button 
                     onClick={() => onAskAI(`Create a detailed report for ${speciesName} regarding...`)}
-                    className="w-full flex items-center justify-center gap-2 py-3 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-teal-dark transition-all shadow-lg"
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-dark transition-all shadow-lg"
                 >
                     <SparklesIcon className="h-4 w-4 text-purple-200" />
                     Ask FloraGPT about this

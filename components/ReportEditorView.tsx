@@ -267,7 +267,7 @@ const ReportEditorView: React.FC<ReportEditorViewProps> = ({
         }
     };
 
-    if (!activeReport) return <div className="flex flex-col items-center justify-center h-full text-slate-400 bg-slate-50"><FileTextIcon className="h-12 w-12 mb-4 opacity-20" /><p>No report selected.</p>{onCreateReport && <button onClick={onCreateReport} className="mt-4 px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm hover:bg-weflora-teal-dark transition-colors">Create New Report</button>}</div>;
+    if (!activeReport) return <div className="flex flex-col items-center justify-center h-full text-slate-400 bg-slate-50"><FileTextIcon className="h-12 w-12 mb-4 opacity-20" /><p>No report selected.</p>{onCreateReport && <button onClick={onCreateReport} className="mt-4 px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm hover:bg-weflora-dark transition-colors">Create New Report</button>}</div>;
 
     const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
 
@@ -314,11 +314,11 @@ const ReportEditorView: React.FC<ReportEditorViewProps> = ({
                         <button onClick={handleRedo} className="p-1.5 hover:bg-weflora-mint/10 hover:text-weflora-teal rounded text-slate-500 transition-colors disabled:opacity-30 disabled:hover:bg-transparent" title="Redo" disabled={historyIndex >= history.length - 1}><RedoIcon className="h-4 w-4" /></button>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button onClick={() => setIsInsertModalOpen(true)} className="flex items-center gap-1.5 px-2 py-1 bg-weflora-mint/10 hover:bg-weflora-mint/30 text-weflora-teal-dark rounded text-xs font-bold transition-colors border border-transparent hover:border-weflora-teal/30" title="Insert from Worksheet"><TableIcon className="h-3.5 w-3.5" />Insert Worksheet Data</button>
+                        <button onClick={() => setIsInsertModalOpen(true)} className="flex items-center gap-1.5 px-2 py-1 bg-weflora-mint/10 hover:bg-weflora-mint/30 text-weflora-dark rounded text-xs font-bold transition-colors border border-transparent hover:border-weflora-teal/30" title="Insert from Worksheet"><TableIcon className="h-3.5 w-3.5" />Insert Worksheet Data</button>
                         <div className="h-4 w-px bg-slate-300 mx-1"></div>
                         <button onClick={() => setIsPreviewOpen(!isPreviewOpen)} className={`flex items-center justify-center p-2 rounded-lg transition-all border ${isPreviewOpen ? 'bg-weflora-teal text-white border-weflora-teal' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`} title={isPreviewOpen ? "Edit" : "Preview"}><EyeIcon className="h-3.5 w-3.5" /></button>
                         <div className="h-4 w-px bg-slate-300 mx-1"></div>
-                        {onToggleAssistant && <button onClick={onToggleAssistant} className="flex items-center gap-1.5 px-3 py-1.5 bg-weflora-mint/20 text-weflora-teal-dark border border-weflora-teal hover:bg-weflora-mint/30 rounded-lg transition-colors" title="Open Writing Assistant"><SparklesIcon className="h-3.5 w-3.5" /><span className="text-xs font-bold hidden sm:inline">Assistant</span></button>}
+                        {onToggleAssistant && <button onClick={onToggleAssistant} className="flex items-center gap-1.5 px-3 py-1.5 bg-weflora-mint/20 text-weflora-dark border border-weflora-teal hover:bg-weflora-mint/30 rounded-lg transition-colors" title="Open Writing Assistant"><SparklesIcon className="h-3.5 w-3.5" /><span className="text-xs font-bold hidden sm:inline">Assistant</span></button>}
                     </div>
                 </div>
                 

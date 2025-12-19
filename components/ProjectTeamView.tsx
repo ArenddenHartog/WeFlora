@@ -100,7 +100,7 @@ const ProjectTeamView: React.FC<ProjectTeamViewProps> = ({
                     </h2>
                     <button 
                         onClick={() => setIsTaskModalOpen(true)} 
-                        className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-teal-dark transition-colors shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-dark transition-colors shadow-sm"
                     >
                         <PlusIcon className="h-4 w-4" /> Add Task
                     </button>
@@ -118,7 +118,7 @@ const ProjectTeamView: React.FC<ProjectTeamViewProps> = ({
                                 ))}
                             </div>
                          </div>
-                         <button onClick={() => setIsInviteModalOpen(true)} className="flex items-center gap-1 text-xs font-bold text-weflora-teal hover:text-weflora-teal-dark bg-weflora-mint/10 hover:bg-weflora-mint/30 px-2 py-1 rounded-lg transition-colors" title="Invite Member">
+                         <button onClick={() => setIsInviteModalOpen(true)} className="flex items-center gap-1 text-xs font-bold text-weflora-teal hover:text-weflora-dark bg-weflora-mint/10 hover:bg-weflora-mint/30 px-2 py-1 rounded-lg transition-colors" title="Invite Member">
                              <UserPlusIcon className="h-4 w-4" /> Invite
                          </button>
                     </div>
@@ -183,13 +183,13 @@ const ProjectTeamView: React.FC<ProjectTeamViewProps> = ({
                     <div className="p-3 border-t border-slate-100 bg-slate-50">
                         <form onSubmit={handlePostComment} className="flex gap-2">
                             <input type="text" value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Write a comment..." className="flex-1 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:ring-2 focus:ring-weflora-teal focus:border-weflora-teal outline-none transition-shadow" />
-                            <button type="submit" disabled={!commentText.trim()} className="p-2.5 bg-weflora-teal text-white rounded-xl disabled:opacity-50 hover:bg-weflora-teal-dark transition-colors shadow-sm"><SendIcon className="h-5 w-5" /></button>
+                            <button type="submit" disabled={!commentText.trim()} className="p-2.5 bg-weflora-teal text-white rounded-xl disabled:opacity-50 hover:bg-weflora-dark transition-colors shadow-sm"><SendIcon className="h-5 w-5" /></button>
                         </form>
                     </div>
                 </div>
             </div>
 
-            <BaseModal isOpen={isTaskModalOpen} onClose={() => setIsTaskModalOpen(false)} title="Add New Task" size="sm" footer={<><button onClick={() => setIsTaskModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors">Cancel</button><button onClick={handleCreateTask} className="px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm font-medium hover:bg-weflora-teal-dark shadow-sm transition-colors">Create Task</button></>}>
+            <BaseModal isOpen={isTaskModalOpen} onClose={() => setIsTaskModalOpen(false)} title="Add New Task" size="sm" footer={<><button onClick={() => setIsTaskModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors">Cancel</button><button onClick={handleCreateTask} className="px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm font-medium hover:bg-weflora-dark shadow-sm transition-colors">Create Task</button></>}>
                 <form onSubmit={handleCreateTask} className="space-y-4">
                     <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Task Title</label><input autoFocus type="text" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="e.g. Call Utility Co." className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 outline-none focus:ring-2 focus:ring-weflora-teal focus:border-weflora-teal" /></div>
                     <div className="grid grid-cols-2 gap-4">
@@ -200,7 +200,7 @@ const ProjectTeamView: React.FC<ProjectTeamViewProps> = ({
                 </form>
             </BaseModal>
 
-            <BaseModal isOpen={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} title="Invite Team Member" size="sm" footer={<><button onClick={() => setIsInviteModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors">Cancel</button><button onClick={handleInvite} className="px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm font-medium hover:bg-weflora-teal-dark shadow-sm transition-colors">Send Invite</button></>}>
+            <BaseModal isOpen={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} title="Invite Team Member" size="sm" footer={<><button onClick={() => setIsInviteModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors">Cancel</button><button onClick={handleInvite} className="px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm font-medium hover:bg-weflora-dark shadow-sm transition-colors">Send Invite</button></>}>
                 <form onSubmit={handleInvite} className="space-y-4">
                     <p className="text-sm text-slate-500">Invite a new member to collaborate on this project.</p>
                     <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email Address</label><input autoFocus type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="colleague@example.com" className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 outline-none focus:ring-2 focus:ring-weflora-teal focus:border-weflora-teal" /></div>

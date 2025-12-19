@@ -126,7 +126,7 @@ const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOpen, onC
                             </div>
 
                             <div className="pt-4">
-                                <button type="submit" disabled={loading} className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium text-sm transition-colors disabled:opacity-50 shadow-sm">
+                                <button type="submit" disabled={loading} className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium text-sm transition-colors disabled:opacity-50 shadow-sm">
                                     {loading ? 'Saving...' : 'Save Changes'}
                                 </button>
                             </div>
@@ -160,7 +160,7 @@ const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOpen, onC
                             </div>
 
                             <div className="pt-4">
-                                <button type="submit" disabled={loading} className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium text-sm transition-colors disabled:opacity-50 shadow-sm">
+                                <button type="submit" disabled={loading} className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium text-sm transition-colors disabled:opacity-50 shadow-sm">
                                     {loading ? 'Updating...' : 'Update Password'}
                                 </button>
                             </div>

@@ -217,7 +217,7 @@ const MainContent: React.FC<MainContentProps> = ({
                         <button 
                             onClick={handleConfirmDest}
                             disabled={isExtracting}
-                            className="px-6 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-bold text-sm shadow-sm transition-colors flex items-center gap-2 disabled:opacity-70"
+                            className="px-6 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-bold text-sm shadow-sm transition-colors flex items-center gap-2 disabled:opacity-70"
                         >
                             {isExtracting ? (
                                 <>

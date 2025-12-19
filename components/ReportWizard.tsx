@@ -186,7 +186,7 @@ const ReportWizard: React.FC<ReportWizardProps> = ({ onClose, onCreate, template
                             className="w-full text-left p-4 rounded-xl border border-slate-200 hover:border-weflora-teal hover:shadow-sm transition-all group"
                         >
                             <div className="flex justify-between items-start mb-1">
-                                <span className="font-bold text-slate-800 group-hover:text-weflora-teal-dark">{t.title}</span>
+                                <span className="font-bold text-slate-800 group-hover:text-weflora-dark">{t.title}</span>
                                 <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{t.usageCount} uses</span>
                             </div>
                             <p className="text-xs text-slate-500 line-clamp-2">{t.description}</p>
@@ -273,7 +273,7 @@ const ReportWizard: React.FC<ReportWizardProps> = ({ onClose, onCreate, template
             {step === 2 && (
                 <button 
                     onClick={handleCreate}
-                    className="px-6 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-bold text-sm shadow-md transition-all flex items-center gap-2"
+                    className="px-6 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-bold text-sm shadow-md transition-all flex items-center gap-2"
                 >
                     <PlusIcon className="h-4 w-4" />
                     Create Report

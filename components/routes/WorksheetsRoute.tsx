@@ -26,7 +26,7 @@ const HeaderActionButton = ({ icon: Icon, label, active, onClick }: any) => (
         className={`
             flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap
             ${active 
-                ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark' 
+                ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark' 
                 : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }
         `}

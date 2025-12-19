@@ -70,7 +70,7 @@ const PromptTemplatesView: React.FC<PromptTemplatesViewProps> = ({ items, onOpen
                      </div>
                      <button 
                         onClick={() => setIsCreateModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium shadow-sm transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium shadow-sm transition-colors"
                      >
                         <PlusIcon className="h-4 w-4" />
                         <span className="hidden sm:inline">Create Prompt</span>
@@ -102,7 +102,7 @@ const PromptTemplatesView: React.FC<PromptTemplatesViewProps> = ({ items, onOpen
                                 </span>
                             </div>
                             
-                            <h3 className="text-lg font-bold text-slate-800 mb-1 group-hover:text-weflora-teal-dark transition-colors">{item.title}</h3>
+                            <h3 className="text-lg font-bold text-slate-800 mb-1 group-hover:text-weflora-dark transition-colors">{item.title}</h3>
                             <p className="text-sm text-slate-500 line-clamp-2 mb-4">{item.description}</p>
                             
                             {/* Preview Area */}
@@ -229,7 +229,7 @@ const PromptTemplatesView: React.FC<PromptTemplatesViewProps> = ({ items, onOpen
                         </button>
                         <button 
                             onClick={handleCreate}
-                            className="px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm font-medium hover:bg-weflora-teal-dark shadow-sm transition-colors"
+                            className="px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm font-medium hover:bg-weflora-dark shadow-sm transition-colors"
                         >
                             Create Template
                         </button>

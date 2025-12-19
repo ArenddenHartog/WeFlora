@@ -178,28 +178,28 @@ const InsertWorksheetModal: React.FC<InsertWorksheetModalProps> = ({ isOpen, onC
                 <div className="grid grid-cols-2 gap-3">
                     <button 
                         onClick={() => setMode('table')}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${mode === 'table' ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                        className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${mode === 'table' ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
                     >
                         <TableIcon className="h-5 w-5 mb-1" />
                         <span className="text-xs font-bold">Raw Table</span>
                     </button>
                     <button 
                         onClick={() => setMode('narrative')}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${mode === 'narrative' ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                        className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${mode === 'narrative' ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
                     >
                         <FileTextIcon className="h-5 w-5 mb-1" />
                         <span className="text-xs font-bold">Narrative</span>
                     </button>
                     <button 
                         onClick={() => setMode('list')}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${mode === 'list' ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                        className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${mode === 'list' ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
                     >
                         <ListIcon className="h-5 w-5 mb-1" />
                         <span className="text-xs font-bold">Spec List</span>
                     </button>
                     <button 
                         onClick={() => setMode('comparison')}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${mode === 'comparison' ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                        className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${mode === 'comparison' ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
                     >
                         <LayoutGridIcon className="h-5 w-5 mb-1" />
                         <span className="text-xs font-bold">Comparison</span>
@@ -269,7 +269,7 @@ const InsertWorksheetModal: React.FC<InsertWorksheetModalProps> = ({ isOpen, onC
                             <button 
                                 onClick={() => setStep(2)} 
                                 disabled={!selectedMatrix || selectedColumnIds.size === 0}
-                                className="flex items-center gap-2 px-6 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-bold text-sm shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex items-center gap-2 px-6 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-bold text-sm shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Next <ChevronRightIcon className="h-3 w-3" />
                             </button>
@@ -286,7 +286,7 @@ const InsertWorksheetModal: React.FC<InsertWorksheetModalProps> = ({ isOpen, onC
                             <button 
                                 onClick={handleInsert} 
                                 disabled={isGenerating}
-                                className="flex items-center gap-2 px-6 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-bold text-sm shadow-sm transition-colors disabled:opacity-50"
+                                className="flex items-center gap-2 px-6 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-bold text-sm shadow-sm transition-colors disabled:opacity-50"
                             >
                                 {isGenerating ? <RefreshIcon className="h-4 w-4 animate-spin" /> : <ArrowUpIcon className="h-4 w-4 rotate-90" />}
                                 {isGenerating ? 'Generating...' : 'Insert'}

@@ -351,7 +351,7 @@ const WorksheetWizard: React.FC<{
                     {filteredTemplates.length === 0 && <div className="text-center py-10 text-slate-400"><MagicWandIcon className="h-8 w-8 mx-auto mb-2 opacity-30" /><p className="text-sm">No templates found.</p></div>}
                     {filteredTemplates.map(template => (
                          <button key={template.id} onClick={() => { const newMatrix: Matrix = { id: `mtx-${Date.now()}`, title: template.title, description: template.description, columns: template.columns, rows: template.rows || [] }; onCreate(newMatrix); onClose(); }} className="w-full flex flex-col items-start p-4 bg-white border border-slate-100 rounded-xl hover:border-weflora-teal hover:shadow-md transition-all text-left group">
-                            <div className="flex items-center justify-between w-full mb-1"><span className="font-bold text-slate-900 text-sm group-hover:text-weflora-teal-dark transition-colors">{template.title}</span><span className="text-[10px] bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full">{template.usageCount} uses</span></div>
+                            <div className="flex items-center justify-between w-full mb-1"><span className="font-bold text-slate-900 text-sm group-hover:text-weflora-dark transition-colors">{template.title}</span><span className="text-[10px] bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full">{template.usageCount} uses</span></div>
                             <p className="text-xs text-slate-500 line-clamp-2 mb-2">{template.description}</p>
                             <div className="flex flex-wrap gap-1">{template.tags.slice(0, 3).map(tag => <span key={tag} className="text-[10px] px-1.5 py-0.5 bg-slate-50 text-slate-500 rounded">#{tag}</span>)}</div>
                         </button>
@@ -370,7 +370,7 @@ const WorksheetWizard: React.FC<{
                         {filteredSpecies.map(species => {
                             const isSelected = selectedSpeciesIds.has(species.id);
                             return (
-                                <button key={species.id} onClick={() => { const next = new Set(selectedSpeciesIds); if (next.has(species.id)) next.delete(species.id); else next.add(species.id); setSelectedSpeciesIds(next); }} className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all text-left group ${isSelected ? 'bg-weflora-mint/10 border-weflora-teal text-weflora-teal-dark' : 'bg-white border-transparent hover:border-slate-200 hover:shadow-sm text-slate-700'}`}>
+                                <button key={species.id} onClick={() => { const next = new Set(selectedSpeciesIds); if (next.has(species.id)) next.delete(species.id); else next.add(species.id); setSelectedSpeciesIds(next); }} className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all text-left group ${isSelected ? 'bg-weflora-mint/10 border-weflora-teal text-weflora-dark' : 'bg-white border-transparent hover:border-slate-200 hover:shadow-sm text-slate-700'}`}>
                                     <div><div className="font-bold text-sm text-slate-900">{species.scientificName}</div><div className="text-xs opacity-70 text-slate-600">{species.commonName}</div></div>
                                     <div className={`h-5 w-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'bg-weflora-teal border-weflora-teal text-white' : 'border-slate-300 bg-white group-hover:border-weflora-teal'}`}>{isSelected && <CheckIcon className="h-3 w-3" />}</div>
                                 </button>
@@ -379,7 +379,7 @@ const WorksheetWizard: React.FC<{
                     </div>
                 </div>
                 <div className="w-7/12 bg-white flex flex-col">
-                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white"><h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Selected Items</h4><span className="text-xs font-bold bg-weflora-mint/20 text-weflora-teal-dark px-2 py-0.5 rounded-full">{selectedSpeciesIds.size}</span></div>
+                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white"><h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Selected Items</h4><span className="text-xs font-bold bg-weflora-mint/20 text-weflora-dark px-2 py-0.5 rounded-full">{selectedSpeciesIds.size}</span></div>
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
                         {Array.from(selectedSpeciesIds).map(id => {
                             const sp = speciesList.find(s => s.id === id);
@@ -402,8 +402,8 @@ const WorksheetWizard: React.FC<{
         <>
             {step > 0 && step !== 3 ? <button onClick={() => setStep(s => (s === 5 || s === 6 ? 0 : Math.max(0, s - 1)) as any)} className="mr-auto px-6 py-3 text-slate-500 hover:text-slate-800 text-sm font-bold transition-colors">Back</button> : <div className="mr-auto" />}
             {step === 2 && <button onClick={handleExtract} disabled={schemaColumns.length === 0} className="px-8 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-black disabled:opacity-50 shadow-lg transition-all flex items-center gap-2"><SparklesIcon className="h-4 w-4" />Extract Data</button>}
-            {step === 4 && <button onClick={handleFinalCreate} className="px-8 py-3 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-teal-dark shadow-lg shadow-weflora-mint/50 transition-all">Create Worksheet</button>}
-            {step === 6 && <button onClick={handleCreateSpeciesSheet} disabled={selectedSpeciesIds.size === 0} className="px-8 py-3 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-teal-dark shadow-lg shadow-weflora-mint/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed">Create Worksheet ({selectedSpeciesIds.size})</button>}
+            {step === 4 && <button onClick={handleFinalCreate} className="px-8 py-3 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-dark shadow-lg shadow-weflora-mint/50 transition-all">Create Worksheet</button>}
+            {step === 6 && <button onClick={handleCreateSpeciesSheet} disabled={selectedSpeciesIds.size === 0} className="px-8 py-3 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-dark shadow-lg shadow-weflora-mint/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed">Create Worksheet ({selectedSpeciesIds.size})</button>}
         </>
     );
 
