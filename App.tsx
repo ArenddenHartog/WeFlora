@@ -87,7 +87,7 @@ const AppContent: React.FC = () => {
     };
 
     return (
-        <div className="flex h-[100dvh] w-full bg-white overflow-hidden font-sans text-slate-900">
+        <div className="flex h-[100dvh] w-full bg-weflora-mintLight overflow-hidden font-sans text-slate-900">
             <GlobalToast />
             
             {/* Global File Preview Modal (Controlled by UI Context) */}

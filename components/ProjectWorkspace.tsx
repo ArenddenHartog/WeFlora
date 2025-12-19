@@ -437,7 +437,7 @@ const ProjectWorkspace: React.FC = () => {
 
     return (
         <>
-            <div className="flex flex-col h-full bg-white relative">
+            <div className="flex flex-col h-full bg-weflora-mint relative">
                 <header className="flex-none h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30 gap-4">
                     <div className="flex items-center gap-4">
                         <button onClick={() => navigate('/projects')} className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium pr-2">
