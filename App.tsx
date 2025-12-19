@@ -4,7 +4,7 @@ import { BrowserRouter, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import FilePreview from './components/FilePreview';
-import Header from './components/Header';
+import GlobalTopBar from './components/GlobalTopBar';
 import { DataProvider, useData } from './contexts/DataContext';
 import { ProjectProvider, useProject } from './contexts/ProjectContext';
 import { ChatProvider, useChat } from './contexts/ChatContext';
@@ -125,7 +125,8 @@ const AppContent: React.FC = () => {
 
             {/* Main Layout Area */}
             <div className="flex-1 flex flex-col h-full min-w-0 relative">
-                <Header />
+                {/* Only ONE header allowed above content. Do not add headers inside pages. */}
+                <GlobalTopBar />
                 <main className="flex-1 overflow-hidden relative">
                     <MainContent 
                         onNavigate={(path) => navigate(path === 'home' ? '/' : `/${path}`)}

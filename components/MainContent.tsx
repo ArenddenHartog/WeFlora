@@ -177,7 +177,7 @@ const MainContent: React.FC<MainContentProps> = ({
     return (
         <>
             <Routes>
-                {/* Global Routes wrapped in Global Layout (Contains Header) */}
+                {/* Global Routes wrapped in Global Layout */}
                 <Route element={<GlobalLayout />}>
                     <Route path="/" element={<GlobalWorkspace view="home" {...sharedProps} />} />
                     <Route path="/projects" element={<GlobalWorkspace view="projects" {...sharedProps} />} />
@@ -193,7 +193,7 @@ const MainContent: React.FC<MainContentProps> = ({
                 <Route path="/reports/*" element={<ReportsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
                 <Route path="/reports/:reportId" element={<ReportsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
                 
-                {/* Project Workspace (Has its own header) */}
+                {/* Project Workspace */}
                 <Route path="/project/:projectId/*" element={<ProjectWorkspace />} />
                 
                 <Route path="*" element={<Navigate to="/" replace />} />

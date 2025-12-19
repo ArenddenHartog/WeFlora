@@ -22,24 +22,12 @@ import ReportWizard from './ReportWizard';
 import WritingAssistantPanel from './WritingAssistantPanel'; 
 import SpeciesIntelligencePanel from './SpeciesIntelligencePanel';
 import ProjectOverview from './ProjectOverview';
+import ProjectHeader from './ProjectHeader';
 import { useChat } from '../contexts/ChatContext';
 import { useUI } from '../contexts/UIContext';
 import { useProject } from '../contexts/ProjectContext';
 import { useData } from '../contexts/DataContext';
 import { aiService } from '../services/aiService';
-
-const ProjectNavTab: React.FC<{ label: string, active: boolean, onClick: () => void }> = ({ label, active, onClick }) => (
-    <button
-        onClick={onClick}
-        className={`px-3 py-1.5 rounded-md text-sm font-bold transition-all capitalize ${
-            active 
-            ? 'bg-weflora-mint/20 text-weflora-dark' 
-            : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-        }`}
-    >
-        {label}
-    </button>
-);
 
 const EmptyState = ({ 
     icon: Icon, 
@@ -438,49 +426,20 @@ const ProjectWorkspace: React.FC = () => {
     return (
         <>
             <div className="flex flex-col h-full bg-weflora-mint relative">
-                {/* Note: Project-level navigation is handled by the global App Header (breadcrumb + tabs).
-                   Keep only local panel controls here to avoid duplicate headers. */}
-                <div className="flex-none px-4 py-3 flex items-center justify-end gap-2">
-                    {activeTab === 'worksheets' && matrices.length > 0 && (
-                        <button
-                            onClick={toggleManage}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
-                                rightPanel === 'manage'
-                                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark'
-                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                            }`}
-                        >
-                            <SlidersIcon className="h-4 w-4 text-weflora-teal" />
-                            <span className="hidden sm:inline">Worksheet Setting</span>
-                        </button>
-                    )}
-
-                    {activeTab === 'reports' && reports.length > 0 && (
-                        <button
-                            onClick={toggleManage}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
-                                rightPanel === 'manage'
-                                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark'
-                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                            }`}
-                        >
-                            <PencilIcon className="h-4 w-4 text-weflora-teal" />
-                            <span className="hidden sm:inline">Report Setting</span>
-                        </button>
-                    )}
-
-                    <button
-                        onClick={toggleChat}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
-                            rightPanel === 'chat'
-                                ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark'
-                                : 'bg-white border-slate-200 text-slate-600 hover:bg-weflora-mint/10 hover:text-weflora-teal hover:border-weflora-teal'
-                        }`}
-                    >
-                        <SparklesIcon className="h-4 w-4 text-weflora-teal" />
-                        <span>Ask FloraGPT</span>
-                    </button>
-                </div>
+                <ProjectHeader
+                    projectName={project.name || project.id}
+                    activeTab={activeTab === 'files' ? 'files' : activeTab}
+                    onNavigateTab={(tab) => {
+                        if (tab === 'overview') handleTabChange('overview');
+                        else handleTabChange(tab);
+                    }}
+                    onToggleSettings={() => {
+                        if (activeTab === 'worksheets' || activeTab === 'reports') toggleManage();
+                        else showNotification('Project settings are available in Worksheets or Reports.', 'success');
+                    }}
+                    onToggleAsk={toggleChat}
+                    canShowSettings={(activeTab === 'worksheets' && matrices.length > 0) || (activeTab === 'reports' && reports.length > 0)}
+                />
 
                 <div className="flex-1 overflow-hidden bg-white relative">
                     {renderContent()}
