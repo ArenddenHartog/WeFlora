@@ -1,8 +1,3 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* TEMP DIAGNOSTIC: confirm CSS bundle loads in production (remove once verified). */
-body {
-  outline: 10px solid red !important;
-}
