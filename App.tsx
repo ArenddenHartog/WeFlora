@@ -4,6 +4,7 @@ import { BrowserRouter, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import FilePreview from './components/FilePreview';
+import Header from './components/Header';
 import { DataProvider, useData } from './contexts/DataContext';
 import { ProjectProvider, useProject } from './contexts/ProjectContext';
 import { ChatProvider, useChat } from './contexts/ChatContext';
@@ -122,8 +123,9 @@ const AppContent: React.FC = () => {
                 toggleCollapse={toggleSidebarCollapse}
             />
 
-            {/* Main Layout Area - Header logic is now delegated to MainContent routes */}
+            {/* Main Layout Area */}
             <div className="flex-1 flex flex-col h-full min-w-0 relative">
+                <Header />
                 <main className="flex-1 overflow-hidden relative">
                     <MainContent 
                         onNavigate={(path) => navigate(path === 'home' ? '/' : `/${path}`)}

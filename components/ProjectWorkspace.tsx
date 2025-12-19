@@ -438,85 +438,49 @@ const ProjectWorkspace: React.FC = () => {
     return (
         <>
             <div className="flex flex-col h-full bg-weflora-mint relative">
-                <header className="flex-none h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30 gap-4">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => navigate('/projects')} className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium pr-2">
-                            <ChevronRightIcon className="h-4 w-4 rotate-180" />
-                            Back
-                        </button>
-                        <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 bg-weflora-mint/20 rounded-lg flex items-center justify-center text-weflora-teal">
-                                <FolderIcon className="h-5 w-5" />
-                            </div>
-                            <span className="text-lg font-bold text-slate-900 truncate max-w-[200px]">{project.name}</span>
-                        </div>
-                        <div className="h-6 w-px bg-slate-200 mx-1"></div>
-                        <div className="flex items-center gap-1">
-                            {['overview', 'worksheets', 'reports', 'team'].map((tab) => (
-                                <ProjectNavTab 
-                                    key={tab} 
-                                    label={tab} 
-                                    active={activeTab === tab} 
-                                    onClick={() => handleTabChange(tab)} 
-                                />
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <button 
-                            onClick={() => handleTabChange('files')}
+                {/* Note: Project-level navigation is handled by the global App Header (breadcrumb + tabs).
+                   Keep only local panel controls here to avoid duplicate headers. */}
+                <div className="flex-none px-4 py-3 flex items-center justify-end gap-2">
+                    {activeTab === 'worksheets' && matrices.length > 0 && (
+                        <button
+                            onClick={toggleManage}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
-                                activeTab === 'files'
-                                ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark'
-                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                rightPanel === 'manage'
+                                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark'
+                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                             }`}
                         >
-                            <DatabaseIcon className={`h-4 w-4 ${activeTab === 'files' ? 'text-weflora-dark' : 'text-weflora-teal'}`} />
-                            <span>Project Files</span>
+                            <SlidersIcon className="h-4 w-4 text-weflora-teal" />
+                            <span className="hidden sm:inline">Worksheet Setting</span>
                         </button>
+                    )}
 
-                        {activeTab === 'worksheets' && matrices.length > 0 && (
-                            <button 
-                                onClick={toggleManage}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
-                                    rightPanel === 'manage'
-                                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark' 
-                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                                }`}
-                            >
-                                <SlidersIcon className="h-4 w-4 text-weflora-teal" />
-                                <span className="hidden sm:inline">Worksheet Setting</span>
-                            </button>
-                        )}
-                        
-                        {activeTab === 'reports' && reports.length > 0 && (
-                            <button 
-                                onClick={toggleManage}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
-                                    rightPanel === 'manage'
-                                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark' 
-                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                                }`}
-                            >
-                                <PencilIcon className="h-4 w-4 text-weflora-teal" />
-                                <span className="hidden sm:inline">Report Setting</span>
-                            </button>
-                        )}
-
-                        <button 
-                            onClick={toggleChat}
+                    {activeTab === 'reports' && reports.length > 0 && (
+                        <button
+                            onClick={toggleManage}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
-                                rightPanel === 'chat'
+                                rightPanel === 'manage'
+                                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark'
+                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                            }`}
+                        >
+                            <PencilIcon className="h-4 w-4 text-weflora-teal" />
+                            <span className="hidden sm:inline">Report Setting</span>
+                        </button>
+                    )}
+
+                    <button
+                        onClick={toggleChat}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
+                            rightPanel === 'chat'
                                 ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark'
                                 : 'bg-white border-slate-200 text-slate-600 hover:bg-weflora-mint/10 hover:text-weflora-teal hover:border-weflora-teal'
-                            }`}
-                        >
-                            <SparklesIcon className={`h-4 w-4 ${rightPanel === 'chat' ? 'text-weflora-teal' : 'text-weflora-teal'}`} />
-                            <span>Ask FloraGPT</span>
-                        </button>
-                    </div>
-                </header>
+                        }`}
+                    >
+                        <SparklesIcon className="h-4 w-4 text-weflora-teal" />
+                        <span>Ask FloraGPT</span>
+                    </button>
+                </div>
 
                 <div className="flex-1 overflow-hidden bg-white relative">
                     {renderContent()}
