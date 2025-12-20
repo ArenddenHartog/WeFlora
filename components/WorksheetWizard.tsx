@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import type { Matrix, MatrixColumn, MatrixRow, MatrixColumnType, DiscoveredStructure, WorksheetTemplate, Species, ProjectFile } from '../types';
+import type { CreateEntityResult } from '../contexts/ProjectContext';
 import { 
     TelescopeIcon, LayoutGridIcon, MagicWandIcon, TableIcon, UploadIcon, 
     SparklesIcon, RefreshIcon, CheckIcon, SearchIcon, XIcon, FileSheetIcon, FilePdfIcon
@@ -46,7 +47,7 @@ const WizardStepper = ({ step }: { step: number }) => {
 
 const WorksheetWizard: React.FC<{
     onClose: () => void;
-    onCreate: (matrix: Matrix) => void;
+    onCreate: (matrix: Matrix) => Promise<CreateEntityResult>;
     onDiscover: (files: File[]) => Promise<DiscoveredStructure[]>;
     onAnalyze: (files: File[], context?: string, columns?: MatrixColumn[]) => Promise<{ columns: MatrixColumn[], rows: any[] }>;
     onFileSave?: (file: ProjectFile) => void; // New prop for saving files
@@ -186,7 +187,7 @@ const WorksheetWizard: React.FC<{
         }
     };
 
-    const handleFinalCreate = () => {
+    const handleFinalCreate = async () => {
         if (!extractionResult) return;
         const newMatrix: Matrix = {
             id: `mtx-${Date.now()}`,
@@ -194,11 +195,18 @@ const WorksheetWizard: React.FC<{
             columns: extractionResult.columns,
             rows: extractionResult.rows
         };
-        onCreate(newMatrix);
+        const result = await onCreate(newMatrix);
+        console.info('[create-flow] worksheet wizard', {
+            kind: 'worksheet',
+            withinProject: result.withinProject,
+            projectId: result.projectId,
+            matrixId: result.matrixId,
+            tabId: result.tabId
+        });
         onClose();
     };
 
-    const handleCreateSpeciesSheet = () => {
+    const handleCreateSpeciesSheet = async () => {
         const standardColumns: MatrixColumn[] = [
             { id: 'sc-1', title: 'Scientific Name', type: 'text', width: 220, isPrimaryKey: true },
             { id: 'sc-2', title: 'Common Name', type: 'text', width: 180 },
@@ -231,7 +239,14 @@ const WorksheetWizard: React.FC<{
             columns: standardColumns,
             rows: rows
         };
-        onCreate(newMatrix);
+        const result = await onCreate(newMatrix);
+        console.info('[create-flow] worksheet wizard', {
+            kind: 'worksheet',
+            withinProject: result.withinProject,
+            projectId: result.projectId,
+            matrixId: result.matrixId,
+            tabId: result.tabId
+        });
         onClose();
     };
 
@@ -252,7 +267,7 @@ const WorksheetWizard: React.FC<{
                 <div className="font-bold text-slate-900 mb-1">Use Template</div>
                 <div className="text-xs text-slate-500 px-4">Start with a pre-defined structure.</div>
             </button>
-            <button onClick={() => { const newMatrix: Matrix = { id: `mtx-${Date.now()}`, title: 'Untitled Worksheet', columns: [{id:'c1', title:'Column 1', type:'text', width: 200}], rows: [] }; onCreate(newMatrix); onClose(); }} className="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-weflora-teal hover:shadow-md transition-all text-center group h-40">
+            <button onClick={async () => { const newMatrix: Matrix = { id: `mtx-${Date.now()}`, title: 'Untitled Worksheet', columns: [{id:'c1', title:'Column 1', type:'text', width: 200}], rows: [] }; const result = await onCreate(newMatrix); console.info('[create-flow] worksheet wizard', { kind: 'worksheet', withinProject: result.withinProject, projectId: result.projectId, matrixId: result.matrixId, tabId: result.tabId }); onClose(); }} className="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-weflora-teal hover:shadow-md transition-all text-center group h-40">
                 <div className="h-12 w-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 mb-3 group-hover:scale-110 transition-transform"><TableIcon className="h-6 w-6" /></div>
                 <div className="font-bold text-slate-900 mb-1">Empty Sheet</div>
                 <div className="text-xs text-slate-500 px-4">Start from scratch with a blank grid.</div>

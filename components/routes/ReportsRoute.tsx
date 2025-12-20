@@ -6,6 +6,7 @@ import { useData } from '../../contexts/DataContext';
 import { useUI } from '../../contexts/UIContext';
 import { useChat } from '../../contexts/ChatContext';
 import type { Report, ReportDocument, ChatMessage } from '../../types';
+import { navigateToCreatedEntity } from '../../utils/navigation';
 import ReportsHubView from '../ReportsHubView';
 import ReportEditorView, { ManageReportPanel } from '../ReportEditorView';
 import ReportWizard from '../ReportWizard';
@@ -59,12 +60,24 @@ const ReportsRoute: React.FC<ReportsRouteProps> = ({ onOpenDestinationModal }) =
 
     // --- Actions ---
 
-    const handleCreate = (report: Report) => {
+    const handleCreate = async (report: Report) => {
         // Ensure it's marked as standalone
         const newReport = { ...report, projectId: undefined };
-        createReport(newReport);
-        // Small delay to ensure state propagates before navigation
-        setTimeout(() => navigate(`/reports/${newReport.id}`), 50);
+        const result = await createReport(newReport);
+        console.info('[create-flow] draft report (reports hub)', {
+            kind: 'report',
+            withinProject: result.withinProject,
+            projectId: result.projectId,
+            reportId: result.reportId,
+            tabId: result.tabId
+        });
+        navigateToCreatedEntity({
+            navigate,
+            kind: 'report',
+            withinProject: false,
+            reportId: result.reportId
+        });
+        return result;
     };
 
     const handleUpdate = (updated: Report) => {

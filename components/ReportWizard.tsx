@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import type { Report, ReportTemplate } from '../types';
+import type { CreateEntityResult } from '../contexts/ProjectContext';
 import { 
     FileTextIcon, UploadIcon, MagicWandIcon, PlusIcon, 
     RefreshIcon, SparklesIcon, SearchIcon, CheckCircleIcon
@@ -10,7 +11,7 @@ import { aiService } from '../services/aiService';
 
 interface ReportWizardProps {
     onClose: () => void;
-    onCreate: (report: Report) => void;
+    onCreate: (report: Report) => Promise<CreateEntityResult>;
     templates: ReportTemplate[];
     initialFile?: File | null;
 }
@@ -94,7 +95,7 @@ const ReportWizard: React.FC<ReportWizardProps> = ({ onClose, onCreate, template
         setStep(2); // Go to finalize
     };
 
-    const handleCreate = () => {
+    const handleCreate = async () => {
         const newReport: Report = {
             id: `rep-${Date.now()}`,
             title: title || 'Untitled Report',
@@ -102,7 +103,14 @@ const ReportWizard: React.FC<ReportWizardProps> = ({ onClose, onCreate, template
             lastModified: new Date().toLocaleDateString(),
             tags: tags.split(',').map(t => t.trim()).filter(Boolean)
         };
-        onCreate(newReport);
+        const result = await onCreate(newReport);
+        console.info('[create-flow] report wizard', {
+            kind: 'report',
+            withinProject: result.withinProject,
+            projectId: result.projectId,
+            reportId: result.reportId,
+            tabId: result.tabId
+        });
     };
 
     // --- Renderers ---

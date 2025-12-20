@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { 
     ViewMode, PinnedProject, Matrix, Report, 
     ContextItem, Chat
@@ -19,6 +20,7 @@ import { useProject } from '../contexts/ProjectContext';
 import { useChat } from '../contexts/ChatContext';
 import { useUI } from '../contexts/UIContext';
 import { aiService } from '../services/aiService';
+import { navigateToCreatedEntity } from '../utils/navigation';
 
 interface GlobalWorkspaceProps {
     view: ViewMode;
@@ -32,6 +34,7 @@ interface GlobalWorkspaceProps {
 const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
     view, onNavigate, onSelectProject, onOpenMenu, onOpenDestinationModal
 }) => {
+    const navigate = useNavigate();
     // Hooks
     const { 
         projects: pinnedProjects, setProjects: setPinnedProjects, 
@@ -89,16 +92,42 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
         setNewProjDate(new Date().toISOString().split('T')[0]);
     };
 
-    const handleCreateWorksheet = (matrix: Matrix) => {
-        createMatrix({ ...matrix, projectId: undefined }); // Standalone
+    const handleCreateWorksheet = async (matrix: Matrix) => {
+        const result = await createMatrix({ ...matrix, projectId: undefined }); // Standalone
+        console.info('[create-flow] build worksheet (home)', {
+            kind: 'worksheet',
+            withinProject: result.withinProject,
+            projectId: result.projectId,
+            matrixId: result.matrixId,
+            tabId: result.tabId
+        });
+        navigateToCreatedEntity({
+            navigate,
+            kind: 'worksheet',
+            withinProject: false,
+            matrixId: result.matrixId
+        });
         setIsCreateWorksheetOpen(false);
-        // Navigation handled by routing in MainContent usually, but here we might need to navigate
-        // Since we don't have navigate hook here (it's in MainContent logic), we rely on list view updates
+        return result;
     };
 
-    const handleCreateReport = (report: Report) => {
-        createReport({ ...report, projectId: undefined });
+    const handleCreateReport = async (report: Report) => {
+        const result = await createReport({ ...report, projectId: undefined });
+        console.info('[create-flow] draft report (home)', {
+            kind: 'report',
+            withinProject: result.withinProject,
+            projectId: result.projectId,
+            reportId: result.reportId,
+            tabId: result.tabId
+        });
+        navigateToCreatedEntity({
+            navigate,
+            kind: 'report',
+            withinProject: false,
+            reportId: result.reportId
+        });
         setIsCreateReportOpen(false);
+        return result;
     };
 
     switch (view) {

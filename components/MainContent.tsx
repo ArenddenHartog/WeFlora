@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import type { 
     PinnedProject, Chat, ProjectFile, Matrix, Report, 
     ChatMessage, DiscoveredStructure, MatrixColumn
@@ -16,6 +16,7 @@ import { aiService } from '../services/aiService';
 import { useProject } from '../contexts/ProjectContext';
 import { useData } from '../contexts/DataContext';
 import { useUI } from '../contexts/UIContext';
+import { navigateToCreatedEntity } from '../utils/navigation';
 
 // Props reduced to minimal handlers if any
 interface MainContentProps {
@@ -27,13 +28,14 @@ interface MainContentProps {
 const MainContent: React.FC<MainContentProps> = ({ 
     onNavigate, onSelectProject, onOpenMenu 
 }) => {
+    const navigate = useNavigate();
     // Hooks for data access
     const { projects, createMatrix, createReport, setProjects } = useProject();
     const { currentWorkspace } = useData();
     const { showNotification, destinationModal, openDestinationModal, closeDestinationModal } = useUI();
 
     // Wrappers to handle logic for Destination Modal
-    const handleCreateMatrix = (newM: Matrix, dest?: { type: 'project' | 'standalone' | 'new_project', projectId?: string, newProjectName?: string }) => {
+    const handleCreateMatrix = async (newM: Matrix, dest?: { type: 'project' | 'standalone' | 'new_project', projectId?: string, newProjectName?: string }) => {
         let finalProjectId = dest?.projectId || newM.projectId;
         
         if (dest?.type === 'new_project' && dest.newProjectName) {
@@ -55,10 +57,10 @@ const MainContent: React.FC<MainContentProps> = ({
         }
 
         const matrixWithProject = { ...newM, projectId: finalProjectId };
-        createMatrix(matrixWithProject);
+        return await createMatrix(matrixWithProject);
     };
 
-    const handleCreateReport = (newR: Report, dest?: { type: 'project' | 'standalone' | 'new_project', projectId?: string, newProjectName?: string }) => {
+    const handleCreateReport = async (newR: Report, dest?: { type: 'project' | 'standalone' | 'new_project', projectId?: string, newProjectName?: string }) => {
         let finalProjectId = dest?.projectId || newR.projectId;
 
         if (dest?.type === 'new_project' && dest.newProjectName) {
@@ -80,7 +82,7 @@ const MainContent: React.FC<MainContentProps> = ({
         }
 
         const reportWithProject = { ...newR, projectId: finalProjectId };
-        createReport(reportWithProject);
+        return await createReport(reportWithProject);
     };
 
     // --- Modal Logic (using UI Context state) ---
@@ -134,7 +136,22 @@ const MainContent: React.FC<MainContentProps> = ({
                 lastModified: new Date().toLocaleDateString(),
                 tags: ['ai-import']
             };
-            handleCreateReport(report, destination);
+            const result = await handleCreateReport(report, destination);
+            console.info('[create-flow] copy to report', {
+                kind: 'report',
+                withinProject: result.withinProject,
+                projectId: result.projectId,
+                reportId: result.reportId,
+                tabId: result.tabId
+            });
+            navigateToCreatedEntity({
+                navigate,
+                kind: 'report',
+                withinProject: result.withinProject,
+                projectId: result.projectId,
+                reportId: result.reportId,
+                focusTabId: result.tabId
+            });
             closeDestinationModal();
             showNotification('Report created from chat');
         } else {
@@ -148,7 +165,22 @@ const MainContent: React.FC<MainContentProps> = ({
                     columns: result.columns,
                     rows: result.rows
                 };
-                handleCreateMatrix(newMatrix, destination);
+                const created = await handleCreateMatrix(newMatrix, destination);
+                console.info('[create-flow] copy to worksheet', {
+                    kind: 'worksheet',
+                    withinProject: created.withinProject,
+                    projectId: created.projectId,
+                    matrixId: created.matrixId,
+                    tabId: created.tabId
+                });
+                navigateToCreatedEntity({
+                    navigate,
+                    kind: 'worksheet',
+                    withinProject: created.withinProject,
+                    projectId: created.projectId,
+                    matrixId: created.matrixId,
+                    focusTabId: created.tabId
+                });
                 showNotification('Worksheet created from chat');
             } catch (error) {
                 console.error("Extraction failed", error);
@@ -158,7 +190,22 @@ const MainContent: React.FC<MainContentProps> = ({
                     columns: [{ id: 'c1', title: 'Content', type: 'text' as const, width: 600, isPrimaryKey: true }],
                     rows: [{ id: 'r1', cells: { c1: { columnId: 'c1', value: message.text } } }]
                 };
-                handleCreateMatrix(fallbackMatrix, destination);
+                const created = await handleCreateMatrix(fallbackMatrix, destination);
+                console.info('[create-flow] copy to worksheet', {
+                    kind: 'worksheet',
+                    withinProject: created.withinProject,
+                    projectId: created.projectId,
+                    matrixId: created.matrixId,
+                    tabId: created.tabId
+                });
+                navigateToCreatedEntity({
+                    navigate,
+                    kind: 'worksheet',
+                    withinProject: created.withinProject,
+                    projectId: created.projectId,
+                    matrixId: created.matrixId,
+                    focusTabId: created.tabId
+                });
                 showNotification('Worksheet created (raw mode)');
             } finally {
                 setIsExtracting(false);

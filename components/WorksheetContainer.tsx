@@ -14,6 +14,7 @@ import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 interface WorksheetContainerProps {
     document: WorksheetDocument;
+    initialActiveTabId?: string;
     onUpdateDocument: (doc: WorksheetDocument) => void;
     onRunAICell?: (prompt: string, contextFiles?: File[], globalContext?: string) => Promise<string>;
     onAnalyze?: (files: File[], context?: string, columns?: MatrixColumn[]) => Promise<{ columns: MatrixColumn[], rows: any[] }>;
@@ -28,10 +29,10 @@ interface WorksheetContainerProps {
 }
 
 const WorksheetContainer: React.FC<WorksheetContainerProps> = ({ 
-    document: worksheetDoc, onUpdateDocument, onRunAICell, onAnalyze, speciesList, onClose, onOpenManage, projectFiles, onUpload, projectContext, onResolveFile, onInspectEntity
+    document: worksheetDoc, initialActiveTabId, onUpdateDocument, onRunAICell, onAnalyze, speciesList, onClose, onOpenManage, projectFiles, onUpload, projectContext, onResolveFile, onInspectEntity
 }) => {
     const { showNotification } = useUI();
-    const [activeTabId, setActiveTabId] = useState<string>(worksheetDoc.tabs[0]?.id || '');
+    const [activeTabId, setActiveTabId] = useState<string>(initialActiveTabId || worksheetDoc.tabs[0]?.id || '');
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [titleInput, setTitleInput] = useState(worksheetDoc.title);
     const [editingTabId, setEditingTabId] = useState<string | null>(null);
@@ -55,6 +56,13 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
             setActiveTabId(worksheetDoc.tabs[0].id);
         }
     }, [worksheetDoc.tabs, activeTabId]);
+
+    useEffect(() => {
+        if (!initialActiveTabId) return;
+        if (worksheetDoc.tabs.some(t => t.id === initialActiveTabId)) {
+            setActiveTabId(initialActiveTabId);
+        }
+    }, [initialActiveTabId, worksheetDoc.tabs]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {

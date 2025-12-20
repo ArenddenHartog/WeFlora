@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import type { 
     PinnedProject, Matrix, Report, Task, TeamComment, 
     WorksheetDocument, ReportDocument, Member, MatrixRow
@@ -29,6 +29,7 @@ import { useUI } from '../contexts/UIContext';
 import { useProject } from '../contexts/ProjectContext';
 import { useData } from '../contexts/DataContext';
 import { aiService } from '../services/aiService';
+import { navigateToCreatedEntity } from '../utils/navigation';
 
 const EmptyState = ({ 
     icon: Icon, 
@@ -58,6 +59,7 @@ const EmptyState = ({
 const ProjectWorkspace: React.FC = () => {
     // Navigation & Params
     const navigate = useNavigate();
+    const location = useLocation();
     const params = useParams();
     const projectId = params.projectId;
     
@@ -98,6 +100,20 @@ const ProjectWorkspace: React.FC = () => {
     const [inspectedEntity, setInspectedEntity] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [pendingDeleteFileId, setPendingDeleteFileId] = useState<string | null>(null);
+
+    // Focus state for "new tab created" redirects (passed via navigate state)
+    const [focusedWorksheetTabId, setFocusedWorksheetTabId] = useState<string | undefined>(undefined);
+    const [focusedReportTabId, setFocusedReportTabId] = useState<string | undefined>(undefined);
+
+    useEffect(() => {
+        const navState = location.state as any;
+        if (typeof navState?.focusWorksheetTabId === 'string') {
+            setFocusedWorksheetTabId(navState.focusWorksheetTabId);
+        }
+        if (typeof navState?.focusReportTabId === 'string') {
+            setFocusedReportTabId(navState.focusReportTabId);
+        }
+    }, [location.state]);
 
     // Sync tab navigation
     const handleTabChange = (tab: string) => {
@@ -220,14 +236,46 @@ const ProjectWorkspace: React.FC = () => {
         });
     };
 
-    const handleCreateWorksheetFromWizard = (matrix: Matrix) => {
-        createMatrix({ ...matrix, projectId: project.id });
+    const handleCreateWorksheetFromWizard = async (matrix: Matrix) => {
+        const result = await createMatrix({ ...matrix, projectId: project.id });
+        console.info('[create-flow] build worksheet (project)', {
+            kind: 'worksheet',
+            withinProject: true,
+            projectId: project.id,
+            matrixId: result.matrixId,
+            tabId: result.tabId
+        });
+        navigateToCreatedEntity({
+            navigate,
+            kind: 'worksheet',
+            withinProject: true,
+            projectId: project.id,
+            matrixId: result.matrixId,
+            focusTabId: result.tabId
+        });
         setIsWorksheetWizardOpen(false);
+        return result;
     };
 
-    const handleCreateReportFromWizard = (report: Report) => {
-        createReport({ ...report, projectId: project.id });
+    const handleCreateReportFromWizard = async (report: Report) => {
+        const result = await createReport({ ...report, projectId: project.id });
+        console.info('[create-flow] draft report (project)', {
+            kind: 'report',
+            withinProject: true,
+            projectId: project.id,
+            reportId: result.reportId,
+            tabId: result.tabId
+        });
+        navigateToCreatedEntity({
+            navigate,
+            kind: 'report',
+            withinProject: true,
+            projectId: project.id,
+            reportId: result.reportId,
+            focusTabId: result.tabId
+        });
         setIsReportWizardOpen(false);
+        return result;
     };
 
     const renderRightPanelContent = () => {
@@ -366,6 +414,7 @@ const ProjectWorkspace: React.FC = () => {
                 return (
                     <WorksheetContainer 
                         document={projectWorksheetDoc}
+                        initialActiveTabId={focusedWorksheetTabId}
                         onUpdateDocument={handleUpdateWorksheetDoc}
                         onRunAICell={aiService.runAICell}
                         onAnalyze={aiService.analyzeDocuments}
@@ -399,6 +448,7 @@ const ProjectWorkspace: React.FC = () => {
                 return (
                     <ReportContainer 
                         document={projectReportDoc}
+                        initialActiveTabId={focusedReportTabId}
                         onUpdateDocument={handleUpdateReportDoc}
                         onClose={() => {}}
                         availableMatrices={allMatrices} 

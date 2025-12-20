@@ -37,13 +37,13 @@ interface ProjectContextType {
     // Explicit Data Actions
     matrices: Matrix[];
     setMatrices: React.Dispatch<React.SetStateAction<Matrix[]>>; // Kept for loading/reset
-    createMatrix: (matrix: Matrix) => Promise<void>;
+    createMatrix: (matrix: Matrix) => Promise<CreateEntityResult>;
     updateMatrix: (matrix: Matrix) => Promise<void>;
     deleteMatrix: (matrixId: string) => Promise<void>;
 
     reports: Report[];
     setReports: React.Dispatch<React.SetStateAction<Report[]>>; // Kept for loading/reset
-    createReport: (report: Report) => Promise<void>;
+    createReport: (report: Report) => Promise<CreateEntityResult>;
     updateReport: (report: Report) => Promise<void>;
     deleteReport: (reportId: string) => Promise<void>;
 
@@ -60,6 +60,14 @@ interface ProjectContextType {
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
+
+export type CreateEntityResult = {
+    reportId?: string;
+    matrixId?: string;
+    projectId?: string;
+    tabId?: string;
+    withinProject: boolean;
+};
 
 export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { user } = useAuth();
@@ -246,15 +254,19 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // --- Explicit Matrix Actions ---
 
-    const createMatrix = async (matrix: Matrix) => {
+    const createMatrix = async (matrix: Matrix): Promise<CreateEntityResult> => {
         const userId = (await supabase.auth.getUser()).data.user?.id;
-        if (!userId) return;
+        const withinProject = Boolean(matrix.projectId);
+        if (!userId) return { withinProject, projectId: matrix.projectId };
 
         // Optimistic Update
         setMatrices(prev => [...prev, matrix]);
 
-        const { error } = await supabase.from('matrices').insert({
-            id: matrix.id.includes('new') || matrix.id.includes('mtx-') ? undefined : matrix.id, // Let DB gen if temp ID
+        const tempId = matrix.id;
+        const shouldDbGenerateId = tempId.includes('new') || tempId.includes('mtx-'); // Let DB gen if temp ID
+
+        const { data, error } = await supabase.from('matrices').insert({
+            id: shouldDbGenerateId ? undefined : tempId,
             project_id: matrix.projectId,
             title: matrix.title,
             description: matrix.description,
@@ -262,13 +274,26 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             rows: matrix.rows,
             parent_id: matrix.parentId,
             user_id: userId
-        });
+        }).select('id').single();
 
         if (error) {
             console.error("Failed to create matrix", error);
             showNotification("Failed to save worksheet.", 'error');
-            setMatrices(prev => prev.filter(m => m.id !== matrix.id)); // Rollback
+            setMatrices(prev => prev.filter(m => m.id !== tempId)); // Rollback
+            return { withinProject, projectId: matrix.projectId };
         }
+
+        const createdId = (data as any)?.id as string | undefined;
+        if (createdId && createdId !== tempId) {
+            setMatrices(prev => prev.map(m => m.id === tempId ? { ...m, id: createdId } : m));
+        }
+
+        return {
+            withinProject,
+            projectId: matrix.projectId,
+            matrixId: createdId || tempId,
+            tabId: withinProject ? (createdId || tempId) : undefined
+        };
     };
 
     const updateMatrix = async (matrix: Matrix) => {
@@ -312,27 +337,44 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // --- Explicit Report Actions ---
 
-    const createReport = async (report: Report) => {
+    const createReport = async (report: Report): Promise<CreateEntityResult> => {
         const userId = (await supabase.auth.getUser()).data.user?.id;
-        if (!userId) return;
+        const withinProject = Boolean(report.projectId);
+        if (!userId) return { withinProject, projectId: report.projectId };
 
         setReports(prev => [...prev, report]);
 
-        const { error } = await supabase.from('reports').insert({
-            id: report.id.includes('rep-') || report.id.includes('new') ? undefined : report.id,
+        const tempId = report.id;
+        const shouldDbGenerateId = tempId.includes('rep-') || tempId.includes('new');
+
+        const { data, error } = await supabase.from('reports').insert({
+            id: shouldDbGenerateId ? undefined : tempId,
             project_id: report.projectId,
             title: report.title,
             content: report.content,
             tags: report.tags,
             parent_id: report.parentId,
             user_id: userId
-        });
+        }).select('id').single();
 
         if (error) {
             console.error("Failed to create report", error);
             showNotification("Failed to save report.", 'error');
-            setReports(prev => prev.filter(r => r.id !== report.id));
+            setReports(prev => prev.filter(r => r.id !== tempId));
+            return { withinProject, projectId: report.projectId };
         }
+
+        const createdId = (data as any)?.id as string | undefined;
+        if (createdId && createdId !== tempId) {
+            setReports(prev => prev.map(r => r.id === tempId ? { ...r, id: createdId } : r));
+        }
+
+        return {
+            withinProject,
+            projectId: report.projectId,
+            reportId: createdId || tempId,
+            tabId: withinProject ? (createdId || tempId) : undefined
+        };
     };
 
     const updateReport = async (report: Report) => {

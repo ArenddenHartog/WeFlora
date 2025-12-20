@@ -11,6 +11,7 @@ import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 interface ReportContainerProps {
     document: ReportDocument;
+    initialActiveTabId?: string;
     onUpdateDocument: (doc: ReportDocument) => void;
     onClose?: () => void;
     availableMatrices?: Matrix[]; 
@@ -18,9 +19,9 @@ interface ReportContainerProps {
 }
 
 const ReportContainer: React.FC<ReportContainerProps> = ({ 
-    document: reportDoc, onUpdateDocument, onClose, availableMatrices, onToggleAssistant 
+    document: reportDoc, initialActiveTabId, onUpdateDocument, onClose, availableMatrices, onToggleAssistant 
 }) => {
-    const [activeTabId, setActiveTabId] = useState<string>(reportDoc.tabs[0]?.id || '');
+    const [activeTabId, setActiveTabId] = useState<string>(initialActiveTabId || reportDoc.tabs[0]?.id || '');
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [titleInput, setTitleInput] = useState(reportDoc.title);
     
@@ -40,6 +41,13 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
             setActiveTabId(reportDoc.tabs[0].id);
         }
     }, [reportDoc.tabs, activeTabId]);
+
+    useEffect(() => {
+        if (!initialActiveTabId) return;
+        if (reportDoc.tabs.some(t => t.id === initialActiveTabId)) {
+            setActiveTabId(initialActiveTabId);
+        }
+    }, [initialActiveTabId, reportDoc.tabs]);
 
     // Close download menu on outside click
     useEffect(() => {

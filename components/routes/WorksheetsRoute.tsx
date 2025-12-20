@@ -7,6 +7,7 @@ import { useUI } from '../../contexts/UIContext';
 import { useChat } from '../../contexts/ChatContext';
 import { aiService } from '../../services/aiService';
 import type { Matrix, WorksheetDocument, ChatMessage, MatrixRow } from '../../types';
+import { navigateToCreatedEntity } from '../../utils/navigation';
 import WorksheetTemplatesView from '../WorksheetTemplatesView';
 import WorksheetContainer from '../WorksheetContainer';
 import WorksheetWizard from '../WorksheetWizard';
@@ -63,11 +64,24 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
 
     // --- Actions ---
 
-    const handleCreate = (matrix: Matrix) => {
+    const handleCreate = async (matrix: Matrix) => {
         // Ensure it's marked as standalone
         const newMatrix = { ...matrix, projectId: undefined };
-        createMatrix(newMatrix);
-        navigate(`/worksheets/${newMatrix.id}`);
+        const result = await createMatrix(newMatrix);
+        console.info('[create-flow] build worksheet (worksheets hub)', {
+            kind: 'worksheet',
+            withinProject: result.withinProject,
+            projectId: result.projectId,
+            matrixId: result.matrixId,
+            tabId: result.tabId
+        });
+        navigateToCreatedEntity({
+            navigate,
+            kind: 'worksheet',
+            withinProject: false,
+            matrixId: result.matrixId
+        });
+        return result;
     };
 
     const handleUpdate = (updated: Matrix) => {
