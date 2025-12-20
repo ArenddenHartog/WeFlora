@@ -3,10 +3,11 @@ import React, { useState, useMemo, useRef } from 'react';
 import type { KnowledgeItem, ProjectFile, PinnedProject } from '../types';
 import { 
     SearchIcon, MenuIcon, UploadIcon, DatabaseIcon, 
-    FileTextIcon, FileSheetIcon, FilePdfIcon, TrashIcon, SparklesIcon,
+    FileTextIcon, FileSheetIcon, FilePdfIcon, XIcon, SparklesIcon,
     FolderIcon, CheckIcon, ChevronRightIcon, ArrowUpIcon
 } from './icons';
 import BaseModal from './BaseModal';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 interface KnowledgeBaseViewProps {
     items: KnowledgeItem[];
@@ -33,6 +34,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [pendingFiles, setPendingFiles] = useState<File[]>([]);
     const [targetProjectId, setTargetProjectId] = useState<string>('');
+    const [pendingDeleteItem, setPendingDeleteItem] = useState<any | null>(null);
 
     // Prepare unified file list for 'All' and 'Knowledge' modes, and for searching
     const unifiedItems = useMemo(() => {
@@ -105,9 +107,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
 
     const handleDelete = (e: React.MouseEvent, item: any) => {
         e.stopPropagation();
-        if (window.confirm("Are you sure you want to delete this file?")) {
-            onDelete(item);
-        }
+        setPendingDeleteItem(item);
     };
 
     const renderProjectCards = () => {
@@ -193,7 +193,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                                     onClick={(e) => handleDelete(e, item)}
                                     className="p-1.5 text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                 >
-                                    <TrashIcon className="h-3.5 w-3.5" />
+                                    <XIcon className="h-3.5 w-3.5" />
                                 </button>
                             </div>
                         </div>
@@ -365,6 +365,21 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                     </div>
                 </div>
             </BaseModal>
+
+            <ConfirmDeleteModal
+                isOpen={Boolean(pendingDeleteItem)}
+                title="Delete file?"
+                description={`This will permanently delete "${
+                    pendingDeleteItem ? (pendingDeleteItem.title || pendingDeleteItem.name || 'this file') : 'this file'
+                }". This cannot be undone.`}
+                confirmLabel="Delete file"
+                onCancel={() => setPendingDeleteItem(null)}
+                onConfirm={() => {
+                    if (!pendingDeleteItem) return;
+                    onDelete(pendingDeleteItem);
+                    setPendingDeleteItem(null);
+                }}
+            />
         </div>
     );
 };

@@ -4,12 +4,13 @@ import type { Report, Matrix, ReportTemplate } from '../types';
 import { 
     BoldIcon, ItalicIcon, ListIcon, HeadingIcon, FileTextIcon, XIcon, PencilIcon,
     PlusIcon, SparklesIcon, HistoryIcon, DownloadIcon, CheckCircleIcon, RefreshIcon, EyeIcon, EyeOffIcon,
-    FilePdfIcon, FileSheetIcon, BookIcon, LayoutGridIcon, UserCircleIcon, TrashIcon, FileCodeIcon, ArrowUpIcon, BookmarkIcon,
+    FilePdfIcon, FileSheetIcon, BookIcon, LayoutGridIcon, UserCircleIcon, FileCodeIcon, ArrowUpIcon, BookmarkIcon,
     TableIcon, UndoIcon, RedoIcon
 } from './icons';
 import { MessageRenderer } from './MessageRenderer';
 import InsertWorksheetModal from './InsertWorksheetModal';
 import { useUI } from '../contexts/UIContext';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 interface ReportEditorViewProps {
     report?: Report;
@@ -123,6 +124,7 @@ const ReportEditorView: React.FC<ReportEditorViewProps> = ({
     const [historyIndex, setHistoryIndex] = useState(-1);
     const historyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [isBookmarked, setIsBookmarked] = useState(false);
+    const [pendingDeleteReportId, setPendingDeleteReportId] = useState<string | null>(null);
 
     useEffect(() => {
         if (activeReport) {
@@ -205,9 +207,7 @@ const ReportEditorView: React.FC<ReportEditorViewProps> = ({
 
     const handleDeleteReport = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        if (window.confirm("Are you sure you want to delete this report?")) {
-            if (onDeleteReport) onDeleteReport(id);
-        }
+        setPendingDeleteReportId(id);
     };
 
     const applyFormat = (marker: string) => {
@@ -338,6 +338,23 @@ const ReportEditorView: React.FC<ReportEditorViewProps> = ({
                 </div>
              </div>
              {isInsertModalOpen && <InsertWorksheetModal isOpen={true} onClose={() => setIsInsertModalOpen(false)} onInsert={insertText} matrices={availableMatrices} />}
+
+             {onDeleteReport && (
+                <ConfirmDeleteModal
+                    isOpen={Boolean(pendingDeleteReportId)}
+                    title="Delete report?"
+                    description={`This will permanently delete "${
+                        pendingDeleteReportId ? (reports?.find(r => r.id === pendingDeleteReportId)?.title || activeReport?.title || 'this report') : 'this report'
+                    }". This cannot be undone.`}
+                    confirmLabel="Delete report"
+                    onCancel={() => setPendingDeleteReportId(null)}
+                    onConfirm={() => {
+                        if (!pendingDeleteReportId) return;
+                        onDeleteReport(pendingDeleteReportId);
+                        setPendingDeleteReportId(null);
+                    }}
+                />
+             )}
         </div>
     );
 };

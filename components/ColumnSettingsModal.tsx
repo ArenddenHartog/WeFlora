@@ -2,9 +2,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { MatrixColumn, MatrixColumnType, SkillConfiguration, ProjectFile, ConditionalFormattingRule } from '../types';
 import BaseModal from './BaseModal';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { 
     FileSheetIcon, FilePdfIcon, FileCodeIcon, CheckIcon, 
-    SparklesIcon, PlusIcon, TrashIcon, SearchIcon, UploadIcon,
+    SparklesIcon, PlusIcon, XIcon, SearchIcon, UploadIcon,
     AdjustmentsHorizontalIcon
 } from './icons';
 
@@ -59,6 +60,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
     const [newRuleCondition, setNewRuleCondition] = useState<ConditionalFormattingRule['condition']>('contains');
     const [newRuleValue, setNewRuleValue] = useState('');
     const [newRuleStyle, setNewRuleStyle] = useState<ConditionalFormattingRule['style']>('green');
+    const [pendingRemoveRuleId, setPendingRemoveRuleId] = useState<string | null>(null);
 
     // File Search State
     const [fileSearch, setFileSearch] = useState('');
@@ -113,10 +115,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
     };
 
     const handleRemoveRule = (id: string) => {
-        setSkillConfig(prev => ({
-            ...prev,
-            conditionalFormatting: (prev.conditionalFormatting || []).filter(r => r.id !== id)
-        }));
+        setPendingRemoveRuleId(id);
     };
 
     const getFileIcon = (name: string) => {
@@ -132,6 +131,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
     const activeFormat = FORMAT_OPTIONS.find(f => f.value === skillConfig.outputType);
 
     return (
+        <>
         <BaseModal 
             isOpen={true} 
             onClose={onClose} 
@@ -312,7 +312,9 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                                     <span className="bg-white px-1.5 py-0.5 rounded border border-weflora-teal/30 text-slate-800 font-mono max-w-[80px] truncate" title={rule.value}>"{rule.value}"</span>
                                                     <span className="text-slate-600">then</span>
                                                     <div className={`w-4 h-4 rounded-full ${COLORS.find(c => c.value === rule.style)?.bg}`}></div>
-                                                    <button onClick={() => handleRemoveRule(rule.id)} className="ml-auto text-slate-400 hover:text-weflora-red"><TrashIcon className="h-3.5 w-3.5" /></button>
+                                                    <button onClick={() => handleRemoveRule(rule.id)} className="ml-auto text-slate-400 hover:text-weflora-red hover:bg-weflora-red/10 rounded p-1 -m-1">
+                                                        <XIcon className="h-3.5 w-3.5" />
+                                                    </button>
                                                 </div>
                                             ))}
                                             {(!skillConfig.conditionalFormatting || skillConfig.conditionalFormatting.length === 0) && (
@@ -364,6 +366,23 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                 )}
             </div>
         </BaseModal>
+
+        <ConfirmDeleteModal
+            isOpen={Boolean(pendingRemoveRuleId)}
+            title="Delete rule?"
+            description="This will permanently delete this conditional formatting rule. This cannot be undone."
+            confirmLabel="Delete rule"
+            onCancel={() => setPendingRemoveRuleId(null)}
+            onConfirm={() => {
+                if (!pendingRemoveRuleId) return;
+                setSkillConfig(prev => ({
+                    ...prev,
+                    conditionalFormatting: (prev.conditionalFormatting || []).filter(r => r.id !== pendingRemoveRuleId)
+                }));
+                setPendingRemoveRuleId(null);
+            }}
+        />
+        </>
     );
 };
 

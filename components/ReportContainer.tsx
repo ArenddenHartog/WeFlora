@@ -7,6 +7,7 @@ import {
     ArrowUpIcon, HistoryIcon, DownloadIcon, BookmarkIcon, CheckCircleIcon, RefreshIcon,
     FilePdfIcon, FileCodeIcon, BookIcon
 } from './icons';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 interface ReportContainerProps {
     document: ReportDocument;
@@ -32,6 +33,7 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
     // Download State
     const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
     const downloadMenuRef = useRef<HTMLDivElement>(null);
+    const [pendingDeleteTabId, setPendingDeleteTabId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!reportDoc.tabs.find(t => t.id === activeTabId) && reportDoc.tabs.length > 0) {
@@ -92,17 +94,7 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
             alert("A document must have at least one section.");
             return;
         }
-        
-        setTimeout(() => {
-            if (window.confirm("Delete this section?")) {
-                const newTabs = reportDoc.tabs.filter(t => t.id !== tabId);
-                // Preemptively switch if we are deleting the active tab
-                if (activeTabId === tabId) {
-                    setActiveTabId(newTabs[0].id);
-                }
-                onUpdateDocument({ ...reportDoc, tabs: newTabs });
-            }
-        }, 0);
+        setPendingDeleteTabId(tabId);
     };
 
     // Tab Renaming
@@ -320,6 +312,23 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
                     </div>
                 ))}
             </div>
+
+            <ConfirmDeleteModal
+                isOpen={Boolean(pendingDeleteTabId)}
+                title="Delete section?"
+                description={`This will permanently delete "${
+                    pendingDeleteTabId ? (reportDoc.tabs.find(t => t.id === pendingDeleteTabId)?.tabTitle || reportDoc.tabs.find(t => t.id === pendingDeleteTabId)?.title || 'this section') : 'this section'
+                }" from this report. This cannot be undone.`}
+                confirmLabel="Delete section"
+                onCancel={() => setPendingDeleteTabId(null)}
+                onConfirm={() => {
+                    if (!pendingDeleteTabId) return;
+                    const newTabs = reportDoc.tabs.filter(t => t.id !== pendingDeleteTabId);
+                    if (activeTabId === pendingDeleteTabId && newTabs.length > 0) setActiveTabId(newTabs[0].id);
+                    onUpdateDocument({ ...reportDoc, tabs: newTabs });
+                    setPendingDeleteTabId(null);
+                }}
+            />
         </div>
     );
 };

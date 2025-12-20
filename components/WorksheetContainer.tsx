@@ -10,6 +10,7 @@ import {
 import { useUI } from '../contexts/UIContext';
 import WorksheetAnalyticsPanel from './WorksheetAnalyticsPanel';
 import { ResizablePanel } from './ResizablePanel';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 interface WorksheetContainerProps {
     document: WorksheetDocument;
@@ -47,6 +48,7 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
     
     // UI State for toggles
     const [isBookmarked, setIsBookmarked] = useState(false);
+    const [pendingDeleteTabId, setPendingDeleteTabId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!worksheetDoc.tabs.find(t => t.id === activeTabId) && worksheetDoc.tabs.length > 0) {
@@ -100,15 +102,8 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
             alert("A document must have at least one sheet.");
             return;
         }
-        
-        if (window.confirm("Delete this sheet?")) {
-            const newTabs = worksheetDoc.tabs.filter(t => t.id !== tabId);
-            // Switch tab first if we are deleting the active one
-            if (activeTabId === tabId) {
-                setActiveTabId(newTabs[0].id);
-            }
-            onUpdateDocument({ ...worksheetDoc, tabs: newTabs });
-        }
+
+        setPendingDeleteTabId(tabId);
     };
 
     const startRenamingTab = (tab: Matrix) => {
@@ -334,6 +329,23 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
             >
                 <WorksheetAnalyticsPanel matrix={activeMatrix} onClose={() => setIsAnalyticsOpen(false)} />
             </ResizablePanel>
+
+            <ConfirmDeleteModal
+                isOpen={Boolean(pendingDeleteTabId)}
+                title="Delete sheet?"
+                description={`This will permanently delete "${
+                    pendingDeleteTabId ? (worksheetDoc.tabs.find(t => t.id === pendingDeleteTabId)?.tabTitle || worksheetDoc.tabs.find(t => t.id === pendingDeleteTabId)?.title || 'this sheet') : 'this sheet'
+                }" from this worksheet. This cannot be undone.`}
+                confirmLabel="Delete sheet"
+                onCancel={() => setPendingDeleteTabId(null)}
+                onConfirm={() => {
+                    if (!pendingDeleteTabId) return;
+                    const newTabs = worksheetDoc.tabs.filter(t => t.id !== pendingDeleteTabId);
+                    if (activeTabId === pendingDeleteTabId && newTabs.length > 0) setActiveTabId(newTabs[0].id);
+                    onUpdateDocument({ ...worksheetDoc, tabs: newTabs });
+                    setPendingDeleteTabId(null);
+                }}
+            />
         </div>
     );
 };

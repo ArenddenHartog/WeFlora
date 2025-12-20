@@ -7,6 +7,7 @@ import {
     ShieldCheckIcon, ToolIcon, CurrencyDollarIcon, BarChartIcon, SparklesIcon
 } from './icons';
 import ColumnSettingsModal from './ColumnSettingsModal';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 const ManageWorksheetPanel: React.FC<{
     matrix?: Matrix;
@@ -16,6 +17,7 @@ const ManageWorksheetPanel: React.FC<{
 }> = ({ matrix, onUpdate, onClose, onUpload }) => {
     const [draggedColId, setDraggedColId] = useState<string | null>(null);
     const [editingColumn, setEditingColumn] = useState<MatrixColumn | null>(null);
+    const [pendingDeleteColumnId, setPendingDeleteColumnId] = useState<string | null>(null);
 
     // --- TEMPLATE DATA ---
     interface SkillTemplate {
@@ -100,11 +102,7 @@ const ManageWorksheetPanel: React.FC<{
     };
 
     const handleDeleteColumn = (colId: string) => {
-        if (window.confirm("Delete this column? This cannot be undone.")) {
-            const newCols = matrix.columns.filter(c => c.id !== colId);
-            onUpdate({ ...matrix, columns: newCols });
-            setEditingColumn(null);
-        }
+        setPendingDeleteColumnId(colId);
     };
 
     const handleUpdateColumn = (updatedCol: MatrixColumn) => {
@@ -209,7 +207,7 @@ const ManageWorksheetPanel: React.FC<{
                         type="text" 
                         value={matrix.title}
                         onChange={(e) => onUpdate({ ...matrix, title: e.target.value })}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-weflora-teal/30 focus:border-weflora-teal text-slate-900"
                         placeholder="Worksheet Title"
                     />
                 </div>
@@ -378,6 +376,23 @@ const ManageWorksheetPanel: React.FC<{
                     onUpload={onUpload} 
                 />
             )}
+
+            <ConfirmDeleteModal
+                isOpen={Boolean(pendingDeleteColumnId)}
+                title="Delete column?"
+                description={`This will permanently delete "${
+                    pendingDeleteColumnId ? (matrix.columns.find(c => c.id === pendingDeleteColumnId)?.title || 'this column') : 'this column'
+                }" from this worksheet. This cannot be undone.`}
+                confirmLabel="Delete column"
+                onCancel={() => setPendingDeleteColumnId(null)}
+                onConfirm={() => {
+                    if (!pendingDeleteColumnId) return;
+                    const newCols = matrix.columns.filter(c => c.id !== pendingDeleteColumnId);
+                    onUpdate({ ...matrix, columns: newCols });
+                    setEditingColumn(null);
+                    setPendingDeleteColumnId(null);
+                }}
+            />
         </div>
     );
 };

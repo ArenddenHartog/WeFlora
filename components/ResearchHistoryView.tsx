@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import { useChat } from '../contexts/ChatContext';
 import { useUI } from '../contexts/UIContext';
 import { 
-    SearchIcon, MenuIcon, MessageSquareIcon, ClockIcon, TrashIcon, ChevronRightIcon, ChatBubbleIcon, PinIcon, PinFilledIcon
+    SearchIcon, MenuIcon, MessageSquareIcon, ClockIcon, XIcon, ChevronRightIcon, ChatBubbleIcon, PinIcon, PinFilledIcon
 } from './icons';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 interface ResearchHistoryViewProps {
     onOpenMenu: () => void;
@@ -14,6 +15,7 @@ const ResearchHistoryView: React.FC<ResearchHistoryViewProps> = ({ onOpenMenu })
     const { threads, setActiveThreadId, togglePinThread, deleteThread } = useChat();
     const { navigateToHome } = useUI();
     const [search, setSearch] = useState('');
+    const [pendingDeleteThreadId, setPendingDeleteThreadId] = useState<string | null>(null);
 
     const filteredThreads = threads
         .filter(t => t.title.toLowerCase().includes(search.toLowerCase()) || 
@@ -33,9 +35,7 @@ const ResearchHistoryView: React.FC<ResearchHistoryViewProps> = ({ onOpenMenu })
 
     const handleDeleteThread = (e: React.MouseEvent, threadId: string) => {
         e.stopPropagation();
-        if (window.confirm("Are you sure you want to delete this research thread?")) {
-            deleteThread(threadId);
-        }
+        setPendingDeleteThreadId(threadId);
     };
 
     const handlePinThread = (e: React.MouseEvent, threadId: string) => {
@@ -125,7 +125,7 @@ const ResearchHistoryView: React.FC<ResearchHistoryViewProps> = ({ onOpenMenu })
                                     className="p-2 text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                     title="Delete Thread"
                                 >
-                                    <TrashIcon className="h-4 w-4" />
+                                    <XIcon className="h-4 w-4" />
                                 </button>
                                 <ChevronRightIcon className="h-4 w-4 text-slate-300" />
                             </div>
@@ -133,6 +133,21 @@ const ResearchHistoryView: React.FC<ResearchHistoryViewProps> = ({ onOpenMenu })
                     ))
                 )}
             </div>
+
+            <ConfirmDeleteModal
+                isOpen={Boolean(pendingDeleteThreadId)}
+                title="Delete session?"
+                description={`This will permanently delete "${
+                    pendingDeleteThreadId ? (threads.find(t => t.id === pendingDeleteThreadId)?.title || 'this session') : 'this session'
+                }". This cannot be undone.`}
+                confirmLabel="Delete session"
+                onCancel={() => setPendingDeleteThreadId(null)}
+                onConfirm={() => {
+                    if (!pendingDeleteThreadId) return;
+                    deleteThread(pendingDeleteThreadId);
+                    setPendingDeleteThreadId(null);
+                }}
+            />
         </div>
     );
 };

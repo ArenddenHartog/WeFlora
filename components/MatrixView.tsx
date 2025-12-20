@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import type { Matrix, MatrixRow, MatrixColumn, MatrixColumnType, Species, ProjectFile, SkillConfiguration, ConditionalFormattingRule } from '../types';
 import { 
     PlusIcon, SparklesIcon, TableIcon, XIcon, RefreshIcon, 
-    CheckCircleIcon, MoreHorizontalIcon, TrashIcon, 
+    CheckCircleIcon, MoreHorizontalIcon, 
     GripVerticalIcon, MaximizeIcon, DownloadIcon, BookmarkIcon, HistoryIcon, ArrowUpIcon, EyeOffIcon, SearchIcon, MagicWandIcon, UploadIcon,
     LightningBoltIcon, InfoIcon, StarFilledIcon, CheckIcon, AlertTriangleIcon, PencilIcon, SettingsIcon, SlidersIcon,
     CopyIcon, FileTextIcon, AdjustmentsHorizontalIcon, LayoutGridIcon, LeafIcon

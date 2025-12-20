@@ -8,7 +8,7 @@ import type {
 import { 
     DatabaseIcon, FileTextIcon,
     SparklesIcon, SlidersIcon, FolderIcon, ChevronRightIcon,
-    UploadIcon, PencilIcon, TableIcon, TrashIcon, HomeIcon
+    UploadIcon, PencilIcon, TableIcon, XIcon, HomeIcon
 } from './icons';
 import ProjectTeamView from './ProjectTeamView';
 import ChatView from './ChatView';
@@ -23,6 +23,7 @@ import WritingAssistantPanel from './WritingAssistantPanel';
 import SpeciesIntelligencePanel from './SpeciesIntelligencePanel';
 import ProjectOverview from './ProjectOverview';
 import ProjectHeader from './ProjectHeader';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { useChat } from '../contexts/ChatContext';
 import { useUI } from '../contexts/UIContext';
 import { useProject } from '../contexts/ProjectContext';
@@ -96,6 +97,7 @@ const ProjectWorkspace: React.FC = () => {
     // Removed local previewFile state
     const [inspectedEntity, setInspectedEntity] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [pendingDeleteFileId, setPendingDeleteFileId] = useState<string | null>(null);
 
     // Sync tab navigation
     const handleTabChange = (tab: string) => {
@@ -132,9 +134,7 @@ const ProjectWorkspace: React.FC = () => {
 
     const handleDeleteFile = (e: React.MouseEvent, fileId: string) => {
         e.stopPropagation();
-        if (window.confirm("Delete this file? This cannot be undone.")) {
-            deleteProjectFile(fileId, projectId);
-        }
+        setPendingDeleteFileId(fileId);
     };
 
     const handleAddSpeciesToWorksheet = (data: any) => {
@@ -341,7 +341,7 @@ const ProjectWorkspace: React.FC = () => {
                                             className="absolute top-2 right-2 p-1 text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded transition-colors opacity-0 group-hover:opacity-100"
                                             title="Delete File"
                                         >
-                                            <TrashIcon className="h-3.5 w-3.5" />
+                                            <XIcon className="h-3.5 w-3.5" />
                                         </button>
                                     </div>
                                 ))}
@@ -429,6 +429,7 @@ const ProjectWorkspace: React.FC = () => {
                 <ProjectHeader
                     projectName={project.name || project.id}
                     activeTab={activeTab === 'files' ? 'files' : activeTab}
+                    onBackToProjects={() => navigate('/projects')}
                     onNavigateTab={(tab) => {
                         if (tab === 'overview') handleTabChange('overview');
                         else handleTabChange(tab);
@@ -449,6 +450,21 @@ const ProjectWorkspace: React.FC = () => {
                     {renderRightPanelContent()}
                 </ResizablePanel>
             </div>
+
+            <ConfirmDeleteModal
+                isOpen={Boolean(pendingDeleteFileId)}
+                title="Delete project file?"
+                description={`This will permanently delete "${
+                    pendingDeleteFileId ? (files.find(f => f.id === pendingDeleteFileId)?.name || 'this file') : 'this file'
+                }" from the project. This cannot be undone.`}
+                confirmLabel="Delete file"
+                onCancel={() => setPendingDeleteFileId(null)}
+                onConfirm={() => {
+                    if (!pendingDeleteFileId) return;
+                    deleteProjectFile(pendingDeleteFileId, projectId);
+                    setPendingDeleteFileId(null);
+                }}
+            />
 
             {isWorksheetWizardOpen && (
                 <WorksheetWizard 

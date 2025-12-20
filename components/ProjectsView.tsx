@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import type { PinnedProject, Member } from '../types';
-import { SearchIcon, PlusIcon, FolderIcon, FilterIcon, SortAscendingIcon, MoreHorizontalIcon, LockClosedIcon, MenuIcon, XIcon, ChevronDownIcon, TrashIcon } from './icons';
+import { SearchIcon, PlusIcon, FolderIcon, FilterIcon, SortAscendingIcon, MoreHorizontalIcon, LockClosedIcon, MenuIcon, XIcon, ChevronDownIcon } from './icons';
 import BaseModal from './BaseModal';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { useProject } from '../contexts/ProjectContext';
 
 interface ProjectsViewProps {
@@ -23,6 +24,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
     // Expansion and Invite States
     const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
     const [inviteInputs, setInviteInputs] = useState<{[key: string]: string}>({});
+    const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState<string | null>(null);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -43,9 +45,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
 
     const handleDeleteProject = (e: React.MouseEvent, projectId: string) => {
         e.stopPropagation();
-        if (window.confirm("Are you sure you want to delete this project? This will remove all files, worksheets, and reports associated with it.")) {
-            deleteProject(projectId);
-        }
+        setPendingDeleteProjectId(projectId);
         setActiveMenuId(null);
     };
 
@@ -230,7 +230,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                                                 onClick={(e) => handleDeleteProject(e, project.id)}
                                                 className="w-full text-left px-4 py-2 text-sm text-weflora-red hover:bg-weflora-red/10 last:rounded-b-lg flex items-center gap-2"
                                             >
-                                                <TrashIcon className="h-3.5 w-3.5" /> Delete
+                                                <XIcon className="h-3.5 w-3.5" /> Delete
                                             </button>
                                         </div>
                                     )}
@@ -371,6 +371,21 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                     </div>
                 </form>
             </BaseModal>
+
+            <ConfirmDeleteModal
+                isOpen={Boolean(pendingDeleteProjectId)}
+                title="Delete project?"
+                description={`This will permanently delete "${
+                    pendingDeleteProjectId ? (projects.find(p => p.id === pendingDeleteProjectId)?.name || pendingDeleteProjectId) : 'this project'
+                }" and remove all associated files, worksheets, and reports. This cannot be undone.`}
+                confirmLabel="Delete project"
+                onCancel={() => setPendingDeleteProjectId(null)}
+                onConfirm={() => {
+                    if (!pendingDeleteProjectId) return;
+                    deleteProject(pendingDeleteProjectId);
+                    setPendingDeleteProjectId(null);
+                }}
+            />
         </div>
     );
 };

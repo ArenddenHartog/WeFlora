@@ -3,9 +3,10 @@ import React, { useState, useMemo } from 'react';
 import type { Report, ReportTemplate } from '../types';
 import { 
     SearchIcon, MenuIcon, PlusIcon, FileTextIcon, FolderIcon, TagIcon, XIcon,
-    MagicWandIcon, LightningBoltIcon, TrashIcon
+    MagicWandIcon, LightningBoltIcon
 } from './icons';
 import BaseModal from './BaseModal';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 interface ReportsHubViewProps {
     reports: Report[];
@@ -31,6 +32,7 @@ const ReportsHubView: React.FC<ReportsHubViewProps> = ({
     const [newTemplateDesc, setNewTemplateDesc] = useState('');
     const [newTemplateTags, setNewTemplateTags] = useState('');
     const [newTemplateContent, setNewTemplateContent] = useState('');
+    const [pendingDeleteReportId, setPendingDeleteReportId] = useState<string | null>(null);
 
     // Display reports passed from parent (filtered by parent logic). 
     // Only exclude sections (parentId) to ensure we show documents.
@@ -60,12 +62,7 @@ const ReportsHubView: React.FC<ReportsHubViewProps> = ({
 
     const handleDelete = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        // Use setTimeout to allow the event loop to clear before blocking with confirm
-        setTimeout(() => {
-            if (window.confirm("Are you sure you want to delete this report?")) {
-                onDeleteReport && onDeleteReport(id);
-            }
-        }, 0);
+        setPendingDeleteReportId(id);
     };
 
     const handleCreateTemplate = (e: React.FormEvent) => {
@@ -224,7 +221,7 @@ const ReportsHubView: React.FC<ReportsHubViewProps> = ({
                                     className="absolute top-4 right-4 p-1.5 text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                     title="Delete Report"
                                 >
-                                    <TrashIcon className="h-4 w-4" />
+                                    <XIcon className="h-4 w-4" />
                                 </button>
                             )}
                         </div>
@@ -360,6 +357,21 @@ const ReportsHubView: React.FC<ReportsHubViewProps> = ({
                     </div>
                 </form>
             </BaseModal>
+
+            <ConfirmDeleteModal
+                isOpen={Boolean(pendingDeleteReportId)}
+                title="Delete report?"
+                description={`This will permanently delete "${
+                    pendingDeleteReportId ? (reports.find(r => r.id === pendingDeleteReportId)?.title || 'this report') : 'this report'
+                }". This cannot be undone.`}
+                confirmLabel="Delete report"
+                onCancel={() => setPendingDeleteReportId(null)}
+                onConfirm={() => {
+                    if (!pendingDeleteReportId) return;
+                    onDeleteReport && onDeleteReport(pendingDeleteReportId);
+                    setPendingDeleteReportId(null);
+                }}
+            />
         </div>
     );
 };

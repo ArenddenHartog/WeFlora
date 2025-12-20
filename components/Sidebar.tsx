@@ -101,6 +101,9 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const isActive = (path: string) => {
       if (path === '/') return location.pathname === '/';
+      // Normalize project domain routes so sidebar selection reflects the active domain.
+      // - /projects (hub) and /project/:id/* (workspace) both count as "Projects"
+      if (path === '/projects') return location.pathname.startsWith('/projects') || location.pathname.startsWith('/project/');
       return location.pathname.startsWith(path);
   }
 

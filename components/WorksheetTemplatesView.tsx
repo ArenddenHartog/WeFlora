@@ -2,9 +2,10 @@
 import React, { useState } from 'react';
 import type { WorksheetTemplate, Matrix } from '../types';
 import { 
-    SearchIcon, MenuIcon, PlusIcon, TableIcon, LightningBoltIcon, MagicWandIcon, XIcon, FolderIcon, TrashIcon
+    SearchIcon, MenuIcon, PlusIcon, TableIcon, LightningBoltIcon, MagicWandIcon, XIcon, FolderIcon
 } from './icons';
 import BaseModal from './BaseModal';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 interface WorksheetTemplatesViewProps {
     items: WorksheetTemplate[];
@@ -24,6 +25,7 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
     const [newTitle, setNewTitle] = useState('');
     const [newDescription, setNewDescription] = useState('');
     const [newTags, setNewTags] = useState('');
+    const [pendingDeleteMatrixId, setPendingDeleteMatrixId] = useState<string | null>(null);
 
     const filteredTemplates = items.filter(item => 
         item.title.toLowerCase().includes(search.toLowerCase()) || 
@@ -38,12 +40,7 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
 
     const handleDelete = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        // Use setTimeout to avoid UI freeze
-        setTimeout(() => {
-            if (window.confirm("Are you sure you want to delete this worksheet?")) {
-                onDeleteMatrix && onDeleteMatrix(id);
-            }
-        }, 0);
+        setPendingDeleteMatrixId(id);
     };
 
     const handleCreate = (e: React.FormEvent) => {
@@ -166,7 +163,7 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
                                     className="absolute top-4 right-4 p-1.5 text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                     title="Delete Worksheet"
                                 >
-                                    <TrashIcon className="h-4 w-4" />
+                                    <XIcon className="h-4 w-4" />
                                 </button>
                             )}
                         </div>
@@ -288,6 +285,21 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
                     </div>
                 </form>
             </BaseModal>
+
+            <ConfirmDeleteModal
+                isOpen={Boolean(pendingDeleteMatrixId)}
+                title="Delete worksheet?"
+                description={`This will permanently delete "${
+                    pendingDeleteMatrixId ? (standaloneMatrices.find(m => m.id === pendingDeleteMatrixId)?.title || 'this worksheet') : 'this worksheet'
+                }". This cannot be undone.`}
+                confirmLabel="Delete worksheet"
+                onCancel={() => setPendingDeleteMatrixId(null)}
+                onConfirm={() => {
+                    if (!pendingDeleteMatrixId) return;
+                    onDeleteMatrix && onDeleteMatrix(pendingDeleteMatrixId);
+                    setPendingDeleteMatrixId(null);
+                }}
+            />
         </div>
     );
 };

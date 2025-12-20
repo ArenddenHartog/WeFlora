@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { 
     SparklesIcon, XIcon, CheckCircleIcon, RefreshIcon, 
-    CopyIcon, TrashIcon, SendIcon, LightningBoltIcon, TelescopeIcon
+    CopyIcon, SendIcon, LightningBoltIcon, TelescopeIcon
 } from './icons';
 import { aiService } from '../services/aiService';
 
@@ -57,7 +57,7 @@ const WritingAssistantPanel: React.FC<WritingAssistantPanelProps> = ({ content, 
         { label: 'Professional', instruction: 'Rewrite to sound more professional, objective, and authoritative.', icon: LightningBoltIcon },
         { label: 'Simplify', instruction: 'Simplify the language to make it easier to read (lower reading grade level).', icon: RefreshIcon },
         { label: 'Enhance Findings', instruction: 'Strengthen the presentation of key findings, making them more impactful and evidence-based.', icon: TelescopeIcon },
-        { label: 'Shorten', instruction: 'Make the text concise and remove redundancy without losing key information.', icon: TrashIcon },
+        { label: 'Shorten', instruction: 'Make the text concise and remove redundancy without losing key information.', icon: XIcon },
         { label: 'Expand', instruction: 'Elaborate on the key points and provide more detail.', icon: SparklesIcon }
     ];
 
