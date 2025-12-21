@@ -37,13 +37,13 @@ interface ProjectContextType {
     // Explicit Data Actions
     matrices: Matrix[];
     setMatrices: React.Dispatch<React.SetStateAction<Matrix[]>>; // Kept for loading/reset
-    createMatrix: (matrix: Matrix) => Promise<CreateEntityResult>;
+    createMatrix: (matrix: Matrix) => Promise<{ id: string; projectId?: string; parentId?: string } | null>;
     updateMatrix: (matrix: Matrix) => Promise<void>;
     deleteMatrix: (matrixId: string) => Promise<void>;
 
     reports: Report[];
     setReports: React.Dispatch<React.SetStateAction<Report[]>>; // Kept for loading/reset
-    createReport: (report: Report) => Promise<CreateEntityResult>;
+    createReport: (report: Report) => Promise<{ id: string; projectId?: string; parentId?: string } | null>;
     updateReport: (report: Report) => Promise<void>;
     deleteReport: (reportId: string) => Promise<void>;
 
@@ -60,14 +60,6 @@ interface ProjectContextType {
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
-
-export type CreateEntityResult = {
-    reportId?: string;
-    matrixId?: string;
-    projectId?: string;
-    tabId?: string;
-    withinProject: boolean;
-};
 
 export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { user } = useAuth();
@@ -254,10 +246,9 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // --- Explicit Matrix Actions ---
 
-    const createMatrix = async (matrix: Matrix): Promise<CreateEntityResult> => {
+    const createMatrix = async (matrix: Matrix): Promise<{ id: string; projectId?: string; parentId?: string } | null> => {
         const userId = (await supabase.auth.getUser()).data.user?.id;
-        const withinProject = Boolean(matrix.projectId);
-        if (!userId) return { withinProject, projectId: matrix.projectId };
+        if (!userId) return null;
 
         // Optimistic Update
         setMatrices(prev => [...prev, matrix]);
@@ -274,26 +265,29 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             rows: matrix.rows,
             parent_id: matrix.parentId,
             user_id: userId
-        }).select('id').single();
+        }).select('*').single();
 
         if (error) {
             console.error("Failed to create matrix", error);
             showNotification("Failed to save worksheet.", 'error');
             setMatrices(prev => prev.filter(m => m.id !== tempId)); // Rollback
-            return { withinProject, projectId: matrix.projectId };
+            return null;
         }
 
-        const createdId = (data as any)?.id as string | undefined;
-        if (createdId && createdId !== tempId) {
-            setMatrices(prev => prev.map(m => m.id === tempId ? { ...m, id: createdId } : m));
-        }
-
-        return {
-            withinProject,
-            projectId: matrix.projectId,
-            matrixId: createdId || tempId,
-            tabId: withinProject ? (createdId || tempId) : undefined
+        const mappedMatrix: Matrix = {
+            id: (data as any).id,
+            projectId: (data as any).project_id ?? matrix.projectId,
+            parentId: (data as any).parent_id ?? matrix.parentId,
+            title: (data as any).title,
+            description: (data as any).description ?? matrix.description,
+            columns: (data as any).columns ?? matrix.columns,
+            rows: (data as any).rows ?? matrix.rows,
+            tabTitle: matrix.tabTitle,
+            updatedAt: (data as any).updated_at ?? new Date().toISOString()
         };
+
+        setMatrices(prev => prev.map(m => m.id === tempId ? mappedMatrix : m));
+        return { id: mappedMatrix.id, projectId: mappedMatrix.projectId, parentId: mappedMatrix.parentId };
     };
 
     const updateMatrix = async (matrix: Matrix) => {
@@ -337,10 +331,9 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // --- Explicit Report Actions ---
 
-    const createReport = async (report: Report): Promise<CreateEntityResult> => {
+    const createReport = async (report: Report): Promise<{ id: string; projectId?: string; parentId?: string } | null> => {
         const userId = (await supabase.auth.getUser()).data.user?.id;
-        const withinProject = Boolean(report.projectId);
-        if (!userId) return { withinProject, projectId: report.projectId };
+        if (!userId) return null;
 
         setReports(prev => [...prev, report]);
 
@@ -355,26 +348,28 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             tags: report.tags,
             parent_id: report.parentId,
             user_id: userId
-        }).select('id').single();
+        }).select('*').single();
 
         if (error) {
             console.error("Failed to create report", error);
             showNotification("Failed to save report.", 'error');
             setReports(prev => prev.filter(r => r.id !== tempId));
-            return { withinProject, projectId: report.projectId };
+            return null;
         }
 
-        const createdId = (data as any)?.id as string | undefined;
-        if (createdId && createdId !== tempId) {
-            setReports(prev => prev.map(r => r.id === tempId ? { ...r, id: createdId } : r));
-        }
-
-        return {
-            withinProject,
-            projectId: report.projectId,
-            reportId: createdId || tempId,
-            tabId: withinProject ? (createdId || tempId) : undefined
+        const mappedReport: Report = {
+            id: (data as any).id,
+            projectId: (data as any).project_id ?? report.projectId,
+            parentId: (data as any).parent_id ?? report.parentId,
+            title: (data as any).title,
+            content: (data as any).content,
+            tags: (data as any).tags ?? report.tags,
+            tabTitle: report.tabTitle,
+            lastModified: (data as any).updated_at ?? (data as any).last_modified ?? new Date().toISOString()
         };
+
+        setReports(prev => prev.map(r => r.id === tempId ? mappedReport : r));
+        return { id: mappedReport.id, projectId: mappedReport.projectId, parentId: mappedReport.parentId };
     };
 
     const updateReport = async (report: Report) => {

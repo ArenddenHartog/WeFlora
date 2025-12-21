@@ -63,21 +63,22 @@ const ReportsRoute: React.FC<ReportsRouteProps> = ({ onOpenDestinationModal }) =
     const handleCreate = async (report: Report) => {
         // Ensure it's marked as standalone
         const newReport = { ...report, projectId: undefined };
-        const result = await createReport(newReport);
+        const created = await createReport(newReport);
+        if (!created) return null;
         console.info('[create-flow] draft report (reports hub)', {
             kind: 'report',
-            withinProject: result.withinProject,
-            projectId: result.projectId,
-            reportId: result.reportId,
-            tabId: result.tabId
+            withinProject: Boolean(created.projectId),
+            projectId: created.projectId,
+            reportId: created.id,
+            tabId: Boolean(created.projectId) ? created.id : undefined
         });
         navigateToCreatedEntity({
             navigate,
             kind: 'report',
             withinProject: false,
-            reportId: result.reportId
+            reportId: created.id
         });
-        return result;
+        return created;
     };
 
     const handleUpdate = (updated: Report) => {

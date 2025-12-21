@@ -1,7 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import type { Report, ReportTemplate } from '../types';
-import type { CreateEntityResult } from '../contexts/ProjectContext';
 import { 
     FileTextIcon, UploadIcon, MagicWandIcon, PlusIcon, 
     RefreshIcon, SparklesIcon, SearchIcon, CheckCircleIcon
@@ -11,7 +10,7 @@ import { aiService } from '../services/aiService';
 
 interface ReportWizardProps {
     onClose: () => void;
-    onCreate: (report: Report) => Promise<CreateEntityResult>;
+    onCreate: (report: Report) => Promise<{ id: string; projectId?: string; parentId?: string } | null>;
     templates: ReportTemplate[];
     initialFile?: File | null;
 }
@@ -103,13 +102,14 @@ const ReportWizard: React.FC<ReportWizardProps> = ({ onClose, onCreate, template
             lastModified: new Date().toLocaleDateString(),
             tags: tags.split(',').map(t => t.trim()).filter(Boolean)
         };
-        const result = await onCreate(newReport);
+        const created = await onCreate(newReport);
+        if (!created) return;
         console.info('[create-flow] report wizard', {
             kind: 'report',
-            withinProject: result.withinProject,
-            projectId: result.projectId,
-            reportId: result.reportId,
-            tabId: result.tabId
+            withinProject: Boolean(created.projectId),
+            projectId: created.projectId,
+            reportId: created.id,
+            tabId: Boolean(created.projectId) ? created.id : undefined
         });
     };
 

@@ -67,21 +67,22 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
     const handleCreate = async (matrix: Matrix) => {
         // Ensure it's marked as standalone
         const newMatrix = { ...matrix, projectId: undefined };
-        const result = await createMatrix(newMatrix);
+        const created = await createMatrix(newMatrix);
+        if (!created) return null;
         console.info('[create-flow] build worksheet (worksheets hub)', {
             kind: 'worksheet',
-            withinProject: result.withinProject,
-            projectId: result.projectId,
-            matrixId: result.matrixId,
-            tabId: result.tabId
+            withinProject: Boolean(created.projectId),
+            projectId: created.projectId,
+            matrixId: created.id,
+            tabId: Boolean(created.projectId) ? created.id : undefined
         });
         navigateToCreatedEntity({
             navigate,
             kind: 'worksheet',
             withinProject: false,
-            matrixId: result.matrixId
+            matrixId: created.id
         });
-        return result;
+        return created;
     };
 
     const handleUpdate = (updated: Matrix) => {

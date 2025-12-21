@@ -136,21 +136,22 @@ const MainContent: React.FC<MainContentProps> = ({
                 lastModified: new Date().toLocaleDateString(),
                 tags: ['ai-import']
             };
-            const result = await handleCreateReport(report, destination);
+            const created = await handleCreateReport(report, destination);
+            if (!created) return;
             console.info('[create-flow] copy to report', {
                 kind: 'report',
-                withinProject: result.withinProject,
-                projectId: result.projectId,
-                reportId: result.reportId,
-                tabId: result.tabId
+                withinProject: Boolean(created.projectId),
+                projectId: created.projectId,
+                reportId: created.id,
+                tabId: Boolean(created.projectId) ? created.id : undefined
             });
             navigateToCreatedEntity({
                 navigate,
                 kind: 'report',
-                withinProject: result.withinProject,
-                projectId: result.projectId,
-                reportId: result.reportId,
-                focusTabId: result.tabId
+                withinProject: Boolean(created.projectId),
+                projectId: created.projectId,
+                reportId: created.id,
+                focusTabId: created.id
             });
             closeDestinationModal();
             showNotification('Report created from chat');
@@ -166,20 +167,21 @@ const MainContent: React.FC<MainContentProps> = ({
                     rows: result.rows
                 };
                 const created = await handleCreateMatrix(newMatrix, destination);
+                if (!created) return;
                 console.info('[create-flow] copy to worksheet', {
                     kind: 'worksheet',
-                    withinProject: created.withinProject,
+                    withinProject: Boolean(created.projectId),
                     projectId: created.projectId,
-                    matrixId: created.matrixId,
-                    tabId: created.tabId
+                    matrixId: created.id,
+                    tabId: Boolean(created.projectId) ? created.id : undefined
                 });
                 navigateToCreatedEntity({
                     navigate,
                     kind: 'worksheet',
-                    withinProject: created.withinProject,
+                    withinProject: Boolean(created.projectId),
                     projectId: created.projectId,
-                    matrixId: created.matrixId,
-                    focusTabId: created.tabId
+                    matrixId: created.id,
+                    focusTabId: created.id
                 });
                 showNotification('Worksheet created from chat');
             } catch (error) {
@@ -191,20 +193,21 @@ const MainContent: React.FC<MainContentProps> = ({
                     rows: [{ id: 'r1', cells: { c1: { columnId: 'c1', value: message.text } } }]
                 };
                 const created = await handleCreateMatrix(fallbackMatrix, destination);
+                if (!created) return;
                 console.info('[create-flow] copy to worksheet', {
                     kind: 'worksheet',
-                    withinProject: created.withinProject,
+                    withinProject: Boolean(created.projectId),
                     projectId: created.projectId,
-                    matrixId: created.matrixId,
-                    tabId: created.tabId
+                    matrixId: created.id,
+                    tabId: Boolean(created.projectId) ? created.id : undefined
                 });
                 navigateToCreatedEntity({
                     navigate,
                     kind: 'worksheet',
-                    withinProject: created.withinProject,
+                    withinProject: Boolean(created.projectId),
                     projectId: created.projectId,
-                    matrixId: created.matrixId,
-                    focusTabId: created.tabId
+                    matrixId: created.id,
+                    focusTabId: created.id
                 });
                 showNotification('Worksheet created (raw mode)');
             } finally {

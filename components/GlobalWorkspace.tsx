@@ -93,41 +93,43 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
     };
 
     const handleCreateWorksheet = async (matrix: Matrix) => {
-        const result = await createMatrix({ ...matrix, projectId: undefined }); // Standalone
+        const created = await createMatrix({ ...matrix, projectId: undefined }); // Standalone
+        if (!created) return null;
         console.info('[create-flow] build worksheet (home)', {
             kind: 'worksheet',
-            withinProject: result.withinProject,
-            projectId: result.projectId,
-            matrixId: result.matrixId,
-            tabId: result.tabId
+            withinProject: Boolean(created.projectId),
+            projectId: created.projectId,
+            matrixId: created.id,
+            tabId: Boolean(created.projectId) ? created.id : undefined
         });
         navigateToCreatedEntity({
             navigate,
             kind: 'worksheet',
             withinProject: false,
-            matrixId: result.matrixId
+            matrixId: created.id
         });
         setIsCreateWorksheetOpen(false);
-        return result;
+        return created;
     };
 
     const handleCreateReport = async (report: Report) => {
-        const result = await createReport({ ...report, projectId: undefined });
+        const created = await createReport({ ...report, projectId: undefined });
+        if (!created) return null;
         console.info('[create-flow] draft report (home)', {
             kind: 'report',
-            withinProject: result.withinProject,
-            projectId: result.projectId,
-            reportId: result.reportId,
-            tabId: result.tabId
+            withinProject: Boolean(created.projectId),
+            projectId: created.projectId,
+            reportId: created.id,
+            tabId: Boolean(created.projectId) ? created.id : undefined
         });
         navigateToCreatedEntity({
             navigate,
             kind: 'report',
             withinProject: false,
-            reportId: result.reportId
+            reportId: created.id
         });
         setIsCreateReportOpen(false);
-        return result;
+        return created;
     };
 
     switch (view) {

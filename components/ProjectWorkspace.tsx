@@ -237,45 +237,47 @@ const ProjectWorkspace: React.FC = () => {
     };
 
     const handleCreateWorksheetFromWizard = async (matrix: Matrix) => {
-        const result = await createMatrix({ ...matrix, projectId: project.id });
+        const created = await createMatrix({ ...matrix, projectId: project.id });
+        if (!created) return null;
         console.info('[create-flow] build worksheet (project)', {
             kind: 'worksheet',
             withinProject: true,
             projectId: project.id,
-            matrixId: result.matrixId,
-            tabId: result.tabId
+            matrixId: created.id,
+            tabId: created.id
         });
         navigateToCreatedEntity({
             navigate,
             kind: 'worksheet',
             withinProject: true,
             projectId: project.id,
-            matrixId: result.matrixId,
-            focusTabId: result.tabId
+            matrixId: created.id,
+            focusTabId: created.id
         });
         setIsWorksheetWizardOpen(false);
-        return result;
+        return created;
     };
 
     const handleCreateReportFromWizard = async (report: Report) => {
-        const result = await createReport({ ...report, projectId: project.id });
+        const created = await createReport({ ...report, projectId: project.id });
+        if (!created) return null;
         console.info('[create-flow] draft report (project)', {
             kind: 'report',
             withinProject: true,
             projectId: project.id,
-            reportId: result.reportId,
-            tabId: result.tabId
+            reportId: created.id,
+            tabId: created.id
         });
         navigateToCreatedEntity({
             navigate,
             kind: 'report',
             withinProject: true,
             projectId: project.id,
-            reportId: result.reportId,
-            focusTabId: result.tabId
+            reportId: created.id,
+            focusTabId: created.id
         });
         setIsReportWizardOpen(false);
-        return result;
+        return created;
     };
 
     const renderRightPanelContent = () => {
