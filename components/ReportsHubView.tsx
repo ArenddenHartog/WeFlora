@@ -192,14 +192,11 @@ const ReportsHubView: React.FC<ReportsHubViewProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredReports.map(report => (
                         <div key={report.id} onClick={() => onOpenReport(report)} className="group flex flex-col bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-weflora-teal transition-all duration-200 cursor-pointer relative">
-                            <div className="p-5 flex-grow">
+                            <div className="p-5 flex-grow pb-10">
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="h-10 w-10 rounded-lg flex items-center justify-center border bg-weflora-mint/10 border-weflora-mint text-weflora-teal">
                                         <FileTextIcon className="h-5 w-5" />
                                     </div>
-                                    <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded">
-                                        {report.projectId ? 'Project Report' : 'General Report'}
-                                    </span>
                                 </div>
                                 <h3 className="text-lg font-bold text-slate-800 mb-1 group-hover:text-weflora-teal transition-colors pr-6">{report.title}</h3>
                                 <div className="text-xs text-slate-400 mb-4">
@@ -214,6 +211,10 @@ const ReportsHubView: React.FC<ReportsHubViewProps> = ({
                                     ))}
                                 </div>
                             </div>
+
+                            <span className="absolute bottom-4 right-4 text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded pointer-events-none">
+                                {report.projectId ? 'Project Report' : 'General Report'}
+                            </span>
                             {/* Delete Button */}
                             {onDeleteReport && (
                                 <button 
