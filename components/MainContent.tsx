@@ -30,27 +30,30 @@ const MainContent: React.FC<MainContentProps> = ({
 }) => {
     const navigate = useNavigate();
     // Hooks for data access
-    const { projects, createMatrix, createReport, setProjects } = useProject();
+    const { projects, createProject, createMatrix, createReport } = useProject();
     const { currentWorkspace } = useData();
     const { showNotification, destinationModal, openDestinationModal, closeDestinationModal } = useUI();
+
+    const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const persistedProjects = projects.filter(p => isUuid(p.id));
 
     // Wrappers to handle logic for Destination Modal
     const handleCreateMatrix = async (newM: Matrix, dest?: { type: 'project' | 'standalone' | 'new_project', projectId?: string, newProjectName?: string }) => {
         let finalProjectId = dest?.projectId || newM.projectId;
         
         if (dest?.type === 'new_project' && dest.newProjectName) {
-            const newProjId = `proj-${Date.now()}`;
-            finalProjectId = newProjId;
-            const newProj: PinnedProject = {
-                id: newProjId,
+            const tempId = `proj-${Date.now()}`;
+            const created = await createProject({
+                id: tempId,
                 name: dest.newProjectName,
-                icon: FolderIcon, 
+                icon: FolderIcon,
                 status: 'Active',
                 date: new Date().toISOString().split('T')[0],
                 workspaceId: currentWorkspace.id,
                 members: []
-            };
-            setProjects(prev => [newProj, ...prev]);
+            });
+            if (!created) return null;
+            finalProjectId = created.id;
         } else if (dest?.type === 'project') {
             // Do NOT navigate/select project here. Navigation happens only after successful create.
         }
@@ -63,18 +66,18 @@ const MainContent: React.FC<MainContentProps> = ({
         let finalProjectId = dest?.projectId || newR.projectId;
 
         if (dest?.type === 'new_project' && dest.newProjectName) {
-            const newProjId = `proj-${Date.now()}`;
-            finalProjectId = newProjId;
-            const newProj: PinnedProject = {
-                id: newProjId,
+            const tempId = `proj-${Date.now()}`;
+            const created = await createProject({
+                id: tempId,
                 name: dest.newProjectName,
-                icon: FolderIcon, 
+                icon: FolderIcon,
                 status: 'Active',
                 date: new Date().toISOString().split('T')[0],
                 workspaceId: currentWorkspace.id,
                 members: []
-            };
-            setProjects(prev => [newProj, ...prev]);
+            });
+            if (!created) return null;
+            finalProjectId = created.id;
         } else if (dest?.type === 'project') {
             // Do NOT navigate/select project here. Navigation happens only after successful create.
         }
@@ -334,7 +337,7 @@ const MainContent: React.FC<MainContentProps> = ({
                                             onClick={(e) => e.stopPropagation()}
                                         >
                                             <option value="" disabled>Select Project...</option>
-                                            {projects.map(p => (
+                                            {persistedProjects.map(p => (
                                                 <option key={p.id} value={p.id}>{p.name}</option>
                                             ))}
                                         </select>

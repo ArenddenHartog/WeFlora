@@ -29,6 +29,7 @@ const ALLOWED_MIME_TYPES = [
 interface ProjectContextType {
     projects: PinnedProject[];
     setProjects: React.Dispatch<React.SetStateAction<PinnedProject[]>>;
+    createProject: (project: PinnedProject) => Promise<{ id: string } | null>;
     updateProject: (project: PinnedProject) => Promise<void>;
     deleteProject: (projectId: string) => Promise<void>;
     files: { [projectId: string]: ProjectFile[] };
@@ -162,30 +163,9 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 setFiles(groupedFiles);
             }
 
-            // 5. Tasks & Comments
-            const { data: taskData } = await supabase.from('tasks').select('*').eq('user_id', userId);
-            if (taskData) {
-                setTasks(taskData.map((t: any) => ({
-                    id: t.id,
-                    title: t.title,
-                    status: t.status,
-                    priority: t.priority,
-                    dueDate: t.due_date,
-                    assigneeId: t.assignee_id,
-                    projectId: t.project_id
-                })));
-            }
-
-            const { data: commData } = await supabase.from('comments').select('*').eq('user_id', userId);
-            if (commData) {
-                setComments(commData.map((c: any) => ({
-                    id: c.id,
-                    text: c.text,
-                    memberId: c.member_id,
-                    projectId: c.project_id,
-                    timestamp: new Date(c.created_at).toLocaleString()
-                })));
-            }
+            // 5. Tasks & Comments (MVP: disabled to avoid 404 spam if tables not present)
+            setTasks([]);
+            setComments([]);
         };
 
         fetchData();
@@ -193,26 +173,47 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // --- Projects CRUD ---
     const handleSetProjects: React.Dispatch<React.SetStateAction<PinnedProject[]>> = (action) => {
-        setProjects(prev => {
-            const newVal = typeof action === 'function' ? action(prev) : action;
-            // Legacy handling for direct setProjects calls from MainContent
-            // Ideally we would migrate this too, but focusing on Matrices/Reports first
-            const added = newVal.filter(p => !prev.find(old => old.id === p.id));
-            added.forEach(async (p) => {
-                const userId = (await supabase.auth.getUser()).data.user?.id;
-                if (!userId) return;
-                await supabase.from('projects').insert({
-                    id: p.id.includes('new') ? undefined : p.id,
-                    name: p.name,
-                    status: p.status,
-                    date: p.date,
-                    user_id: userId,
-                    members: p.members,
-                    workspace_id: p.workspaceId
-                });
-            });
-            return newVal;
-        });
+        setProjects(action as any);
+    };
+
+    const createProject = async (project: PinnedProject): Promise<{ id: string } | null> => {
+        const userId = (await supabase.auth.getUser()).data.user?.id;
+        if (!userId) return null;
+
+        const tempId = project.id;
+        setProjects(prev => [project, ...prev]);
+
+        const shouldDbGenerateId = tempId.startsWith('proj-') || tempId.startsWith('new-') || tempId.includes('new');
+
+        const { data, error } = await supabase.from('projects').insert({
+            id: shouldDbGenerateId ? undefined : tempId,
+            name: project.name,
+            status: project.status,
+            date: project.date,
+            user_id: userId,
+            members: project.members,
+            workspace_id: null
+        }).select('*').single();
+
+        if (error || !data) {
+            console.error('Failed to create project', error);
+            showNotification('Failed to create project.', 'error');
+            setProjects(prev => prev.filter(p => p.id !== tempId));
+            return null;
+        }
+
+        const mappedProject: PinnedProject = {
+            id: (data as any).id,
+            name: (data as any).name,
+            status: (data as any).status,
+            date: (data as any).date,
+            workspaceId: project.workspaceId,
+            icon: FolderIcon,
+            members: (data as any).members || project.members || []
+        };
+
+        setProjects(prev => prev.map(p => p.id === tempId ? mappedProject : p));
+        return { id: mappedProject.id };
     };
 
     const updateProject = async (project: PinnedProject) => {
@@ -250,9 +251,10 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         const userId = (await supabase.auth.getUser()).data.user?.id;
         if (!userId) return null;
 
-        const withinProject = Boolean(matrix.projectId);
-        if (withinProject && !matrix.projectId) {
-            showNotification("Cannot create worksheet: missing project.", 'error');
+        const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        if (matrix.projectId && !isUuid(matrix.projectId)) {
+            console.error('[createMatrix] refusing non-uuid projectId', { projectId: matrix.projectId });
+            showNotification("Cannot save: project not yet persisted.", 'error');
             return null;
         }
 
@@ -267,8 +269,6 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             isPrimaryKey: true
         }];
         const rows = rowsIsArray ? matrix.rows : [];
-
-        const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
         // Optimistic Update
         const optimisticMatrix: Matrix = {
@@ -378,6 +378,13 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         const userId = (await supabase.auth.getUser()).data.user?.id;
         if (!userId) return null;
 
+        const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        if (report.projectId && !isUuid(report.projectId)) {
+            console.error('[createReport] refusing non-uuid projectId', { projectId: report.projectId });
+            showNotification("Cannot save: project not yet persisted.", 'error');
+            return null;
+        }
+
         setReports(prev => [...prev, report]);
 
         const tempId = report.id;
@@ -452,29 +459,6 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const handleSetTasks: React.Dispatch<React.SetStateAction<Task[]>> = (action) => {
         setTasks(prev => {
             const newVal = typeof action === 'function' ? action(prev) : action;
-            newVal.forEach(async (t) => {
-                const exists = prev.find(old => old.id === t.id);
-                const userId = (await supabase.auth.getUser()).data.user?.id;
-                if (!userId) return;
-
-                if (!exists) {
-                    await supabase.from('tasks').insert({
-                        title: t.title,
-                        status: t.status,
-                        priority: t.priority,
-                        due_date: t.dueDate,
-                        assignee_id: t.assigneeId,
-                        project_id: t.projectId,
-                        user_id: userId
-                    });
-                } else if (JSON.stringify(exists) !== JSON.stringify(t)) {
-                    await supabase.from('tasks').update({
-                        status: t.status,
-                        priority: t.priority,
-                        title: t.title
-                    }).eq('id', t.id);
-                }
-            });
             return newVal;
         });
     };
@@ -482,17 +466,6 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const handleSetComments: React.Dispatch<React.SetStateAction<TeamComment[]>> = (action) => {
         setComments(prev => {
             const newVal = typeof action === 'function' ? action(prev) : action;
-            const added = newVal.filter(c => !prev.find(old => old.id === c.id));
-            added.forEach(async c => {
-                const userId = (await supabase.auth.getUser()).data.user?.id;
-                if (!userId) return;
-                await supabase.from('comments').insert({
-                    text: c.text,
-                    member_id: c.memberId,
-                    project_id: c.projectId,
-                    user_id: userId
-                });
-            });
             return newVal;
         });
     };
@@ -601,6 +574,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     return (
         <ProjectContext.Provider value={{
             projects, setProjects: handleSetProjects,
+            createProject,
             updateProject, deleteProject,
             files, setFiles, 
             
