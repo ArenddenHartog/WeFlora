@@ -143,8 +143,8 @@ const GlobalTopBar: React.FC = () => {
   };
 
   return (
-    <div className="flex-none sticky top-0 z-40 border-b border-slate-200 bg-weflora-mintLight">
-      <div className="h-12 px-4 flex items-center gap-3">
+    <div className="flex-none sticky top-0 z-40 border-b border-slate-200/30 bg-weflora-mintLight">
+      <div className="h-14 px-4 flex items-center gap-3">
         <div className="flex-1 relative" ref={searchRef}>
           <div className="relative">
             <SearchIcon className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${isSearchFocused ? 'text-weflora-teal' : 'text-slate-400'}`} />
@@ -157,7 +157,7 @@ const GlobalTopBar: React.FC = () => {
               }}
               onFocus={() => setIsSearchFocused(true)}
               onKeyDown={handleKeyDown}
-              placeholder="Search or Ask FloraGPT…"
+              placeholder="Search for anything or Ask FloraGPT…"
               className={`w-full pl-9 pr-14 py-2 rounded-lg text-sm outline-none border transition-colors ${
                 isSearchFocused ? 'bg-white border-weflora-teal ring-2 ring-weflora-teal/30' : 'bg-white border-slate-200 hover:border-slate-300'
               }`}
@@ -213,6 +213,21 @@ const GlobalTopBar: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={() => {
+              if (!searchQuery.trim()) {
+                setIsSearchFocused(true);
+                return;
+              }
+              handleGlobalQuery(searchQuery);
+              setSearchQuery('');
+              setIsSearchFocused(false);
+            }}
+            className="p-2 text-slate-600 hover:text-weflora-dark hover:bg-white/60 rounded-lg transition-colors"
+            title="Ask FloraGPT"
+          >
+            <SparklesIcon className="h-5 w-5" />
+          </button>
           <button
             onClick={() => setIsHelpOpen(true)}
             className="p-2 text-slate-600 hover:text-weflora-dark hover:bg-white/60 rounded-lg transition-colors"

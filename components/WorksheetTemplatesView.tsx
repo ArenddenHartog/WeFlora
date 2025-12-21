@@ -6,7 +6,6 @@ import {
 } from './icons';
 import BaseModal from './BaseModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
-import { useUI } from '../contexts/UIContext';
 
 interface WorksheetTemplatesViewProps {
     items: WorksheetTemplate[];
@@ -19,8 +18,7 @@ interface WorksheetTemplatesViewProps {
     onDeleteMatrix?: (id: string) => void;
 }
 
-const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, standaloneMatrices, onOpenMenu: _onOpenMenu, onUseTemplate, onCreateTemplate, onOpenMatrix, onOpenCreateWorksheet, onDeleteMatrix }) => {
-    const { topBarCommand, clearTopBarCommand } = useUI();
+const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, standaloneMatrices, onOpenMenu, onUseTemplate, onCreateTemplate, onOpenMatrix, onOpenCreateWorksheet, onDeleteMatrix }) => {
     const [activeTab, setActiveTab] = useState<'mysheets' | 'templates'>('mysheets');
     const [search, setSearch] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -71,17 +69,38 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
         }
     };
 
-    React.useEffect(() => {
-        if (!topBarCommand) return;
-        if (topBarCommand.type === 'openWorksheetsTemplateModal') {
-            setIsCreateModalOpen(true);
-            clearTopBarCommand();
-        }
-    }, [topBarCommand, clearTopBarCommand]);
-
     return (
         <div className="h-full overflow-y-auto bg-white p-4 md:p-8">
-            <div className="mb-8">
+            <header className="mb-8">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                        <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
+                            <MenuIcon className="h-6 w-6" />
+                        </button>
+                        {/* Updated to Teal theme */}
+                        <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
+                            <TableIcon className="h-6 w-6" />
+                        </div>
+                        <h1 className="text-2xl font-bold text-slate-800">Worksheet Hub</h1>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={() => setIsCreateModalOpen(true)}
+                            className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium border border-slate-200 hover:border-slate-300 transition-colors shadow-sm"
+                        >
+                            <PlusIcon className="h-4 w-4" />
+                            <span className="hidden sm:inline">Create Template</span>
+                        </button>
+                        <button 
+                            onClick={onOpenCreateWorksheet}
+                            className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium shadow-sm transition-colors"
+                        >
+                            <PlusIcon className="h-4 w-4" />
+                            <span className="hidden sm:inline">Build Worksheet</span>
+                        </button>
+                    </div>
+                </div>
+
                 <div className="flex flex-col md:flex-row gap-6 items-center">
                     <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 hide-scrollbar flex-1 border-b border-slate-100 w-full">
                         <button
@@ -116,7 +135,7 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
                         />
                     </div>
                 </div>
-            </div>
+            </header>
 
             {activeTab === 'mysheets' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

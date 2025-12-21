@@ -40,11 +40,6 @@ interface UIContextType {
     sessionOpenOrigin: 'sessions' | 'other' | null;
     setSessionOpenOrigin: (origin: 'sessions' | 'other' | null) => void;
 
-    // TopBar command bus (header-triggered actions)
-    topBarCommand: TopBarCommand | null;
-    emitTopBarCommand: (cmd: TopBarCommand) => void;
-    clearTopBarCommand: () => void;
-
     // Destination Modal State
     destinationModal: DestinationModalState;
     openDestinationModal: (type: 'report' | 'worksheet', message: ChatMessage) => void;
@@ -58,17 +53,6 @@ interface UIContextType {
 
 const UIContext = createContext<UIContextType | undefined>(undefined);
 
-export type TopBarCommand =
-    | { type: 'openProjectsCreateModal' }
-    | { type: 'openWorksheetsWizard' }
-    | { type: 'openWorksheetsTemplateModal' }
-    | { type: 'openReportsWizard' }
-    | { type: 'openReportsTemplateModal' }
-    | { type: 'projectToggleSettings' }
-    | { type: 'projectToggleAsk' }
-    | { type: 'worksheetTogglePanel'; panel: 'species' | 'files' | 'settings' | 'ask' }
-    | { type: 'reportTogglePanel'; panel: 'settings' | 'ask' };
-
 export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const navigate = useNavigate();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -77,7 +61,6 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
     const [notification, setNotification] = useState<NotificationState | null>(null);
     const [sessionOpenOrigin, setSessionOpenOrigin] = useState<'sessions' | 'other' | null>(null);
-    const [topBarCommand, setTopBarCommand] = useState<TopBarCommand | null>(null);
 
     const [destinationModal, setDestinationModal] = useState<DestinationModalState>({
         isOpen: false,
@@ -95,9 +78,6 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     };
 
     const closeNotification = () => setNotification(null);
-
-    const emitTopBarCommand = (cmd: TopBarCommand) => setTopBarCommand(cmd);
-    const clearTopBarCommand = () => setTopBarCommand(null);
 
     const navigateToProject = (id: string) => {
         setSelectedProjectId(id);
@@ -138,7 +118,6 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
             notification, showNotification, closeNotification,
             navigateToProject, navigateToHome,
             sessionOpenOrigin, setSessionOpenOrigin,
-            topBarCommand, emitTopBarCommand, clearTopBarCommand,
             destinationModal, openDestinationModal, closeDestinationModal,
             previewItem, openFilePreview, closeFilePreview
         }}>

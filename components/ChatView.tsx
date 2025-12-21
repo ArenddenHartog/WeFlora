@@ -27,7 +27,7 @@ interface ChatViewProps {
 
 const ChatView: React.FC<ChatViewProps> = ({ 
     chat, messages, onBack, onSendMessage, isGenerating, 
-    onRegenerateMessage, onOpenMenu: _onOpenMenu, variant = 'full',
+    onRegenerateMessage, onOpenMenu, variant = 'full',
     onContinueInReport, onContinueInWorksheet, contextProjectId
 }) => {
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -82,44 +82,36 @@ const ChatView: React.FC<ChatViewProps> = ({
     return (
         <div className="flex h-full bg-white relative overflow-hidden">
             <div className="flex-1 flex flex-col min-w-0">
-                {/* Panel-only header (TopBar covers full-page variant) */}
-                {variant === 'panel' && (
-                    <header className="flex-none h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-white z-20">
-                        <div className="flex items-center gap-3">
-                            {onBack && (
-                                <button onClick={onBack} className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium pr-3 border-r border-slate-200 h-6">
-                                    <ChevronRightIcon className="h-4 w-4 rotate-180" /> Back
-                                </button>
-                            )}
-                            <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-800 text-sm truncate max-w-[200px]">
-                                    {chat.title}
-                                </span>
-                            </div>
-                        </div>
-                        <div>
-                            <button 
-                                onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedMessageIds(new Set()); }}
-                                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${isSelectionMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                            >
-                                {isSelectionMode ? 'Cancel Selection' : 'Select Messages'}
+                <header className="flex-none h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-white z-20">
+                    <div className="flex items-center gap-3">
+                        {variant === 'full' && (
+                            <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
+                                <MenuIcon className="h-6 w-6" />
                             </button>
+                        )}
+                        {onBack && (
+                            <button onClick={onBack} className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium pr-3 border-r border-slate-200 h-6">
+                                <ChevronRightIcon className="h-4 w-4 rotate-180" /> Back
+                            </button>
+                        )}
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-800 text-sm truncate max-w-[200px]">
+                                {chat.title}
+                            </span>
                         </div>
-                    </header>
-                )}
+                    </div>
+                    <div>
+                        <button 
+                            onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedMessageIds(new Set()); }}
+                            className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${isSelectionMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        >
+                            {isSelectionMode ? 'Cancel Selection' : 'Select Messages'}
+                        </button>
+                    </div>
+                </header>
 
                 {/* Messages Area */}
                 <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/30">
-                    {variant === 'full' && (
-                        <div className="max-w-3xl mx-auto w-full flex justify-end pb-2">
-                            <button 
-                                onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedMessageIds(new Set()); }}
-                                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${isSelectionMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                            >
-                                {isSelectionMode ? 'Cancel Selection' : 'Select Messages'}
-                            </button>
-                        </div>
-                    )}
                     <div className="max-w-3xl mx-auto space-y-6 pb-4">
                         {messages.length === 0 && (
                             <div className="text-center py-20 text-slate-400">

@@ -1,11 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import type { PinnedProject, Member } from '../types';
-import { SearchIcon, PlusIcon, FolderIcon, FilterIcon, SortAscendingIcon, MoreHorizontalIcon, LockClosedIcon, XIcon, ChevronDownIcon } from './icons';
+import { SearchIcon, PlusIcon, FolderIcon, FilterIcon, SortAscendingIcon, MoreHorizontalIcon, LockClosedIcon, XIcon, ChevronDownIcon, MenuIcon } from './icons';
 import BaseModal from './BaseModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { useProject } from '../contexts/ProjectContext';
-import { useUI } from '../contexts/UIContext';
 
 interface ProjectsViewProps {
     projects: PinnedProject[];
@@ -15,9 +14,8 @@ interface ProjectsViewProps {
     onUpdateProject?: (project: PinnedProject) => void;
 }
 
-const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, onOpenMenu: _onOpenMenu, onCreateProject, onUpdateProject }) => {
+const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, onOpenMenu, onCreateProject, onUpdateProject }) => {
     const { deleteProject } = useProject();
-    const { topBarCommand, clearTopBarCommand } = useUI();
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'Archived'>('Active');
     const [sortOrder, setSortOrder] = useState<'name' | 'date'>('name');
@@ -102,14 +100,6 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
         return () => document.removeEventListener('click', handleClickOutside);
     }, []);
 
-    useEffect(() => {
-        if (!topBarCommand) return;
-        if (topBarCommand.type === 'openProjectsCreateModal') {
-            setIsModalOpen(true);
-            clearTopBarCommand();
-        }
-    }, [topBarCommand, clearTopBarCommand]);
-
     const handleCreateProject = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newProjectName.trim()) return;
@@ -147,6 +137,25 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
 
     return (
         <div className="h-full overflow-y-auto bg-white p-4 md:p-8 relative">
+            <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 relative z-10">
+                <div className="flex items-center gap-4">
+                    <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
+                        <MenuIcon className="h-6 w-6" />
+                    </button>
+                    <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
+                        <FolderIcon className="h-6 w-6" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-slate-800">Projects Hub</h1>
+                </div>
+                <button 
+                    onClick={() => setIsModalOpen(true)}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium transition-colors shadow-sm"
+                >
+                    <PlusIcon className="h-5 w-5" />
+                    New Project
+                </button>
+            </header>
+
             <div className="flex flex-col md:flex-row gap-4 mb-8 relative z-20">
                 <div className="relative flex-grow">
                     <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />

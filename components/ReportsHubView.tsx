@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Report, ReportTemplate } from '../types';
 import { 
     SearchIcon, MenuIcon, PlusIcon, FileTextIcon, FolderIcon, TagIcon, XIcon,
@@ -7,7 +7,6 @@ import {
 } from './icons';
 import BaseModal from './BaseModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
-import { useUI } from '../contexts/UIContext';
 
 interface ReportsHubViewProps {
     reports: Report[];
@@ -21,9 +20,8 @@ interface ReportsHubViewProps {
 }
 
 const ReportsHubView: React.FC<ReportsHubViewProps> = ({ 
-    reports, templates = [], onOpenMenu: _onOpenMenu, onOpenReport, onCreateReport, onUseTemplate, onCreateTemplate, onDeleteReport
+    reports, templates = [], onOpenMenu, onOpenReport, onCreateReport, onUseTemplate, onCreateTemplate, onDeleteReport
 }) => {
-    const { topBarCommand, clearTopBarCommand } = useUI();
     const [activeTab, setActiveTab] = useState<'myreports' | 'templates'>('myreports');
     const [search, setSearch] = useState('');
     const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -89,17 +87,39 @@ const ReportsHubView: React.FC<ReportsHubViewProps> = ({
         }
     };
 
-    useEffect(() => {
-        if (!topBarCommand) return;
-        if (topBarCommand.type === 'openReportsTemplateModal') {
-            setIsCreateTemplateModalOpen(true);
-            clearTopBarCommand();
-        }
-    }, [topBarCommand, clearTopBarCommand]);
-
     return (
         <div className="h-full overflow-y-auto bg-white p-4 md:p-8">
-            <div className="mb-8">
+            <header className="mb-8">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                        <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
+                            <MenuIcon className="h-6 w-6" />
+                        </button>
+                        {/* Updated to Teal Theme */}
+                        <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
+                            <FileTextIcon className="h-6 w-6" />
+                        </div>
+                        <h1 className="text-2xl font-bold text-slate-800">Reports Hub</h1>
+                    </div>
+                    <div className="flex gap-2">
+                        {onCreateTemplate && (
+                            <button 
+                                onClick={() => setIsCreateTemplateModalOpen(true)}
+                                className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium border border-slate-200 hover:border-slate-300 transition-colors shadow-sm"
+                            >
+                                <PlusIcon className="h-4 w-4" />
+                                <span className="hidden sm:inline">Draft Template</span>
+                            </button>
+                        )}
+                        <button 
+                            onClick={onCreateReport}
+                            className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium shadow-sm transition-colors"
+                        >
+                            <PlusIcon className="h-4 w-4" />
+                            <span className="hidden sm:inline">Draft Report</span>
+                        </button>
+                    </div>
+                </div>
 
                 <div className="flex flex-col md:flex-row gap-6 items-center mb-4">
                     <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 hide-scrollbar flex-1 border-b border-slate-100 w-full">
@@ -166,7 +186,7 @@ const ReportsHubView: React.FC<ReportsHubViewProps> = ({
                         ))}
                     </div>
                 )}
-            </div>
+            </header>
 
             {activeTab === 'myreports' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

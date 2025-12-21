@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProject } from '../../contexts/ProjectContext';
 import { useData } from '../../contexts/DataContext';
@@ -14,8 +14,31 @@ import { ResizablePanel } from '../ResizablePanel';
 import WritingAssistantPanel from '../WritingAssistantPanel';
 import ChatView from '../ChatView';
 import { 
+    ChevronRightIcon,
+    DatabaseIcon,
+    FileTextIcon,
+    SlidersIcon,
     SparklesIcon
 } from '../icons';
+
+// Header Button Helper
+const HeaderActionButton = ({ icon: Icon, label, active, onClick, primary }: any) => (
+    <button 
+        onClick={onClick}
+        className={`
+            flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap
+            ${primary
+                ? 'bg-weflora-teal text-white border-weflora-teal hover:bg-weflora-dark'
+                : active 
+                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark' 
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            }
+        `}
+    >
+        <Icon className={`h-4 w-4 ${primary ? 'text-white' : 'text-weflora-teal'}`} />
+        <span>{label}</span>
+    </button>
+);
 
 interface ReportsRouteProps {
     onOpenDestinationModal: (type: 'report' | 'worksheet', message: ChatMessage) => void;
@@ -30,26 +53,12 @@ const ReportsRoute: React.FC<ReportsRouteProps> = ({ onOpenDestinationModal }) =
     
     const { reportTemplates, saveReportTemplate } = useData();
     const { entityThreads, sendEntityMessage, isGenerating } = useChat();
-    const { showNotification, topBarCommand, clearTopBarCommand } = useUI();
+    const { showNotification } = useUI();
 
     // Local UI State
     const [rightPanel, setRightPanel] = useState<'none' | 'chat' | 'manage' | 'writing_assistant'>('none');
     const [panelWidth, setPanelWidth] = useState(400);
     const [isWizardOpen, setIsWizardOpen] = useState(false);
-
-    useEffect(() => {
-        if (!topBarCommand) return;
-        if (topBarCommand.type === 'openReportsWizard') {
-            setIsWizardOpen(true);
-            clearTopBarCommand();
-            return;
-        }
-        if (topBarCommand.type === 'reportTogglePanel') {
-            if (topBarCommand.panel === 'settings') togglePanel('manage');
-            if (topBarCommand.panel === 'ask') togglePanel('chat');
-            clearTopBarCommand();
-        }
-    }, [topBarCommand, clearTopBarCommand]);
 
     // Derived Data
     const standaloneReports = reports.filter(r => !r.projectId);
@@ -112,6 +121,24 @@ const ReportsRoute: React.FC<ReportsRouteProps> = ({ onOpenDestinationModal }) =
     if (reportId && activeReport) {
         return (
             <div className="h-full flex flex-col bg-white relative">
+                <header className="flex-none h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30">
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => navigate('/reports')} className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium">
+                            <ChevronRightIcon className="h-4 w-4 rotate-180" /> Back
+                        </button>
+                        <div className="h-6 w-px bg-slate-200 mx-2"></div>
+                        <div className="h-8 w-8 bg-weflora-mint/20 rounded-lg flex items-center justify-center text-weflora-teal">
+                            <FileTextIcon className="h-5 w-5" />
+                        </div>
+                        <h1 className="text-lg font-bold text-slate-900 truncate max-w-md">{activeReport.title}</h1>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <HeaderActionButton icon={DatabaseIcon} label="Files" active={false} onClick={() => navigate('/files')} />
+                        <HeaderActionButton icon={SlidersIcon} label="Settings" active={rightPanel === 'manage'} onClick={() => togglePanel('manage')} />
+                        <HeaderActionButton icon={SparklesIcon} label="Ask FloraGPT" active={rightPanel === 'chat'} onClick={() => togglePanel('chat')} primary />
+                    </div>
+                </header>
+
                 <div className="flex-1 overflow-hidden relative">
                     <ReportEditorView 
                         report={activeReport}
