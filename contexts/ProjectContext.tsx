@@ -191,17 +191,22 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             status: project.status,
             date: project.date,
             user_id: userId,
-            members: project.members,
             workspace_id: null
         }).select('*').single();
 
         if (error || !data) {
-            console.error('Failed to create project', error);
+            console.info('[createProject:error]', {
+                code: (error as any)?.code,
+                message: (error as any)?.message,
+                details: (error as any)?.details,
+                hint: (error as any)?.hint
+            });
             showNotification('Failed to create project.', 'error');
             setProjects(prev => prev.filter(p => p.id !== tempId));
             return null;
         }
 
+        const members = project.members ?? [];
         const mappedProject: PinnedProject = {
             id: (data as any).id,
             name: (data as any).name,
@@ -209,10 +214,11 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             date: (data as any).date,
             workspaceId: project.workspaceId,
             icon: FolderIcon,
-            members: (data as any).members || project.members || []
+            members
         };
 
         setProjects(prev => prev.map(p => p.id === tempId ? mappedProject : p));
+        console.info('[createProject] inserted', { tempId, dbId: mappedProject.id });
         return { id: mappedProject.id };
     };
 
@@ -220,8 +226,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         setProjects(prev => prev.map(p => p.id === project.id ? project : p));
         await supabase.from('projects').update({
             name: project.name,
-            status: project.status,
-            members: project.members
+            status: project.status
         }).eq('id', project.id);
     };
 
