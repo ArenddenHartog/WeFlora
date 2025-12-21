@@ -110,20 +110,24 @@ const Sidebar: React.FC<SidebarProps> = ({
       return location.pathname.startsWith(path);
   }
 
+  const isSessionsThread = sessionOpenOrigin === "sessions" && !!activeThreadId;
+
   const NavItem = ({ 
       icon: Icon, 
       label, 
       path,
       onClick, 
-      color = 'teal' 
+      color = 'teal',
+      activeOverride
   }: { 
       icon: any, 
       label: string, 
       path: string,
       onClick: () => void,
-      color?: 'teal' | 'purple'
+      color?: 'teal' | 'purple',
+      activeOverride?: boolean
   }) => {
-      const active = isActive(path);
+      const active = typeof activeOverride === 'boolean' ? activeOverride : isActive(path);
       const colorStyles = {
           teal: {
               activeBg: 'bg-weflora-mint/30',
@@ -191,12 +195,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                       navigate('/'); 
                       if(window.innerWidth < 768) onClose(); 
                   }} 
+                  activeOverride={!isSessionsThread && isActive('/')}
                />
                <NavItem 
                   icon={MessageSquareIcon} 
                   label="Sessions" 
                   path="/sessions"
                   onClick={() => { navigate('/sessions'); if(window.innerWidth < 768) onClose(); }} 
+                  activeOverride={isSessionsThread || isActive('/sessions')}
                />
                <NavItem 
                   icon={FolderIcon} 
