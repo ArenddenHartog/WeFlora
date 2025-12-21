@@ -55,7 +55,7 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
         sendMessage, setActiveThreadId
     } = useChat();
 
-    const { selectedChatId } = useUI();
+    const { selectedChatId, sessionOpenOrigin, setSessionOpenOrigin } = useUI();
 
     // Derived Data
     const standaloneMatrices = useMemo(() => allMatrices.filter(m => !m.projectId), [allMatrices]);
@@ -155,7 +155,11 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
                         onCopyContentToReport={(msg) => onOpenDestinationModal('report', msg)}
                         onCopyContentToWorksheet={(msg) => onOpenDestinationModal('worksheet', msg)}
                         isGenerating={isGenerating}
-                        onBack={() => onNavigate('research_history')}
+                        onBack={sessionOpenOrigin === 'sessions' ? () => {
+                            setSessionOpenOrigin(null);
+                            setActiveThreadId(null);
+                            navigate('/sessions');
+                        } : undefined}
                     />
                     {isCreateWorksheetOpen && (
                         <WorksheetWizard 

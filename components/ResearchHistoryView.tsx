@@ -13,7 +13,7 @@ interface ResearchHistoryViewProps {
 
 const ResearchHistoryView: React.FC<ResearchHistoryViewProps> = ({ onOpenMenu }) => {
     const { threads, setActiveThreadId, togglePinThread, deleteThread } = useChat();
-    const { navigateToHome } = useUI();
+    const { navigateToHome, setSessionOpenOrigin } = useUI();
     const [search, setSearch] = useState('');
     const [pendingDeleteThreadId, setPendingDeleteThreadId] = useState<string | null>(null);
 
@@ -29,6 +29,7 @@ const ResearchHistoryView: React.FC<ResearchHistoryViewProps> = ({ onOpenMenu })
         });
 
     const handleThreadClick = (threadId: string) => {
+        setSessionOpenOrigin('sessions');
         setActiveThreadId(threadId);
         navigateToHome();
     };

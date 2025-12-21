@@ -40,9 +40,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     const navigate = useNavigate();
     const location = useLocation();
     
-    const { setActiveThreadId } = useChat();
+    const { activeThreadId, setActiveThreadId } = useChat();
     const { signOut } = useAuth();
-    const { showNotification } = useUI();
+    const { showNotification, sessionOpenOrigin, setSessionOpenOrigin } = useUI();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -105,6 +105,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       // Normalize project domain routes so sidebar selection reflects the active domain.
       // - /projects (hub) and /project/:id/* (workspace) both count as "Projects"
       if (path === '/projects') return location.pathname.startsWith('/projects') || location.pathname.startsWith('/project/');
+      // Keep "Sessions" active while viewing a session opened from /sessions (even though the detail UI lives on /).
+      if (path === '/sessions') return location.pathname.startsWith('/sessions') || (sessionOpenOrigin === 'sessions' && Boolean(activeThreadId) && location.pathname === '/');
       return location.pathname.startsWith(path);
   }
 
@@ -185,6 +187,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   path="/"
                   onClick={() => { 
                       setActiveThreadId(null);
+                      setSessionOpenOrigin(null);
                       navigate('/'); 
                       if(window.innerWidth < 768) onClose(); 
                   }} 

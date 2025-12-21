@@ -36,6 +36,10 @@ interface UIContextType {
     navigateToProject: (id: string) => void;
     navigateToHome: () => void;
 
+    // Sessions Navigation Intent
+    sessionOpenOrigin: 'sessions' | 'other' | null;
+    setSessionOpenOrigin: (origin: 'sessions' | 'other' | null) => void;
+
     // Destination Modal State
     destinationModal: DestinationModalState;
     openDestinationModal: (type: 'report' | 'worksheet', message: ChatMessage) => void;
@@ -56,6 +60,7 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
     const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
     const [notification, setNotification] = useState<NotificationState | null>(null);
+    const [sessionOpenOrigin, setSessionOpenOrigin] = useState<'sessions' | 'other' | null>(null);
 
     const [destinationModal, setDestinationModal] = useState<DestinationModalState>({
         isOpen: false,
@@ -112,6 +117,7 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
             selectedChatId, setSelectedChatId,
             notification, showNotification, closeNotification,
             navigateToProject, navigateToHome,
+            sessionOpenOrigin, setSessionOpenOrigin,
             destinationModal, openDestinationModal, closeDestinationModal,
             previewItem, openFilePreview, closeFilePreview
         }}>
