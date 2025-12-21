@@ -175,7 +175,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ item, onClose, onAskAI, verif
                                                 item.category === 'Internal' ? 'bg-weflora-mint/20 text-weflora-dark' :
                                                 item.category === 'Policy' ? 'bg-weflora-teal/20 text-weflora-dark' :
                                                 item.category === 'Research' ? 'bg-weflora-success/20 text-weflora-success' :
-                                                'bg-orange-100 text-orange-700'
+                                                'bg-weflora-amber/10 text-weflora-amber'
                                             }`}>
                                                 {item.category}
                                             </span>

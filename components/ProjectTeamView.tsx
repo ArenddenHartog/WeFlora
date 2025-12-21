@@ -76,8 +76,8 @@ const ProjectTeamView: React.FC<ProjectTeamViewProps> = ({
     const getPriorityColor = (priority: TaskPriority) => {
         switch (priority) {
             case 'High': return 'bg-weflora-red/20 text-weflora-red border-weflora-red/20';
-            case 'Medium': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-            case 'Low': return 'bg-blue-100 text-blue-700 border-blue-200';
+            case 'Medium': return 'bg-weflora-amber/10 text-weflora-amber border-weflora-amber/20';
+            case 'Low': return 'bg-weflora-teal/10 text-weflora-dark border-weflora-teal/20';
         }
     };
 

@@ -148,7 +148,7 @@ const CitationsSidebar: React.FC<CitationsSidebarProps> = ({ messages, onCitatio
                                                     onMouseLeave={() => onCitationHover?.(null)}
                                                     className={`w-full text-left p-2 rounded-lg transition-all duration-300 group ${
                                                         isHighlighted 
-                                                            ? 'bg-yellow-100 ring-2 ring-yellow-400 shadow-sm' 
+                                                            ? 'bg-weflora-amber/10 ring-2 ring-weflora-amber shadow-sm' 
                                                             : 'hover:bg-slate-200'
                                                     }`}
                                                 >
@@ -157,7 +157,7 @@ const CitationsSidebar: React.FC<CitationsSidebarProps> = ({ messages, onCitatio
                                                         <span className="truncate">{citation.source}</span>
                                                     </div>
                                                     <blockquote className={`pl-4 text-slate-600 border-l-2 ml-2 py-1 text-sm ${
-                                                        isHighlighted ? 'border-yellow-400' : 'border-slate-200 group-hover:border-slate-400'
+                                                        isHighlighted ? 'border-weflora-amber' : 'border-slate-200 group-hover:border-slate-400'
                                                     }`}>
                                                     "{citation.text}"
                                                     </blockquote>

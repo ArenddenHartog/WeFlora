@@ -66,7 +66,16 @@ const WorksheetAnalyticsPanel: React.FC<WorksheetAnalyticsPanelProps> = ({ matri
         }).filter(Boolean);
     }, [matrix]);
 
-    const colors = ['bg-blue-500', 'bg-weflora-teal', 'bg-purple-500', 'bg-orange-400', 'bg-red-400', 'bg-slate-500', 'bg-indigo-400', 'bg-pink-400'];
+    const colors = [
+        'bg-weflora-teal',
+        'bg-weflora-mint',
+        'bg-weflora-success',
+        'bg-weflora-amber',
+        'bg-weflora-red',
+        'bg-weflora-dark',
+        'bg-weflora-teal/40',
+        'bg-weflora-mint/40'
+    ];
 
     if (!matrix) return null;
 

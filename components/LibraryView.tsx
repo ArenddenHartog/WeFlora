@@ -26,13 +26,13 @@ const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTempl
     const getIcon = (type: TemplateType) => {
         if (type === 'Prompt') return <ChatBubbleIcon className="h-5 w-5 text-weflora-dark" />;
         if (type === 'Project') return <FolderIcon className="h-5 w-5 text-weflora-teal" />;
-        return <LayoutGridIcon className="h-5 w-5 text-orange-600" />;
+        return <LayoutGridIcon className="h-5 w-5 text-weflora-teal" />;
     };
 
     const getColor = (type: TemplateType) => {
         if (type === 'Prompt') return 'bg-weflora-teal/10 border-weflora-teal/20 text-weflora-dark';
         if (type === 'Project') return 'bg-weflora-mint/20 border-weflora-teal/20 text-weflora-dark';
-        return 'bg-orange-50 border-orange-100 text-orange-700';
+        return 'bg-weflora-mint/10 border-weflora-teal/20 text-weflora-dark';
     };
 
     return (

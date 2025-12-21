@@ -346,7 +346,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             case 'knowledge': return 'bg-weflora-teal/10 text-weflora-dark border-weflora-teal/20';
             // NOTE: Use WeFlora tokens for project context (avoid Tailwind blue palette in AI-adjacent UI).
             case 'project': return 'bg-weflora-mint/20 text-weflora-dark border-weflora-teal/20';
-            case 'report': return 'bg-orange-50 text-orange-700 border-orange-200';
+            case 'report': return 'bg-weflora-teal/10 text-weflora-dark border-weflora-teal/20';
             case 'worksheet': return 'bg-weflora-mint/20 text-weflora-dark border-weflora-teal';
             case 'upload': return 'bg-slate-50 text-slate-700 border-slate-200';
             case 'web': return 'bg-weflora-success/10 text-weflora-success border-weflora-success/20';
@@ -427,7 +427,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     <div className="p-3 border-b border-slate-100 bg-white">
                         <div className="flex gap-2 mb-2 pb-2 border-b border-slate-50">
                             <button onClick={() => setContextTab('files')} className={`px-2 py-1 rounded text-xs font-bold ${contextTab === 'files' ? 'bg-weflora-teal/10 text-weflora-dark' : 'text-slate-500 hover:bg-slate-50'}`}>Files</button>
-                            <button onClick={() => setContextTab('reports')} className={`px-2 py-1 rounded text-xs font-bold ${contextTab === 'reports' ? 'bg-orange-50 text-orange-600' : 'text-slate-500 hover:bg-slate-50'}`}>Reports</button>
+                            <button onClick={() => setContextTab('reports')} className={`px-2 py-1 rounded text-xs font-bold ${contextTab === 'reports' ? 'bg-weflora-teal/10 text-weflora-dark' : 'text-slate-500 hover:bg-slate-50'}`}>Reports</button>
                             <button onClick={() => setContextTab('worksheets')} className={`px-2 py-1 rounded text-xs font-bold ${contextTab === 'worksheets' ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-500 hover:bg-slate-50'}`}>Worksheets</button>
                         </div>
                         <div className="relative"><SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" /><input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-7 pr-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-slate-400 text-slate-900 font-medium" autoFocus /></div>
@@ -447,10 +447,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
                             </>
                         )}
                         {contextTab === 'reports' && filteredReports.map(report => (
-                            <div key={report.id} onClick={() => addReportContext(report)} className="flex items-center gap-3 p-2 hover:bg-orange-50 rounded-lg cursor-pointer transition-colors group">
-                                <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center"><FileTextIcon className="h-4 w-4" /></div>
+                            <div key={report.id} onClick={() => addReportContext(report)} className="flex items-center gap-3 p-2 hover:bg-weflora-teal/10 rounded-lg cursor-pointer transition-colors group">
+                                <div className="w-8 h-8 rounded-lg bg-weflora-teal/10 text-weflora-teal flex items-center justify-center"><FileTextIcon className="h-4 w-4" /></div>
                                 <div className="flex-1 min-w-0"><div className="text-xs font-bold text-slate-700 truncate">{report.title}</div><div className="text-[10px] text-slate-400">Report</div></div>
-                                {selectedContextItems.some(i => i.itemId === report.id) && <CheckIcon className="h-3 w-3 text-orange-600" />}
+                                {selectedContextItems.some(i => i.itemId === report.id) && <CheckIcon className="h-3 w-3 text-weflora-teal" />}
                             </div>
                         ))}
                         {contextTab === 'worksheets' && filteredMatrices.map(matrix => (
