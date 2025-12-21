@@ -317,7 +317,7 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
                         {!editingTabId && (
                             <button 
                                 onClick={(e) => handleDeleteTab(e, tab.id)}
-                                className={`p-0.5 rounded hover:bg-weflora-red/20 hover:text-weflora-red opacity-0 group-hover:opacity-100 transition-opacity ${activeTabId === tab.id ? 'text-slate-300' : 'text-slate-400'}`}
+                                className={`h-8 w-8 flex items-center justify-center cursor-pointer rounded hover:bg-weflora-red/20 hover:text-weflora-red opacity-0 group-hover:opacity-100 transition-opacity ${activeTabId === tab.id ? 'text-slate-300' : 'text-slate-400'}`}
                             >
                                 <XIcon className="h-3 w-3" />
                             </button>

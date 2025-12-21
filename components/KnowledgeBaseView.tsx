@@ -191,7 +191,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                                 </button>
                                 <button 
                                     onClick={(e) => handleDelete(e, item)}
-                                    className="p-1.5 text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                    className="h-8 w-8 flex items-center justify-center cursor-pointer text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                 >
                                     <XIcon className="h-3.5 w-3.5" />
                                 </button>

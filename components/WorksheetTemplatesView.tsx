@@ -141,14 +141,11 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredSheets.map(sheet => (
                         <div key={sheet.id} onClick={() => onOpenMatrix(sheet)} className="group flex flex-col bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-weflora-teal transition-all duration-200 cursor-pointer relative">
-                            <div className="p-5 flex-grow">
+                            <div className="p-5 flex-grow pb-10">
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="h-10 w-10 rounded-lg flex items-center justify-center border bg-weflora-mint/10 border-weflora-mint text-weflora-teal">
                                         <TableIcon className="h-5 w-5" />
                                     </div>
-                                    <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded">
-                                        General Worksheet
-                                    </span>
                                 </div>
                                 <h3 className="text-lg font-bold text-slate-800 mb-1 group-hover:text-weflora-teal transition-colors pr-6">{sheet.title}</h3>
                                 <p className="text-sm text-slate-500 line-clamp-2 mb-4">{sheet.description || 'No description'}</p>
@@ -156,11 +153,15 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
                                     Last updated: {sheet.updatedAt || 'Recently'}
                                 </div>
                             </div>
+
+                            <span className="absolute bottom-4 right-4 text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded pointer-events-none">
+                                General Worksheet
+                            </span>
                             {/* Delete Button */}
                             {onDeleteMatrix && (
                                 <button 
                                     onClick={(e) => handleDelete(e, sheet.id)}
-                                    className="absolute top-4 right-4 p-1.5 text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                    className="absolute top-4 right-4 h-8 w-8 flex items-center justify-center cursor-pointer text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                     title="Delete Worksheet"
                                 >
                                     <XIcon className="h-4 w-4" />

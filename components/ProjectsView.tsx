@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { PinnedProject, Member } from '../types';
-import { SearchIcon, PlusIcon, FolderIcon, FilterIcon, SortAscendingIcon, MoreHorizontalIcon, LockClosedIcon, XIcon, ChevronDownIcon, MenuIcon } from './icons';
+import { SearchIcon, PlusIcon, FolderIcon, FilterIcon, SortAscendingIcon, MoreHorizontalIcon, XIcon, ChevronDownIcon, MenuIcon } from './icons';
 import BaseModal from './BaseModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { useProject } from '../contexts/ProjectContext';
@@ -249,7 +249,6 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
 
                             <div className="flex items-center justify-between pt-4 border-t border-slate-100 text-xs font-medium text-slate-500 mt-auto">
                                 <div className="flex items-center gap-1">
-                                    <LockClosedIcon className="h-3 w-3" />
                                     <span>{project.status}</span>
                                 </div>
                                 <div className="flex items-center gap-3">

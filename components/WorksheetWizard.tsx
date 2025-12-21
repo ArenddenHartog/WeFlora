@@ -320,7 +320,13 @@ const WorksheetWizard: React.FC<{
                                          <div className="flex gap-2"><input type="text" value={col.title} onChange={(e) => updateSchemaColumn(col.id, { title: e.target.value })} className="flex-1 text-sm font-bold text-slate-900 border-b border-transparent focus:border-slate-300 outline-none pb-1 bg-transparent placeholder-slate-300" placeholder="Column Name" /><select value={col.type} onChange={(e) => updateSchemaColumn(col.id, { type: e.target.value as MatrixColumnType })} className="text-xs bg-slate-100 rounded px-2 py-1 border-none outline-none text-slate-900 font-medium cursor-pointer hover:bg-slate-200"><option value="text">Text</option><option value="number">Number</option><option value="date">Date</option><option value="select">Select</option><option value="ai">FloraGPT Gen</option></select></div>
                                          {col.type === 'ai' && <input type="text" value={col.aiPrompt || ''} onChange={(e) => updateSchemaColumn(col.id, { aiPrompt: e.target.value })} className="w-full text-xs bg-weflora-teal/10 text-weflora-dark border-0 rounded px-3 py-2 outline-none placeholder:text-weflora-teal/40" placeholder="AI Prompt: e.g. Analyze {Entity Name}..." />}
                                      </div>
-                                     <button onClick={() => removeSchemaColumn(col.id)} className="text-slate-300 hover:text-weflora-red pt-2 transition-colors"><XIcon className="h-4 w-4" /></button>
+                                     <button
+                                         onClick={() => removeSchemaColumn(col.id)}
+                                         className="h-8 w-8 flex items-center justify-center cursor-pointer text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors"
+                                         title="Delete column"
+                                     >
+                                         <XIcon className="h-4 w-4" />
+                                     </button>
                                 </div>
                             ))}
                             {schemaColumns.length === 0 && <div className="text-center py-10 text-slate-400 text-sm">No columns defined.</div>}

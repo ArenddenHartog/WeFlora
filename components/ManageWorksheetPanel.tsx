@@ -264,7 +264,7 @@ const ManageWorksheetPanel: React.FC<{
                                     </button>
                                     <button 
                                         onClick={() => handleDeleteColumn(col.id)}
-                                        className="p-1.5 rounded hover:bg-weflora-red/10 text-slate-300 hover:text-weflora-red"
+                                        className="h-8 w-8 flex items-center justify-center cursor-pointer rounded hover:bg-weflora-red/10 text-slate-300 hover:text-weflora-red"
                                         title="Delete Column"
                                     >
                                         <XIcon className="h-3.5 w-3.5" />

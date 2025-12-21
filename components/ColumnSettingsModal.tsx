@@ -312,7 +312,11 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                                     <span className="bg-white px-1.5 py-0.5 rounded border border-weflora-teal/30 text-slate-800 font-mono max-w-[80px] truncate" title={rule.value}>"{rule.value}"</span>
                                                     <span className="text-slate-600">then</span>
                                                     <div className={`w-4 h-4 rounded-full ${COLORS.find(c => c.value === rule.style)?.bg}`}></div>
-                                                    <button onClick={() => handleRemoveRule(rule.id)} className="ml-auto text-slate-400 hover:text-weflora-red hover:bg-weflora-red/10 rounded p-1 -m-1">
+                                                    <button
+                                                        onClick={() => handleRemoveRule(rule.id)}
+                                                        className="ml-auto h-8 w-8 flex items-center justify-center cursor-pointer text-slate-400 hover:text-weflora-red hover:bg-weflora-red/10 rounded"
+                                                        title="Delete rule"
+                                                    >
                                                         <XIcon className="h-3.5 w-3.5" />
                                                     </button>
                                                 </div>
