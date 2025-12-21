@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { PinnedProject, Member } from '../types';
-import { SearchIcon, PlusIcon, FolderIcon, FilterIcon, SortAscendingIcon, MoreHorizontalIcon, XIcon, ChevronDownIcon, MenuIcon } from './icons';
+import { SearchIcon, PlusIcon, FolderIcon, FilterIcon, SortAscendingIcon, XIcon, ChevronDownIcon, MenuIcon, ArchiveIcon } from './icons';
 import BaseModal from './BaseModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { useProject } from '../contexts/ProjectContext';
@@ -19,7 +19,6 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'Archived'>('Active');
     const [sortOrder, setSortOrder] = useState<'name' | 'date'>('name');
-    const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
     
     // Expansion and Invite States
     const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -40,18 +39,11 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                 status: project.status === 'Active' ? 'Archived' : 'Active' 
             });
         }
-        setActiveMenuId(null);
     };
 
     const handleDeleteProject = (e: React.MouseEvent, projectId: string) => {
         e.stopPropagation();
         setPendingDeleteProjectId(projectId);
-        setActiveMenuId(null);
-    };
-
-    const toggleMenu = (e: React.MouseEvent, projectId: string) => {
-        e.stopPropagation();
-        setActiveMenuId(activeMenuId === projectId ? null : projectId);
     };
 
     const toggleExpand = (e: React.MouseEvent, projectId: string) => {
@@ -92,13 +84,6 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
 
         setInviteInputs(prev => ({ ...prev, [project.id]: '' }));
     };
-
-    // Close menu when clicking outside
-    useEffect(() => {
-        const handleClickOutside = () => setActiveMenuId(null);
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
-    }, []);
 
     const handleCreateProject = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -215,36 +200,20 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                                 <div className="relative">
                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button 
+                                            onClick={(e) => toggleProjectStatus(e, project)}
+                                            className="h-8 w-8 flex items-center justify-center cursor-pointer text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                            title={project.status === 'Active' ? 'Archive project' : 'Restore project'}
+                                        >
+                                            <ArchiveIcon className="h-4 w-4" />
+                                        </button>
+                                        <button 
                                             onClick={(e) => handleDeleteProject(e, project.id)}
                                             className="h-8 w-8 flex items-center justify-center cursor-pointer text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors"
                                             title="Delete project"
                                         >
                                             <XIcon className="h-4 w-4" />
                                         </button>
-                                        <button 
-                                            onClick={(e) => toggleMenu(e, project.id)}
-                                            className="h-8 w-8 flex items-center justify-center cursor-pointer text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
-                                            title="Project actions"
-                                        >
-                                            <MoreHorizontalIcon className="h-5 w-5" />
-                                        </button>
                                     </div>
-                                    {activeMenuId === project.id && (
-                                        <div className="absolute right-0 mt-1 w-36 bg-white border border-slate-200 rounded-lg shadow-lg z-50">
-                                            <button
-                                                onClick={(e) => toggleProjectStatus(e, project)}
-                                                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 first:rounded-t-lg"
-                                            >
-                                                {project.status === 'Active' ? 'Archive' : 'Restore'}
-                                            </button>
-                                            <button
-                                                onClick={(e) => handleDeleteProject(e, project.id)}
-                                                className="w-full text-left px-4 py-2 text-sm text-weflora-red hover:bg-weflora-red/10 last:rounded-b-lg flex items-center gap-2"
-                                            >
-                                                <XIcon className="h-3.5 w-3.5" /> Delete
-                                            </button>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                             
