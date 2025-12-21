@@ -51,9 +51,8 @@ const MainContent: React.FC<MainContentProps> = ({
                 members: []
             };
             setProjects(prev => [newProj, ...prev]);
-            onSelectProject(newProjId);
-        } else if (dest?.type === 'project' && dest.projectId) {
-            onSelectProject(dest.projectId);
+        } else if (dest?.type === 'project') {
+            // Do NOT navigate/select project here. Navigation happens only after successful create.
         }
 
         const matrixWithProject = { ...newM, projectId: finalProjectId };
@@ -76,9 +75,8 @@ const MainContent: React.FC<MainContentProps> = ({
                 members: []
             };
             setProjects(prev => [newProj, ...prev]);
-            onSelectProject(newProjId);
-        } else if (dest?.type === 'project' && dest.projectId) {
-            onSelectProject(dest.projectId);
+        } else if (dest?.type === 'project') {
+            // Do NOT navigate/select project here. Navigation happens only after successful create.
         }
 
         const reportWithProject = { ...newR, projectId: finalProjectId };
@@ -167,7 +165,10 @@ const MainContent: React.FC<MainContentProps> = ({
                     rows: result.rows
                 };
                 const created = await handleCreateMatrix(newMatrix, destination);
-                if (!created) return;
+                if (!created) {
+                    // Keep the user in place on failure (do not close modal or navigate).
+                    return;
+                }
                 console.info('[create-flow] copy to worksheet', {
                     kind: 'worksheet',
                     withinProject: Boolean(created.projectId),
@@ -184,6 +185,7 @@ const MainContent: React.FC<MainContentProps> = ({
                     focusTabId: created.id
                 });
                 showNotification('Worksheet created from chat');
+                closeDestinationModal();
             } catch (error) {
                 console.error("Extraction failed", error);
                 const fallbackMatrix = {
@@ -193,7 +195,10 @@ const MainContent: React.FC<MainContentProps> = ({
                     rows: [{ id: 'r1', cells: { c1: { columnId: 'c1', value: message.text } } }]
                 };
                 const created = await handleCreateMatrix(fallbackMatrix, destination);
-                if (!created) return;
+                if (!created) {
+                    // Keep the user in place on failure (do not close modal or navigate).
+                    return;
+                }
                 console.info('[create-flow] copy to worksheet', {
                     kind: 'worksheet',
                     withinProject: Boolean(created.projectId),
@@ -210,9 +215,9 @@ const MainContent: React.FC<MainContentProps> = ({
                     focusTabId: created.id
                 });
                 showNotification('Worksheet created (raw mode)');
+                closeDestinationModal();
             } finally {
                 setIsExtracting(false);
-                closeDestinationModal();
             }
         }
     };

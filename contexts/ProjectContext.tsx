@@ -250,25 +250,68 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         const userId = (await supabase.auth.getUser()).data.user?.id;
         if (!userId) return null;
 
-        // Optimistic Update
-        setMatrices(prev => [...prev, matrix]);
+        const withinProject = Boolean(matrix.projectId);
+        if (withinProject && !matrix.projectId) {
+            showNotification("Cannot create worksheet: missing project.", 'error');
+            return null;
+        }
 
-        const tempId = matrix.id;
+        const title = (matrix.title || '').trim() || 'Worksheet';
+        const columnsIsArray = Array.isArray((matrix as any).columns);
+        const rowsIsArray = Array.isArray((matrix as any).rows);
+        const columns = columnsIsArray ? matrix.columns : [{
+            id: 'c1',
+            title: 'Item',
+            type: 'text',
+            width: 200,
+            isPrimaryKey: true
+        }];
+        const rows = rowsIsArray ? matrix.rows : [];
+
+        const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+        // Optimistic Update
+        const optimisticMatrix: Matrix = {
+            ...matrix,
+            title,
+            columns,
+            rows
+        };
+        setMatrices(prev => [...prev, optimisticMatrix]);
+
+        const tempId = optimisticMatrix.id;
         const shouldDbGenerateId = tempId.includes('new') || tempId.includes('mtx-'); // Let DB gen if temp ID
 
-        const { data, error } = await supabase.from('matrices').insert({
+        const insertPayload = {
             id: shouldDbGenerateId ? undefined : tempId,
-            project_id: matrix.projectId,
-            title: matrix.title,
-            description: matrix.description,
-            columns: matrix.columns,
-            rows: matrix.rows,
-            parent_id: matrix.parentId,
+            project_id: optimisticMatrix.projectId,
+            title: optimisticMatrix.title,
+            description: optimisticMatrix.description,
+            columns: optimisticMatrix.columns,
+            rows: optimisticMatrix.rows,
+            parent_id: optimisticMatrix.parentId,
             user_id: userId
-        }).select('*').single();
+        };
+
+        const { data, error } = await supabase.from('matrices').insert(insertPayload).select('*').single();
 
         if (error) {
-            console.error("Failed to create matrix", error);
+            console.info('[createMatrix:error]', {
+                message: error.message,
+                code: (error as any).code,
+                details: (error as any).details,
+                hint: (error as any).hint,
+                payload: {
+                    projectId: optimisticMatrix.projectId,
+                    title: optimisticMatrix.title,
+                    parentId: optimisticMatrix.parentId,
+                    columnsCount: Array.isArray(optimisticMatrix.columns) ? optimisticMatrix.columns.length : 0,
+                    rowsCount: Array.isArray(optimisticMatrix.rows) ? optimisticMatrix.rows.length : 0,
+                    columnsIsArray: Array.isArray(optimisticMatrix.columns),
+                    rowsIsArray: Array.isArray(optimisticMatrix.rows),
+                    idKind: shouldDbGenerateId ? 'temp' : (isUuid(tempId) ? 'uuid' : 'custom')
+                }
+            });
             showNotification("Failed to save worksheet.", 'error');
             setMatrices(prev => prev.filter(m => m.id !== tempId)); // Rollback
             return null;
@@ -276,13 +319,13 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         const mappedMatrix: Matrix = {
             id: (data as any).id,
-            projectId: (data as any).project_id ?? matrix.projectId,
-            parentId: (data as any).parent_id ?? matrix.parentId,
+            projectId: (data as any).project_id ?? optimisticMatrix.projectId,
+            parentId: (data as any).parent_id ?? optimisticMatrix.parentId,
             title: (data as any).title,
-            description: (data as any).description ?? matrix.description,
-            columns: (data as any).columns ?? matrix.columns,
-            rows: (data as any).rows ?? matrix.rows,
-            tabTitle: matrix.tabTitle,
+            description: (data as any).description ?? optimisticMatrix.description,
+            columns: (data as any).columns ?? optimisticMatrix.columns,
+            rows: (data as any).rows ?? optimisticMatrix.rows,
+            tabTitle: optimisticMatrix.tabTitle,
             updatedAt: (data as any).updated_at ?? new Date().toISOString()
         };
 
