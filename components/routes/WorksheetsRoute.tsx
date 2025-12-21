@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProject } from '../../contexts/ProjectContext';
 import { useData } from '../../contexts/DataContext';
@@ -50,13 +50,30 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
     
     const { worksheetTemplates, saveWorksheetTemplate, species, addSpecies } = useData();
     const { entityThreads, sendEntityMessage, isGenerating } = useChat();
-    const { showNotification } = useUI();
+    const { showNotification, topBarCommand, clearTopBarCommand } = useUI();
 
     // Local UI State
     const [rightPanel, setRightPanel] = useState<'none' | 'chat' | 'manage' | 'files' | 'entity' | 'species'>('none');
     const [panelWidth, setPanelWidth] = useState(400);
     const [isWizardOpen, setIsWizardOpen] = useState(false);
     const [inspectedEntity, setInspectedEntity] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!topBarCommand) return;
+        if (topBarCommand.type === 'openWorksheetsWizard') {
+            setIsWizardOpen(true);
+            clearTopBarCommand();
+            return;
+        }
+        if (topBarCommand.type === 'worksheetTogglePanel') {
+            const panel = topBarCommand.panel;
+            if (panel === 'settings') setRightPanel((cur) => (cur === 'manage' ? 'none' : 'manage'));
+            else if (panel === 'ask') setRightPanel((cur) => (cur === 'chat' ? 'none' : 'chat'));
+            else if (panel === 'files') setRightPanel((cur) => (cur === 'files' ? 'none' : 'files'));
+            else if (panel === 'species') setRightPanel((cur) => (cur === 'species' ? 'none' : 'species'));
+            clearTopBarCommand();
+        }
+    }, [topBarCommand, clearTopBarCommand]);
 
     // Derived Data
     const standaloneMatrices = matrices.filter(m => !m.projectId);
@@ -206,26 +223,6 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
     if (matrixId && activeMatrix && worksheetDoc) {
         return (
             <div className="h-full flex flex-col bg-white relative">
-                {/* Editor Header */}
-                <header className="flex-none h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30">
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => navigate('/worksheets')} className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium">
-                            <ChevronRightIcon className="h-4 w-4 rotate-180" /> Back
-                        </button>
-                        <div className="h-6 w-px bg-slate-200 mx-2"></div>
-                        <div className="h-8 w-8 bg-weflora-mint/20 rounded-lg flex items-center justify-center text-weflora-teal">
-                            <TableIcon className="h-5 w-5" />
-                        </div>
-                        <h1 className="text-lg font-bold text-slate-900 truncate max-w-md">{activeMatrix.title}</h1>
-                    </div>
-                    <div className="flex items-center gap-2">
-                         <HeaderActionButton icon={LeafIcon} label="Species" active={rightPanel === 'species'} onClick={() => togglePanel('species')} />
-                         <HeaderActionButton icon={DatabaseIcon} label="Files" active={rightPanel === 'files'} onClick={() => togglePanel('files')} />
-                         <HeaderActionButton icon={SlidersIcon} label="Settings" active={rightPanel === 'manage'} onClick={() => togglePanel('manage')} />
-                         <HeaderActionButton icon={SparklesIcon} label="FloraGPT" active={rightPanel === 'chat'} onClick={() => togglePanel('chat')} />
-                    </div>
-                </header>
-
                 <div className="flex-1 flex min-w-0 relative overflow-hidden">
                     <div className="flex-1 min-w-0 h-full">
                         <WorksheetContainer 

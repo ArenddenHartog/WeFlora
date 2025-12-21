@@ -20,7 +20,7 @@ interface KnowledgeBaseViewProps {
 }
 
 const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ 
-    items, projectFiles, projects, onOpenMenu, onUpload, onDelete, onAskAI 
+    items, projectFiles, projects, onOpenMenu: _onOpenMenu, onUpload, onDelete, onAskAI 
 }) => {
     const [search, setSearch] = useState('');
     const [activeTab, setActiveTab] = useState<'all' | 'knowledge' | 'project'>('all');
@@ -211,25 +211,16 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
 
     return (
         <div className="h-full overflow-y-auto bg-white p-4 md:p-8">
-            <header className="mb-8">
-                <div className="flex items-center justify-between mb-6">
-                     <div className="flex items-center gap-4">
-                        <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
-                            <MenuIcon className="h-6 w-6" />
-                        </button>
-                        <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
-                            <DatabaseIcon className="h-6 w-6" />
-                        </div>
-                        <h1 className="text-2xl font-bold text-slate-800">Files Hub</h1>
-                     </div>
-                     <button 
+            <div className="mb-8">
+                <div className="flex justify-end mb-4">
+                    <button 
                         onClick={() => fileInputRef.current?.click()}
                         className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium shadow-sm transition-colors"
-                     >
+                    >
                         <UploadIcon className="h-4 w-4" />
                         <span className="hidden sm:inline">Upload Files</span>
-                     </button>
-                     <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileSelect} />
+                    </button>
+                    <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileSelect} />
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-6 items-center">
@@ -276,7 +267,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                         />
                     </div>
                 </div>
-            </header>
+            </div>
 
             {/* If in Project Tab AND viewing specific project */}
             {activeTab === 'project' && selectedProjectId && (

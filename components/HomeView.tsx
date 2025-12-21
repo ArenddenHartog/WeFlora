@@ -53,13 +53,6 @@ const HomeView: React.FC<HomeViewProps> = ({
     if (!activeThreadId && !isGenerating) {
         return (
             <div className="h-full flex flex-col bg-white">
-                {/* Mobile Menu Trigger for Zero State */}
-                <div className="md:hidden flex items-center p-4 pb-0">
-                    <button onClick={onOpenMenu} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-                        <MenuIcon className="h-6 w-6" />
-                    </button>
-                </div>
-
                 <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center">
                     <header className="mb-8 md:mb-10 text-center relative w-full max-w-3xl mt-4 md:mt-8">
                         <div className="flex flex-col items-center gap-4 mb-6">
@@ -112,55 +105,6 @@ const HomeView: React.FC<HomeViewProps> = ({
     // --- ACTIVE THREAD STATE: RESEARCH INTERFACE ---
     return (
         <div className="h-full flex flex-col bg-white relative">
-            {/* Header - No sticky, just flex-none */}
-            <header className="flex-none h-14 border-b border-slate-100 flex items-center justify-between px-4 bg-white/80 backdrop-blur-md z-30">
-                <div className="flex items-center gap-4">
-                    <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
-                        <MenuIcon className="h-6 w-6" />
-                    </button>
-                    
-                    {onBack && (
-                        <button 
-                            onClick={onBack}
-                            className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium -ml-1 pr-3 border-r border-slate-200 h-6 mr-1"
-                            title="Back to Sessions"
-                        >
-                            <ChevronRightIcon className="h-4 w-4 rotate-180" />
-                            <span className="hidden sm:inline">Back</span>
-                        </button>
-                    )}
-
-                    <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-800 text-sm truncate max-w-[200px] md:max-w-xs">
-                            {activeThread?.title || 'New Research'}
-                        </span>
-                        <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full hidden sm:inline-block">Research Session</span>
-                    </div>
-                </div>
-                
-                {/* Actions */}
-                <div className="flex items-center gap-2">
-                    {onNewChat && (
-                        <button 
-                            onClick={onNewChat}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-all"
-                            title="Start a new research session"
-                        >
-                            <PlusIcon className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline">New Chat</span>
-                        </button>
-                    )}
-                    <button 
-                        onClick={onPromoteToProject}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-weflora-teal text-weflora-teal hover:bg-weflora-mint/10 rounded-lg text-xs font-bold transition-all shadow-sm"
-                        title="Move this research into a Project context"
-                    >
-                        <FolderIcon className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Promote to Project</span>
-                    </button>
-                </div>
-            </header>
-
             {/* Chat Stream - flex-1 scrollable */}
             <div className="flex-1 overflow-y-auto p-4 md:p-0 scroll-smooth">
                 <div className="max-w-3xl mx-auto w-full pt-6 px-4 md:px-0 pb-4">

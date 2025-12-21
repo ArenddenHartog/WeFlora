@@ -22,7 +22,6 @@ import ReportWizard from './ReportWizard';
 import WritingAssistantPanel from './WritingAssistantPanel'; 
 import SpeciesIntelligencePanel from './SpeciesIntelligencePanel';
 import ProjectOverview from './ProjectOverview';
-import ProjectHeader from './ProjectHeader';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { useChat } from '../contexts/ChatContext';
 import { useUI } from '../contexts/UIContext';
@@ -73,7 +72,7 @@ const ProjectWorkspace: React.FC = () => {
     
     const { species, worksheetTemplates, reportTemplates } = useData();
     const { setActiveThreadId, chats, messages, isGenerating, sendMessage } = useChat();
-    const { showNotification, selectedChatId, openDestinationModal, openFilePreview } = useUI(); // Added openFilePreview
+    const { showNotification, selectedChatId, openDestinationModal, openFilePreview, topBarCommand, clearTopBarCommand } = useUI(); // Added openFilePreview
     
     // --- Data Filtering ---
     const project = projects.find(p => p.id === projectId);
@@ -114,6 +113,20 @@ const ProjectWorkspace: React.FC = () => {
             setFocusedReportTabId(navState.focusReportTabId);
         }
     }, [location.state]);
+
+    useEffect(() => {
+        if (!topBarCommand) return;
+        if (topBarCommand.type === 'projectToggleAsk') {
+            setRightPanel(current => current === 'chat' ? 'none' : 'chat');
+            clearTopBarCommand();
+            return;
+        }
+        if (topBarCommand.type === 'projectToggleSettings') {
+            setRightPanel(current => current === 'manage' ? 'none' : 'manage');
+            clearTopBarCommand();
+            return;
+        }
+    }, [topBarCommand, clearTopBarCommand]);
 
     // Sync tab navigation
     const handleTabChange = (tab: string) => {
@@ -478,22 +491,6 @@ const ProjectWorkspace: React.FC = () => {
     return (
         <>
             <div className="flex flex-col h-full bg-weflora-mint relative">
-                <ProjectHeader
-                    projectName={project.name || project.id}
-                    activeTab={activeTab === 'files' ? 'files' : activeTab}
-                    onBackToProjects={() => navigate('/projects')}
-                    onNavigateTab={(tab) => {
-                        if (tab === 'overview') handleTabChange('overview');
-                        else handleTabChange(tab);
-                    }}
-                    onToggleSettings={() => {
-                        if (activeTab === 'worksheets' || activeTab === 'reports') toggleManage();
-                        else showNotification('Project settings are available in Worksheets or Reports.', 'success');
-                    }}
-                    onToggleAsk={toggleChat}
-                    canShowSettings={(activeTab === 'worksheets' && matrices.length > 0) || (activeTab === 'reports' && reports.length > 0)}
-                />
-
                 <div className="flex-1 overflow-hidden bg-white relative">
                     {renderContent()}
                 </div>

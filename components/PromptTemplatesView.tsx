@@ -14,7 +14,7 @@ interface PromptTemplatesViewProps {
     onCreateTemplate?: (template: PromptTemplate) => void;
 }
 
-const PromptTemplatesView: React.FC<PromptTemplatesViewProps> = ({ items, onOpenMenu, onUseTemplate, onCreateTemplate }) => {
+const PromptTemplatesView: React.FC<PromptTemplatesViewProps> = ({ items, onOpenMenu: _onOpenMenu, onUseTemplate, onCreateTemplate }) => {
     const [search, setSearch] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [viewingTemplate, setViewingTemplate] = useState<PromptTemplate | null>(null);
@@ -57,26 +57,7 @@ const PromptTemplatesView: React.FC<PromptTemplatesViewProps> = ({ items, onOpen
 
     return (
         <div className="h-full overflow-y-auto bg-white p-4 md:p-8">
-            <header className="mb-8">
-                <div className="flex items-center justify-between mb-6">
-                     <div className="flex items-center gap-4">
-                        <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
-                            <MenuIcon className="h-6 w-6" />
-                        </button>
-                        <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
-                            <ChatBubbleIcon className="h-6 w-6" />
-                        </div>
-                        <h1 className="text-2xl font-bold text-slate-800">Prompts Hub</h1>
-                     </div>
-                     <button 
-                        onClick={() => setIsCreateModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium shadow-sm transition-colors"
-                     >
-                        <PlusIcon className="h-4 w-4" />
-                        <span className="hidden sm:inline">Create Prompt</span>
-                     </button>
-                </div>
-
+            <div className="mb-8 flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
                 <div className="relative w-full md:w-96">
                     <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input
@@ -87,7 +68,15 @@ const PromptTemplatesView: React.FC<PromptTemplatesViewProps> = ({ items, onOpen
                         className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-weflora-teal focus:border-weflora-teal outline-none text-slate-900"
                     />
                 </div>
-            </header>
+                <button 
+                    onClick={() => setIsCreateModalOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium shadow-sm transition-colors"
+                >
+                    <PlusIcon className="h-4 w-4" />
+                    <span className="hidden sm:inline">Create Prompt</span>
+                    <span className="sm:hidden">New</span>
+                </button>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredItems.map(item => (

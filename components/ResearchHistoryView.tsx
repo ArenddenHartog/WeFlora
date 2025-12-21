@@ -11,7 +11,7 @@ interface ResearchHistoryViewProps {
     onOpenMenu: () => void;
 }
 
-const ResearchHistoryView: React.FC<ResearchHistoryViewProps> = ({ onOpenMenu }) => {
+const ResearchHistoryView: React.FC<ResearchHistoryViewProps> = ({ onOpenMenu: _onOpenMenu }) => {
     const { threads, setActiveThreadId, togglePinThread, deleteThread } = useChat();
     const { navigateToHome, setSessionOpenOrigin } = useUI();
     const [search, setSearch] = useState('');
@@ -51,18 +51,7 @@ const ResearchHistoryView: React.FC<ResearchHistoryViewProps> = ({ onOpenMenu })
 
     return (
         <div className="h-full overflow-y-auto bg-white p-4 md:p-8">
-            <header className="mb-8">
-                <div className="flex items-center gap-4 mb-6">
-                    <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
-                        <MenuIcon className="h-6 w-6" />
-                    </button>
-                    {/* Updated icon container to match mint/teal theme */}
-                    <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
-                        <MessageSquareIcon className="h-6 w-6" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-slate-800">Sessions History</h1>
-                </div>
-
+            <div className="mb-8">
                 <div className="relative w-full max-w-md">
                     <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input
@@ -73,7 +62,7 @@ const ResearchHistoryView: React.FC<ResearchHistoryViewProps> = ({ onOpenMenu })
                         className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none text-slate-900"
                     />
                 </div>
-            </header>
+            </div>
 
             <div className="space-y-3 max-w-4xl">
                 {filteredThreads.length === 0 ? (

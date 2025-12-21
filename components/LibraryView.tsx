@@ -12,7 +12,7 @@ interface LibraryViewProps {
     onUseTemplate: (item: LibraryTemplate) => void;
 }
 
-const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTemplate }) => {
+const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu: _onOpenMenu, onUseTemplate }) => {
     const [search, setSearch] = useState('');
     const [activeTab, setActiveTab] = useState<'All' | TemplateType>('All');
 
@@ -37,26 +37,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTempl
 
     return (
         <div className="h-full overflow-y-auto bg-white p-4 md:p-8">
-            <header className="mb-8">
-                <div className="flex items-center justify-between mb-6">
-                     <div className="flex items-center gap-4">
-                        <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
-                            <MenuIcon className="h-6 w-6" />
-                        </button>
-                        <div className="h-10 w-10 bg-weflora-teal/20 rounded-xl flex items-center justify-center text-weflora-dark">
-                            <MagicWandIcon className="h-6 w-6" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold text-slate-800">Library</h1>
-                            <p className="text-slate-500 text-sm">Receipts, prompts, and reusable workflows.</p>
-                        </div>
-                     </div>
-                     <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 font-medium shadow-sm">
-                        <PlusIcon className="h-4 w-4" />
-                        <span className="hidden sm:inline">Create Template</span>
-                     </button>
-                </div>
-
+            <div className="mb-8">
                 {/* Navigation & Search */}
                 <div className="flex flex-col md:flex-row gap-6">
                     <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 hide-scrollbar flex-1 border-b border-slate-100">
@@ -85,7 +66,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTempl
                         />
                     </div>
                 </div>
-            </header>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredItems.map(item => (
