@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from './AuthContext';
 import { useUI } from './UIContext';
+import { FEATURES } from '../src/config/features';
 import type { PinnedProject, ProjectFile, Matrix, Report, Task, TeamComment, ProjectData } from '../types';
 import { FolderIcon, FileSheetIcon, FilePdfIcon, FileCodeIcon } from '../components/icons';
 
@@ -101,9 +102,9 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                     name: p.name,
                     status: p.status,
                     date: p.date,
-                    workspaceId: p.workspace_id || 'ws-1', 
+                    workspaceId: 'ws-default',
                     icon: FolderIcon,
-                    members: p.members || [] 
+                    members: [] 
                 })));
             }
 
@@ -163,9 +164,38 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 setFiles(groupedFiles);
             }
 
-            // 5. Tasks & Comments (MVP: disabled to avoid 404 spam if tables not present)
-            setTasks([]);
-            setComments([]);
+            // 5. Tasks & Comments (feature-gated)
+            if (FEATURES.tasks) {
+                const { data: taskData } = await supabase.from('tasks').select('*').eq('user_id', userId);
+                if (taskData) {
+                    setTasks(taskData.map((t: any) => ({
+                        id: t.id,
+                        title: t.title,
+                        status: t.status,
+                        priority: t.priority,
+                        dueDate: t.due_date,
+                        assigneeId: t.assignee_id,
+                        projectId: t.project_id
+                    })));
+                }
+            } else {
+                setTasks([]);
+            }
+
+            if (FEATURES.comments) {
+                const { data: commData } = await supabase.from('comments').select('*').eq('user_id', userId);
+                if (commData) {
+                    setComments(commData.map((c: any) => ({
+                        id: c.id,
+                        text: c.text,
+                        memberId: c.member_id,
+                        projectId: c.project_id,
+                        timestamp: new Date(c.created_at).toLocaleString()
+                    })));
+                }
+            } else {
+                setComments([]);
+            }
         };
 
         fetchData();
@@ -190,8 +220,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             name: project.name,
             status: project.status,
             date: project.date,
-            user_id: userId,
-            workspace_id: null
+            user_id: userId
         }).select('*').single();
 
         if (error || !data) {

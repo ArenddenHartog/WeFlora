@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from './AuthContext';
+import { FEATURES } from '../src/config/features';
 import type { 
     Workspace, RecentItem, KnowledgeItem, WorksheetTemplate, 
     PromptTemplate, ReportTemplate, Species
@@ -38,9 +39,6 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { user } = useAuth();
-    // MVP guardrails: disable calls to tables that may not exist to avoid 404 spam.
-    const ENABLE_REMOTE_WORKSPACES = false;
-    const ENABLE_REMOTE_SPECIES = false;
     // Default fallback workspace if none found
     const defaultWorkspace: Workspace = { id: 'ws-default', name: 'Personal Workspace', type: 'Personal', avatar: 'ME' };
     
@@ -77,7 +75,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (!userId) return;
 
             // 1. Workspaces
-            if (ENABLE_REMOTE_WORKSPACES) {
+            if (FEATURES.workspaces) {
                 try {
                     const { data: wsData } = await supabase.from('workspaces').select('*').eq('user_id', userId);
                     if (wsData && wsData.length > 0) {
@@ -151,7 +149,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             } catch (e) { console.error("Error fetching templates", e); }
 
             // 3. Species
-            if (ENABLE_REMOTE_SPECIES) {
+            if (FEATURES.species) {
                 try {
                     const { data: spData } = await supabase.from('species').select('*').limit(50);
                     if (spData) {
@@ -251,7 +249,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (exists) return;
 
         const userId = (await supabase.auth.getUser()).data.user?.id;
-        if (!ENABLE_REMOTE_SPECIES) {
+        if (!FEATURES.species) {
             const local: Species = {
                 id: `sp-local-${Date.now()}`,
                 scientificName: speciesData.scientificName,
