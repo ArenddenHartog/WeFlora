@@ -60,17 +60,19 @@ const AppContent: React.FC = () => {
     } = dataContext;
 
     const {
-        projects, setProjects
+        projects, createProject
     } = projectContext;
 
     const { 
         sendMessage: handleSendMessage 
     } = chatContext;
 
-    const handleCreateProject = (newProject: any) => {
-        setProjects([newProject, ...projects]);
-        setSelectedProjectId(newProject.id);
-        navigate(`/project/${newProject.id}`);
+    const handleCreateProject = async (newProject: any) => {
+        const created = await createProject(newProject);
+        if (!created) return;
+        console.info('[project-created]', { source: 'sidebar', id: created.id });
+        setSelectedProjectId(created.id);
+        navigate(`/project/${created.id}`);
     };
 
     // Wrapper to handle viewMode fallback for global queries

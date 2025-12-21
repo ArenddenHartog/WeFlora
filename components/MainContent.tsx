@@ -35,6 +35,7 @@ const MainContent: React.FC<MainContentProps> = ({
     const { showNotification, destinationModal, openDestinationModal, closeDestinationModal } = useUI();
 
     const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    // Only show persisted projects (UUID ids). Temp ids (e.g. proj-*) are never valid FKs.
     const persistedProjects = projects.filter(p => isUuid(p.id));
 
     // Wrappers to handle logic for Destination Modal
@@ -53,6 +54,7 @@ const MainContent: React.FC<MainContentProps> = ({
                 members: []
             });
             if (!created) return null;
+            console.info('[project-created]', { source: 'destination-modal', id: created.id });
             finalProjectId = created.id;
         } else if (dest?.type === 'project') {
             // Do NOT navigate/select project here. Navigation happens only after successful create.
@@ -77,6 +79,7 @@ const MainContent: React.FC<MainContentProps> = ({
                 members: []
             });
             if (!created) return null;
+            console.info('[project-created]', { source: 'destination-modal', id: created.id });
             finalProjectId = created.id;
         } else if (dest?.type === 'project') {
             // Do NOT navigate/select project here. Navigation happens only after successful create.

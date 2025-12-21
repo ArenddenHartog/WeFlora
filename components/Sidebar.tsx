@@ -27,7 +27,7 @@ interface SidebarProps {
     onNavigate: (view: string) => void; // Changed from ViewMode to string for flexibility
     isOpen: boolean;
     onClose: () => void;
-    onCreateProject: (project: PinnedProject) => void;
+    onCreateProject: (project: PinnedProject) => Promise<{ id: string } | null>;
     isCollapsed: boolean;
     toggleCollapse: () => void;
 }
@@ -58,7 +58,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [newProjectStatus, setNewProjectStatus] = useState<'Active' | 'Archived'>('Active');
   const [newProjectDate, setNewProjectDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const handleCreateProject = (e: React.FormEvent) => {
+  const handleCreateProject = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newProjectName.trim()) return;
 
@@ -72,7 +72,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           members: [{ id: 'me', name: user.name, initials: user.avatar }]
       };
       
-      onCreateProject(newProject);
+      const created = await onCreateProject(newProject);
+      if (!created) return;
       setIsProjectModalOpen(false);
       setNewProjectName('');
       setNewProjectStatus('Active');

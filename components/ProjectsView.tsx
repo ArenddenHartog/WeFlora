@@ -10,7 +10,7 @@ interface ProjectsViewProps {
     projects: PinnedProject[];
     onSelectProject: (id: string) => void;
     onOpenMenu: () => void;
-    onCreateProject: (project: PinnedProject) => void;
+    onCreateProject: (project: PinnedProject) => Promise<{ id: string } | null>;
     onUpdateProject?: (project: PinnedProject) => void;
 }
 
@@ -100,7 +100,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
         return () => document.removeEventListener('click', handleClickOutside);
     }, []);
 
-    const handleCreateProject = (e: React.FormEvent) => {
+    const handleCreateProject = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newProjectName.trim()) return;
 
@@ -114,7 +114,8 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
             members: [{ id: 'me', name: 'Arend den Hartog', initials: 'AH' }]
         };
         
-        onCreateProject(newProject);
+        const created = await onCreateProject(newProject);
+        if (!created) return;
         setIsModalOpen(false);
         
         // Reset form

@@ -37,7 +37,7 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
     const navigate = useNavigate();
     // Hooks
     const { 
-        projects: pinnedProjects, setProjects: setPinnedProjects, 
+        projects: pinnedProjects, createProject,
         files: allFiles, matrices: allMatrices, reports: allReports,
         createMatrix, deleteMatrix, createReport, deleteReport, 
         updateMatrix, updateReport, uploadProjectFile, deleteProjectFile
@@ -72,12 +72,12 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
     const [newProjStatus, setNewProjStatus] = useState<'Active' | 'Archived'>('Active');
     const [newProjDate, setNewProjDate] = useState(new Date().toISOString().split('T')[0]);
 
-    const handleCreateProjectSubmit = (e?: React.FormEvent) => {
+    const handleCreateProjectSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         if (!newProjName.trim()) return;
 
         const newProject: PinnedProject = {
-            id: `proj-${Date.now()}`,
+            id: `new-${Date.now()}`,
             name: newProjName,
             icon: FolderIcon,
             status: newProjStatus,
@@ -85,7 +85,9 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
             workspaceId: currentWorkspace.id, 
             members: []
         };
-        setPinnedProjects(prev => [newProject, ...prev]); // Optimistic
+        const created = await createProject(newProject);
+        if (!created) return;
+        console.info('[project-created]', { source: 'home', id: created.id });
         setIsCreateProjectOpen(false);
         setNewProjName('');
         setNewProjStatus('Active');
@@ -185,7 +187,18 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
                 </>
             );
         case 'projects':
-            return <ProjectsView projects={pinnedProjects} onSelectProject={onSelectProject} onOpenMenu={onOpenMenu} onCreateProject={(p) => setPinnedProjects(prev => [p, ...prev])} />;
+            return (
+                <ProjectsView
+                    projects={pinnedProjects}
+                    onSelectProject={onSelectProject}
+                    onOpenMenu={onOpenMenu}
+                    onCreateProject={async (p) => {
+                        const created = await createProject({ ...p, workspaceId: currentWorkspace.id });
+                        if (created) console.info('[project-created]', { source: 'projects-hub', id: created.id });
+                        return created;
+                    }}
+                />
+            );
         case 'chat':
             if (selectedChat) return <div className="h-full flex flex-col bg-white"><ChatView chat={selectedChat} messages={messages} onBack={() => onNavigate('home')} onSendMessage={sendMessage} isGenerating={isGenerating} onOpenMenu={onOpenMenu} onRegenerateMessage={() => {}} onContinueInReport={(msg) => onOpenDestinationModal('report', msg)} onContinueInWorksheet={(msg) => onOpenDestinationModal('worksheet', msg)} /></div>;
             return <div className="p-10 text-center text-slate-400">Chat not found</div>;
