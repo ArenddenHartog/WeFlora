@@ -206,19 +206,29 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                         <div 
                             key={project.id}
                             onClick={() => onSelectProject(project.id)}
-                            className="group bg-white border border-slate-200 rounded-xl p-5 cursor-pointer hover:border-weflora-teal hover:shadow-md transition-all relative flex flex-col"
+                            className="group bg-white border border-slate-200 rounded-xl p-5 pb-10 cursor-pointer hover:border-weflora-teal hover:shadow-md transition-all relative flex flex-col"
                         >
                             <div className="flex justify-between items-start mb-4">
                                 <div className={`h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0 ${project.status === 'Archived' ? 'bg-slate-100 text-slate-400' : 'bg-weflora-mint/20 text-weflora-teal'}`}>
                                     <FolderIcon className="h-6 w-6" />
                                 </div>
                                 <div className="relative">
-                                    <button 
-                                        onClick={(e) => toggleMenu(e, project.id)}
-                                        className="p-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                        <MoreHorizontalIcon className="h-5 w-5" />
-                                    </button>
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                            onClick={(e) => handleDeleteProject(e, project.id)}
+                                            className="h-8 w-8 flex items-center justify-center cursor-pointer text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors"
+                                            title="Delete project"
+                                        >
+                                            <XIcon className="h-4 w-4" />
+                                        </button>
+                                        <button 
+                                            onClick={(e) => toggleMenu(e, project.id)}
+                                            className="h-8 w-8 flex items-center justify-center cursor-pointer text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                                            title="Project actions"
+                                        >
+                                            <MoreHorizontalIcon className="h-5 w-5" />
+                                        </button>
+                                    </div>
                                     {activeMenuId === project.id && (
                                         <div className="absolute right-0 mt-1 w-36 bg-white border border-slate-200 rounded-lg shadow-lg z-50">
                                             <button
@@ -248,9 +258,6 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                             </p>
 
                             <div className="flex items-center justify-between pt-4 border-t border-slate-100 text-xs font-medium text-slate-500 mt-auto">
-                                <div className="flex items-center gap-1">
-                                    <span>{project.status}</span>
-                                </div>
                                 <div className="flex items-center gap-3">
                                     <button 
                                         onClick={(e) => toggleExpand(e, project.id)}
@@ -263,6 +270,10 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                                     <span>{project.date}</span>
                                 </div>
                             </div>
+
+                            <span className="absolute bottom-4 right-4 text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded pointer-events-none">
+                                {project.status}
+                            </span>
 
                             {/* Expanded Members Section */}
                             {isExpanded && (

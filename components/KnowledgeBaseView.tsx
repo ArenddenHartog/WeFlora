@@ -153,7 +153,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredItems.map((item, index) => (
-                    <div key={index} className="group p-4 bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-weflora-teal transition-all relative flex flex-col">
+                    <div key={index} className="group p-4 pb-10 bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-weflora-teal transition-all relative flex flex-col">
                         <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center gap-3 overflow-hidden">
                                 <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${item.source === 'knowledge' ? 'bg-weflora-teal/10 text-weflora-dark' : 'bg-slate-100 text-slate-500'}`}>
@@ -167,6 +167,13 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                                     </div>
                                 </div>
                             </div>
+                            <button 
+                                onClick={(e) => handleDelete(e, item)}
+                                className="absolute top-3 right-3 h-8 w-8 flex items-center justify-center cursor-pointer text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                title="Delete file"
+                            >
+                                <XIcon className="h-3.5 w-3.5" />
+                            </button>
                         </div>
 
                         <div className="flex flex-wrap gap-1 mb-4 flex-1 content-start">
@@ -181,22 +188,18 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                             <div className="text-[10px] text-slate-400">
                                 {item.size} • {item.date}
                             </div>
-                            <div className="flex items-center gap-1">
-                                <button 
-                                    onClick={() => onAskAI(item.original || item)}
-                                    className="p-1.5 text-weflora-dark bg-weflora-teal/10 rounded-lg hover:bg-weflora-teal/20 transition-colors"
-                                    title="Ask AI about this file"
-                                >
-                                    <SparklesIcon className="h-3.5 w-3.5" />
-                                </button>
-                                <button 
-                                    onClick={(e) => handleDelete(e, item)}
-                                    className="h-8 w-8 flex items-center justify-center cursor-pointer text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                >
-                                    <XIcon className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
+                            <button 
+                                onClick={() => onAskAI(item.original || item)}
+                                className="p-1.5 text-weflora-dark bg-weflora-teal/10 rounded-lg hover:bg-weflora-teal/20 transition-colors"
+                                title="Ask AI about this file"
+                            >
+                                <SparklesIcon className="h-3.5 w-3.5" />
+                            </button>
                         </div>
+
+                        <span className="absolute bottom-3 right-3 text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded pointer-events-none">
+                            {item.source === 'project' ? 'Project File' : item.source === 'knowledge' ? 'Reference' : 'File'}
+                        </span>
                     </div>
                 ))}
                 {filteredItems.length === 0 && (
