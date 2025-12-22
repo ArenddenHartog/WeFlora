@@ -141,8 +141,6 @@ const ProjectWorkspace: React.FC = () => {
         navigate(`/project/${projectId}/${tab}`);
     };
 
-    if (!project || !projectId) return <div className="p-8 text-center text-slate-400">Project not found.</div>;
-
     // --- Handlers ---
 
     const toggleAssistant = (scope: 'project' | 'worksheet' | 'report') => {
@@ -213,13 +211,13 @@ const ProjectWorkspace: React.FC = () => {
 
     // Virtual Documents
     const projectWorksheetDoc: WorksheetDocument = useMemo(() => ({
-        id: project.id,
-        projectId: project.id,
-        title: project.name, 
-        createdAt: project.date,
+        id: project?.id || (projectId || ''),
+        projectId: project?.id || (projectId || ''),
+        title: project?.name || 'Project', 
+        createdAt: project?.date || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        tabs: matrices
-    }), [project, matrices]);
+        tabs: project ? matrices : []
+    }), [project, projectId, matrices]);
 
     const handleUpdateWorksheetDoc = (doc: WorksheetDocument) => {
         const currentIds = new Set(matrices.map(m => m.id));
@@ -236,13 +234,15 @@ const ProjectWorkspace: React.FC = () => {
     };
 
     const projectReportDoc: ReportDocument = useMemo(() => ({
-        id: project.id,
-        projectId: project.id,
+        id: project?.id || (projectId || ''),
+        projectId: project?.id || (projectId || ''),
         title: 'Project Reports',
-        createdAt: project.date,
+        createdAt: project?.date || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        tabs: reports
-    }), [project, reports]);
+        tabs: project ? reports : []
+    }), [project, projectId, reports]);
+
+    if (!project || !projectId) return <div className="p-8 text-center text-slate-400">Project not found.</div>;
 
     const handleUpdateReportDoc = (doc: ReportDocument) => {
         const currentIds = new Set(reports.map(r => r.id));

@@ -40,6 +40,7 @@ const GlobalToast = () => {
 const AppContent: React.FC = () => {
     const { user, loading } = useAuth();
     const navigate = useNavigate();
+    const [assistantPanelWidth, setAssistantPanelWidth] = useState(420);
     
     // Hooks must be inside the component
     const uiContext = useUI();
@@ -72,8 +73,6 @@ const AppContent: React.FC = () => {
         messages,
         isGenerating
     } = chatContext;
-
-    const [assistantPanelWidth, setAssistantPanelWidth] = useState(420);
 
     const handleCreateProject = async (newProject: any) => {
         const created = await createProject(newProject);
