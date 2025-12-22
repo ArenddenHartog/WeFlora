@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { Matrix, MatrixColumn } from '../types';
 import BaseModal from './BaseModal';
 import { 
@@ -34,18 +34,18 @@ const InsertWorksheetModal: React.FC<InsertWorksheetModalProps> = ({ isOpen, onC
     const selectedMatrix = matrices.find(m => m.id === selectedMatrixId);
     
     // Auto-select first matrix and all columns on mount/change if none selected
-    useMemo(() => {
+    useEffect(() => {
         if (!selectedMatrixId && matrices.length > 0) {
             setSelectedMatrixId(matrices[0].id);
         }
-    }, [matrices]);
+    }, [matrices, selectedMatrixId]);
 
-    useMemo(() => {
+    useEffect(() => {
         if (selectedMatrix) {
             // Default to all columns when a matrix is picked
             setSelectedColumnIds(new Set(selectedMatrix.columns.map(c => c.id)));
         }
-    }, [selectedMatrixId]);
+    }, [selectedMatrixId, selectedMatrix?.columns.length]);
 
     const toggleColumn = (id: string) => {
         const next = new Set(selectedColumnIds);
