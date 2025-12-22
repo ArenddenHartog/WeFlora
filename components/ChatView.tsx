@@ -23,12 +23,13 @@ interface ChatViewProps {
     onContinueInReport?: (message: ChatMessage) => void;
     onContinueInWorksheet?: (message: ChatMessage) => void;
     contextProjectId?: string; // New prop for scoping
+    draftKey?: string;
 }
 
 const ChatView: React.FC<ChatViewProps> = ({ 
     chat, messages, onBack, onSendMessage, isGenerating, 
     onRegenerateMessage, onOpenMenu, variant = 'full',
-    onContinueInReport, onContinueInWorksheet, contextProjectId
+    onContinueInReport, onContinueInWorksheet, contextProjectId, draftKey
 }) => {
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
@@ -211,6 +212,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                                 isLoading={isGenerating}
                                 highlightedFileName={highlightedFileName}
                                 contextProjectId={contextProjectId}
+                                draftKey={draftKey}
                             />
                         </div>
                     </div>

@@ -60,6 +60,12 @@ interface UIContextType {
     activeEvidence: EvidenceProvenance | null;
     openEvidencePanel: (provenance: EvidenceProvenance) => void;
     closeEvidencePanel: () => void;
+
+    // Assistant Panel (Global, right-side)
+    isAssistantOpen: boolean;
+    assistantDraftKey: string;
+    openAssistantPanel: (draft?: string) => void;
+    closeAssistantPanel: () => void;
 }
 
 const UIContext = createContext<UIContextType | undefined>(undefined);
@@ -81,6 +87,8 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
     const [previewItem, setPreviewItem] = useState<ProjectFile | KnowledgeItem | null>(null);
     const [activeEvidence, setActiveEvidence] = useState<EvidenceProvenance | null>(null);
+    const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+    const assistantDraftKey = 'weflora-global-assistant-draft';
 
     const toggleSidebarCollapse = () => setIsSidebarCollapsed(prev => !prev);
 
@@ -129,6 +137,18 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
         setActiveEvidence(null);
     };
 
+    const openAssistantPanel = (draft?: string) => {
+        setIsAssistantOpen(true);
+        if (typeof draft === 'string') {
+            localStorage.setItem(assistantDraftKey, draft);
+            window.dispatchEvent(new CustomEvent('weflora:draft', { detail: { draftKey: assistantDraftKey, value: draft } }));
+        }
+    };
+
+    const closeAssistantPanel = () => {
+        setIsAssistantOpen(false);
+    };
+
     return (
         <UIContext.Provider value={{
             isSidebarOpen, setIsSidebarOpen,
@@ -140,7 +160,8 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
             sessionOpenOrigin, setSessionOpenOrigin,
             destinationModal, openDestinationModal, closeDestinationModal,
             previewItem, openFilePreview, closeFilePreview,
-            activeEvidence, openEvidencePanel, closeEvidencePanel
+            activeEvidence, openEvidencePanel, closeEvidencePanel,
+            isAssistantOpen, assistantDraftKey, openAssistantPanel, closeAssistantPanel
         }}>
             {children}
         </UIContext.Provider>

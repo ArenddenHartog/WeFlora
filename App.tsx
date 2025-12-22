@@ -6,13 +6,15 @@ import MainContent from './components/MainContent';
 import FilePreview from './components/FilePreview';
 import GlobalTopBar from './components/GlobalTopBar';
 import EvidencePanel from './components/EvidencePanel';
+import { ResizablePanel } from './components/ResizablePanel';
+import ChatView from './components/ChatView';
 import { DataProvider, useData } from './contexts/DataContext';
 import { ProjectProvider, useProject } from './contexts/ProjectContext';
 import { ChatProvider, useChat } from './contexts/ChatContext';
 import { UIProvider, useUI } from './contexts/UIContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AuthView from './components/AuthView';
-import { XIcon, CheckCircleIcon, AlertTriangleIcon } from './components/icons';
+import { XIcon, AlertTriangleIcon, SparklesIcon } from './components/icons';
 import type { ProjectFile, KnowledgeItem } from './types';
 
 // -- Global Toast Component --
@@ -52,7 +54,8 @@ const AppContent: React.FC = () => {
     const { 
         isSidebarOpen, setIsSidebarOpen, isSidebarCollapsed, toggleSidebarCollapse,
         selectedProjectId, setSelectedProjectId,
-        previewItem, closeFilePreview, openFilePreview
+        previewItem, closeFilePreview, openFilePreview,
+        isAssistantOpen, assistantDraftKey, closeAssistantPanel
     } = uiContext;
 
     const {
@@ -65,8 +68,12 @@ const AppContent: React.FC = () => {
     } = projectContext;
 
     const { 
-        sendMessage: handleSendMessage 
+        sendMessage: handleSendMessage,
+        messages,
+        isGenerating
     } = chatContext;
+
+    const [assistantPanelWidth, setAssistantPanelWidth] = useState(420);
 
     const handleCreateProject = async (newProject: any) => {
         const created = await createProject(newProject);
@@ -136,6 +143,32 @@ const AppContent: React.FC = () => {
                         onOpenMenu={() => setIsSidebarOpen(true)}
                     />
                     <EvidencePanel />
+                    <ResizablePanel
+                        isOpen={isAssistantOpen}
+                        onClose={closeAssistantPanel}
+                        width={assistantPanelWidth}
+                        setWidth={setAssistantPanelWidth}
+                        minWidth={320}
+                        maxWidth={800}
+                    >
+                        <div className="h-full bg-white flex flex-col">
+                            <ChatView
+                                chat={{ id: 'global-assistant', title: 'Ask FloraGPT', description: 'Global assistant', icon: SparklesIcon, time: 'Now' }}
+                                messages={messages}
+                                onBack={() => closeAssistantPanel()}
+                                onSendMessage={(text, files, instructions, model, contextItems) => {
+                                    // New research semantics: opening the panel clears active thread; sending creates a new one.
+                                    handleSendMessage(text, files, instructions, model, contextItems, 'home', false, false);
+                                }}
+                                isGenerating={isGenerating}
+                                onRegenerateMessage={() => {}}
+                                onOpenMenu={() => {}}
+                                variant="panel"
+                                draftKey={assistantDraftKey}
+                                contextProjectId={selectedProjectId || undefined}
+                            />
+                        </div>
+                    </ResizablePanel>
                 </main>
             </div>
         </div>
