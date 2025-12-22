@@ -130,6 +130,7 @@ const GlobalTopBar: React.FC = () => {
     // Force "new session" UI (dashboard) and prefill the primary composer.
     setActiveThreadId(null);
     localStorage.setItem('weflora-home-draft', query);
+    window.dispatchEvent(new CustomEvent('weflora:draft', { detail: { draftKey: 'weflora-home-draft', value: query } }));
     navigate('/');
   };
 

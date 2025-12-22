@@ -105,6 +105,22 @@ const ChatInput: React.FC<ChatInputProps> = ({
         }
     }, [draftKey]);
 
+    // Allow external prefill (e.g. GlobalTopBar escalation) without remount/reload.
+    useEffect(() => {
+        if (!draftKey) return;
+
+        const handler = (e: Event) => {
+            const evt = e as CustomEvent<{ draftKey?: string; value?: string }>;
+            if (!evt.detail) return;
+            if (evt.detail.draftKey !== draftKey) return;
+            if (typeof evt.detail.value !== 'string') return;
+            setText(evt.detail.value);
+        };
+
+        window.addEventListener('weflora:draft', handler as EventListener);
+        return () => window.removeEventListener('weflora:draft', handler as EventListener);
+    }, [draftKey]);
+
     // Auto-save: Save draft
     useEffect(() => {
         if (draftKey) localStorage.setItem(draftKey, text);
