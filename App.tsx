@@ -14,7 +14,7 @@ import { ChatProvider, useChat } from './contexts/ChatContext';
 import { UIProvider, useUI } from './contexts/UIContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AuthView from './components/AuthView';
-import { XIcon, AlertTriangleIcon, SparklesIcon } from './components/icons';
+import { XIcon, AlertTriangleIcon, CheckCircleIcon, SparklesIcon } from './components/icons';
 import type { ProjectFile, KnowledgeItem } from './types';
 
 // -- Global Toast Component --

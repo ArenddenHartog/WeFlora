@@ -10,7 +10,8 @@
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
     "guard:temp-ids": "bash scripts/guard-temp-ids.sh",
-    "check": "npm run lint && npm run guard:temp-ids && npm run build"
+    "guard:toast-icons": "bash scripts/guard-toast-icons.sh",
+    "check": "npm run lint && npm run guard:temp-ids && npm run guard:toast-icons && npm run build"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",
