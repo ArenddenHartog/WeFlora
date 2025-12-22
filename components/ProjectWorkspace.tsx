@@ -23,6 +23,7 @@ import WritingAssistantPanel from './WritingAssistantPanel';
 import SpeciesIntelligencePanel from './SpeciesIntelligencePanel';
 import ProjectOverview from './ProjectOverview';
 import ProjectHeader from './ProjectHeader';
+import ProjectActionsBar from './ProjectActionsBar';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { useChat } from '../contexts/ChatContext';
 import { useUI } from '../contexts/UIContext';
@@ -569,21 +570,35 @@ ${report.content.substring(0, 3000)}${report.content.length > 3000 ? '...(trunca
             <div className="flex flex-col h-full bg-weflora-mint relative">
                 <ProjectHeader
                     projectName={project.name || project.id}
-                    activeTab={activeTab === 'files' ? 'files' : activeTab}
+                    activeTab={activeTab === 'overview' || activeTab === 'worksheets' || activeTab === 'reports' || activeTab === 'team' ? activeTab : undefined}
                     onBackToProjects={() => navigate('/projects')}
-                    onNavigateTab={(tab) => {
-                        if (tab === 'overview') handleTabChange('overview');
-                        else handleTabChange(tab);
-                    }}
-                    showAsk={activeTab === 'overview' || activeTab === 'files' || activeTab === 'team'}
-                    askActive={rightPanel === 'chat' && assistantScope === 'project'}
-                    onToggleAsk={() => toggleAssistant('project')}
-                    onToggleSettings={() => {
-                        if (activeTab === 'worksheets' || activeTab === 'reports') toggleManage();
-                        else showNotification('Project settings are available in Worksheets or Reports.', 'success');
-                    }}
-                    canShowSettings={(activeTab === 'worksheets' && matrices.length > 0) || (activeTab === 'reports' && reports.length > 0)}
+                    onNavigateTab={(tab) => handleTabChange(tab)}
                 />
+
+                <ProjectActionsBar
+                    activeTab={activeTab}
+                    onOpenProjectFiles={() => handleTabChange('files')}
+                    onOpenSettings={() => {
+                        if (activeTab === 'worksheets' || activeTab === 'reports') toggleManage();
+                        else showNotification('Project settings are not available yet.', 'success');
+                    }}
+                    settingsLabel={
+                        activeTab === 'worksheets'
+                            ? 'Worksheet Settings'
+                            : activeTab === 'reports'
+                                ? 'Report Settings'
+                                : 'Project Settings'
+                    }
+                    canOpenSettings={
+                        activeTab === 'overview'
+                            ? false
+                            : (activeTab === 'worksheets' && matrices.length > 0) || (activeTab === 'reports' && reports.length > 0)
+                    }
+                    showAssistant={activeTab === 'worksheets' || activeTab === 'reports'}
+                    assistantActive={rightPanel === 'chat' && assistantScope === (activeTab === 'worksheets' ? 'worksheet' : 'report')}
+                    onToggleAssistant={() => toggleAssistant(activeTab === 'worksheets' ? 'worksheet' : 'report')}
+                />
+
                 <div className="flex-1 overflow-hidden bg-white relative">
                     {renderContent()}
                 </div>
