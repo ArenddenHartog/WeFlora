@@ -1,24 +1,23 @@
-import tsParser from '@typescript-eslint/parser';
-import tsPlugin from '@typescript-eslint/eslint-plugin';
+import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
-import react from 'eslint-plugin-react';
-import reactRefresh from 'eslint-plugin-react-refresh';
 
 /** @type {import('eslint').Linter.FlatConfig[]} */
 export default [
   {
     ignores: [
       'dist/**',
+      '.vercel/**',
       'node_modules/**',
       'backend/**',
       'archive/**',
       'restore/**',
+      'scripts/**',
     ],
   },
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
-      parser: tsParser,
+      parser: tseslint.parser,
       parserOptions: {
         ecmaVersion: 'latest',
         sourceType: 'module',
@@ -26,15 +25,18 @@ export default [
       },
     },
     plugins: {
-      '@typescript-eslint': tsPlugin,
-      react,
-      'react-refresh': reactRefresh,
+      '@typescript-eslint': tseslint.plugin,
       'react-hooks': reactHooks,
     },
     settings: {
       react: { version: 'detect' },
     },
     rules: {
+      // Keep scope intentionally narrow: hooks enforcement only.
+      'no-undef': 'off',
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+
       // Enforce correct Rules of Hooks usage
       'react-hooks/rules-of-hooks': 'error',
       // Warn on missing deps (kept warn to reduce churn)

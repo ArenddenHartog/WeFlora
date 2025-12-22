@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import type { PinnedProject, RecentItem, PromptTemplate, KnowledgeItem, ChatMessage, Thread, ProjectFile, Report, Matrix, ContextItem } from '../types';
 import ChatInput from './ChatInput';
 import { 
@@ -38,7 +38,7 @@ const HomeView: React.FC<HomeViewProps> = ({
     
     // Find active thread
     const activeThread = threads.find(t => t.id === activeThreadId);
-    const messages = activeThread?.messages || [];
+    const messages = useMemo(() => activeThread?.messages || [], [activeThread?.messages]);
     const chatScrollRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll logic for thread view

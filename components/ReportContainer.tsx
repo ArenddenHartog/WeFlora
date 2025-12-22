@@ -75,7 +75,7 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
         if (activeReport) {
             lastContentRef.current[activeReport.id] = activeReport.content;
         }
-    }, [activeReport?.id]);
+    }, [activeReport]);
 
     // --- Handlers ---
 

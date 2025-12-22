@@ -324,7 +324,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         const tempId = optimisticMatrix.id;
         if (tempId && !isUuid(tempId)) {
-            console.info('[id:temp]', { id: tempId });
+            console.info('[id:temp]', { tempId });
         }
 
         const insertPayload = {
@@ -447,7 +447,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         const tempId = report.id;
         if (tempId && !isUuid(tempId)) {
-            console.info('[id:temp]', { id: tempId });
+            console.info('[id:temp]', { tempId });
         }
 
         const { data, error } = await supabase.from('reports').insert({

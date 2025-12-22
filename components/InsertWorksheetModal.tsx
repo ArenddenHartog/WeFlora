@@ -45,7 +45,7 @@ const InsertWorksheetModal: React.FC<InsertWorksheetModalProps> = ({ isOpen, onC
             // Default to all columns when a matrix is picked
             setSelectedColumnIds(new Set(selectedMatrix.columns.map(c => c.id)));
         }
-    }, [selectedMatrixId, selectedMatrix?.columns.length]);
+    }, [selectedMatrixId, selectedMatrix]);
 
     const toggleColumn = (id: string) => {
         const next = new Set(selectedColumnIds);

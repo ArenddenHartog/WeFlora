@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { ProjectFile, ContextItem, PromptTemplate } from '../types';
 import { FLORA_GPT_SYSTEM_INSTRUCTION } from '../services/prompts';
@@ -161,7 +161,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     };
 
     // Calculate Popover Position with smart clamping
-    const updatePopoverPosition = () => {
+    const updatePopoverPosition = useCallback(() => {
         let targetRect: DOMRect | null = null;
         if (isContextPickerOpen && addRefButtonRef.current) {
             targetRect = addRefButtonRef.current.getBoundingClientRect();
@@ -191,7 +191,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 maxHeight: `${maxPopoverHeight}px`
             });
         }
-    };
+    }, [isContextPickerOpen, isTemplatePickerOpen]);
 
     useEffect(() => {
         updatePopoverPosition();
@@ -201,7 +201,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             window.removeEventListener('resize', updatePopoverPosition);
             window.removeEventListener('scroll', updatePopoverPosition, true);
         };
-    }, [isContextPickerOpen, isTemplatePickerOpen]);
+    }, [isContextPickerOpen, isTemplatePickerOpen, updatePopoverPosition]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {

@@ -41,16 +41,16 @@ export const ManageReportPanel: React.FC<{
     useEffect(() => {
         setTitle(report.title);
         setTags(report.tags || []);
-    }, [report.id]);
+    }, [report.id, report.title, report.tags]);
 
-    const handleSave = () => {
+    const handleSave = React.useCallback(() => {
         onUpdate({ 
             ...report, 
             title, 
             tags,
             lastModified: new Date().toLocaleDateString() 
         });
-    };
+    }, [onUpdate, report, tags, title]);
 
     useEffect(() => {
         const timeout = setTimeout(() => {
@@ -59,7 +59,7 @@ export const ManageReportPanel: React.FC<{
             }
         }, 500);
         return () => clearTimeout(timeout);
-    }, [title, tags]);
+    }, [handleSave, report.tags, report.title, tags, title]);
 
     const handleAddTag = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && newTagInput.trim()) {
@@ -131,7 +131,7 @@ const ReportEditorView: React.FC<ReportEditorViewProps> = ({
             setHistory([activeReport.content || '']);
             setHistoryIndex(0);
         }
-    }, [activeReport?.id]);
+    }, [activeReport]);
 
     useEffect(() => {
         setContent(activeReport?.content || '');

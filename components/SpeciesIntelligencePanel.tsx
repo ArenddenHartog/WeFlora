@@ -70,7 +70,7 @@ const SpeciesIntelligencePanel: React.FC<SpeciesIntelligencePanelProps> = ({ spe
         if (speciesName) {
             fetchProfile();
         }
-    }, [speciesName]);
+    }, [speciesName, speciesList]);
 
     const handleSave = () => {
         if (!data || !onSaveToLibrary) return;

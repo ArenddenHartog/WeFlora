@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Matrix, MatrixColumn, MatrixRow, MatrixColumnType, DiscoveredStructure, WorksheetTemplate, Species, ProjectFile } from '../types';
 import { 
     TelescopeIcon, LayoutGridIcon, MagicWandIcon, TableIcon, UploadIcon, 
@@ -75,13 +75,7 @@ const WorksheetWizard: React.FC<{
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
-        if (initialFile && step === 0) {
-            startScanning(initialFile);
-        }
-    }, [initialFile]);
-
-    const startScanning = async (file: File) => {
+    const startScanning = useCallback(async (file: File) => {
         setUploadedFile(file);
         setSheetTitle(file.name.split('.')[0]);
         setStep(2);
@@ -119,7 +113,13 @@ const WorksheetWizard: React.FC<{
         } finally {
             setIsScanning(false);
         }
-    };
+    }, [onDiscover, onFileSave]);
+
+    useEffect(() => {
+        if (initialFile && step === 0) {
+            startScanning(initialFile);
+        }
+    }, [initialFile, startScanning, step]);
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {

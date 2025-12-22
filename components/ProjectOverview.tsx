@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import type { PinnedProject, Matrix, Report, ProjectInsights, ProjectFile } from '../types';
 import { 
     RefreshIcon, SparklesIcon, ChartPieIcon, CheckCircleIcon, 
@@ -18,7 +18,7 @@ const ProjectOverview: React.FC<ProjectOverviewProps> = ({ project, matrices, re
     const [insights, setInsights] = useState<ProjectInsights | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
-    const generateInsights = async () => {
+    const generateInsights = useCallback(async () => {
         setIsLoading(true);
         try {
             const data = await aiService.generateProjectInsights(matrices, reports);
@@ -28,13 +28,13 @@ const ProjectOverview: React.FC<ProjectOverviewProps> = ({ project, matrices, re
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [matrices, reports]);
 
     useEffect(() => {
         if (!insights && (matrices.length > 0 || reports.length > 0)) {
             generateInsights();
         }
-    }, []);
+    }, [generateInsights, insights, matrices.length, reports.length]);
 
     const getIcon = (type?: string) => {
         switch (type) {
