@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProject } from '../../contexts/ProjectContext';
 import { useData } from '../../contexts/DataContext';
@@ -8,11 +8,12 @@ import { useChat } from '../../contexts/ChatContext';
 import type { Report, ReportDocument, ChatMessage } from '../../types';
 import { navigateToCreatedEntity } from '../../utils/navigation';
 import ReportsHubView from '../ReportsHubView';
-import ReportEditorView, { ManageReportPanel } from '../ReportEditorView';
+import { ManageReportPanel } from '../ReportEditorView';
 import ReportWizard from '../ReportWizard';
 import { ResizablePanel } from '../ResizablePanel';
 import WritingAssistantPanel from '../WritingAssistantPanel';
 import ChatView from '../ChatView';
+import ReportContainer from '../ReportContainer';
 import { 
     ChevronRightIcon,
     DatabaseIcon,
@@ -59,10 +60,33 @@ const ReportsRoute: React.FC<ReportsRouteProps> = ({ onOpenDestinationModal }) =
     const [rightPanel, setRightPanel] = useState<'none' | 'chat' | 'manage' | 'writing_assistant'>('none');
     const [panelWidth, setPanelWidth] = useState(400);
     const [isWizardOpen, setIsWizardOpen] = useState(false);
+    const [focusTabId, setFocusTabId] = useState<string | undefined>(undefined);
+    const [activeTabReportId, setActiveTabReportId] = useState<string | null>(null);
 
     // Derived Data
     const standaloneReports = reports.filter(r => !r.projectId);
-    const activeReport = reportId ? reports.find(r => r.id === reportId) : null;
+    const activeRootReport = reportId ? reports.find(r => r.id === reportId) : null;
+
+    const reportDoc: ReportDocument | null = useMemo(() => {
+        if (!activeRootReport) return null;
+        const tabs = reports
+            .filter(r => r.id === activeRootReport.id || r.parentId === activeRootReport.id)
+            .sort((a, b) => (a.id === activeRootReport.id ? -1 : b.id === activeRootReport.id ? 1 : 0));
+        return {
+            id: activeRootReport.id,
+            projectId: undefined,
+            title: activeRootReport.title,
+            createdAt: activeRootReport.lastModified || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            tabs
+        };
+    }, [activeRootReport, reports]);
+
+    const activeReport = useMemo(() => {
+        if (!reportDoc) return null;
+        const id = activeTabReportId || reportDoc.id;
+        return reportDoc.tabs.find(t => t.id === id) || reportDoc.tabs[0] || null;
+    }, [activeTabReportId, reportDoc]);
 
     // --- Actions ---
 
@@ -89,6 +113,33 @@ const ReportsRoute: React.FC<ReportsRouteProps> = ({ onOpenDestinationModal }) =
 
     const handleUpdate = (updated: Report) => {
         updateReport(updated);
+    };
+
+    const handleUpdateDoc = async (doc: ReportDocument) => {
+        if (!activeRootReport) return;
+        const currentTabs = reports.filter(r => r.id === doc.id || r.parentId === doc.id);
+        const newTabs = doc.tabs;
+
+        // Update title of root if changed
+        if (activeRootReport.title !== doc.title) {
+            handleUpdate({ ...activeRootReport, title: doc.title });
+        }
+
+        for (const tab of newTabs) {
+            const existing = currentTabs.find(t => t.id === tab.id);
+            if (!existing) {
+                const created = await createReport({ ...tab, projectId: undefined, parentId: doc.id });
+                if (created?.id) setFocusTabId(created.id);
+            } else if (JSON.stringify(existing) !== JSON.stringify(tab)) {
+                handleUpdate(tab);
+            }
+        }
+
+        currentTabs.forEach(oldTab => {
+            if (!newTabs.find(t => t.id === oldTab.id)) {
+                handleDelete(oldTab.id);
+            }
+        });
     };
 
     const handleDelete = (id: string) => {
@@ -118,7 +169,7 @@ const ReportsRoute: React.FC<ReportsRouteProps> = ({ onOpenDestinationModal }) =
 
     // --- Render ---
 
-    if (reportId && activeReport) {
+    if (reportId && activeRootReport && reportDoc && activeReport) {
         return (
             <div className="h-full flex flex-col bg-white relative">
                 <header className="flex-none h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30">
@@ -130,7 +181,7 @@ const ReportsRoute: React.FC<ReportsRouteProps> = ({ onOpenDestinationModal }) =
                         <div className="h-8 w-8 bg-weflora-mint/20 rounded-lg flex items-center justify-center text-weflora-teal">
                             <FileTextIcon className="h-5 w-5" />
                         </div>
-                        <h1 className="text-lg font-bold text-slate-900 truncate max-w-md">{activeReport.title}</h1>
+                        <h1 className="text-lg font-bold text-slate-900 truncate max-w-md">{activeRootReport.title}</h1>
                     </div>
                     <div className="flex items-center gap-2">
                         <HeaderActionButton icon={DatabaseIcon} label="Files" active={false} onClick={() => navigate('/files')} />
@@ -150,13 +201,15 @@ const ReportsRoute: React.FC<ReportsRouteProps> = ({ onOpenDestinationModal }) =
                 </header>
 
                 <div className="flex-1 overflow-hidden relative">
-                    <ReportEditorView 
-                        report={activeReport}
-                        onUpdate={handleUpdate}
-                        onClose={() => navigate('/reports')}
-                        hideToolbar={true}
-                        availableMatrices={matrices} // Pass all matrices for "Insert Data"
+                    <ReportContainer
+                        document={reportDoc}
+                        initialActiveTabId={focusTabId}
+                        onUpdateDocument={handleUpdateDoc}
+                        onClose={() => {}}
+                        availableMatrices={matrices}
                         onToggleAssistant={() => togglePanel('writing_assistant')}
+                        onActiveReportIdChange={(id) => setActiveTabReportId(id)}
+                        hideHeader={true}
                     />
                 </div>
 

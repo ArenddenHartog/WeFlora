@@ -20,10 +20,11 @@ interface ReportContainerProps {
     onOpenAssistantChat?: () => void; // icon-only entry point (entity chat)
     assistantChatActive?: boolean;
     onActiveReportIdChange?: (reportId: string) => void;
+    hideHeader?: boolean;
 }
 
 const ReportContainer: React.FC<ReportContainerProps> = ({ 
-    document: reportDoc, initialActiveTabId, onUpdateDocument, onClose, availableMatrices, onToggleAssistant, onOpenAssistantChat, assistantChatActive, onActiveReportIdChange
+    document: reportDoc, initialActiveTabId, onUpdateDocument, onClose, availableMatrices, onToggleAssistant, onOpenAssistantChat, assistantChatActive, onActiveReportIdChange, hideHeader
 }) => {
     const [activeTabId, setActiveTabId] = useState<string>(initialActiveTabId || reportDoc.tabs[0]?.id || '');
     const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -208,6 +209,7 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
         <div className="flex flex-col h-full bg-white relative">
             
             {/* 1. Document Header */}
+            {!hideHeader && (
             <header className="flex-none h-14 border-b border-slate-200 bg-white flex items-center justify-between px-4 z-40 print:hidden">
                 <div className="flex items-center gap-3">
                     <div className="h-8 w-8 bg-weflora-mint/20 rounded-lg flex items-center justify-center text-weflora-teal">
@@ -290,6 +292,7 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
                     </button>
                 </div>
             </header>
+            )}
 
             {/* 2. Content Area (ReportEditorView - Toolbar Hidden) */}
             <div className="flex-1 overflow-hidden relative">
