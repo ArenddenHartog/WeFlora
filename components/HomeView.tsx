@@ -7,7 +7,7 @@ import {
     SparklesIcon, LogoIcon, RefreshIcon, CopyIcon, CheckIcon, BookmarkIcon,
     ArrowUpIcon, TrendingUpIcon, ChevronRightIcon
 } from './icons'; 
-import { MessageRenderer } from './MessageRenderer';
+import { MessageRenderer, EvidenceChip } from './MessageRenderer';
 
 interface HomeViewProps {
     pinnedProjects: PinnedProject[];
@@ -188,6 +188,11 @@ const HomeView: React.FC<HomeViewProps> = ({
                                     <div className={`prose prose-sm max-w-none text-slate-700 leading-relaxed ${
                                         msg.sender === 'user' ? 'bg-slate-50 p-4 rounded-2xl rounded-tr-none text-left inline-block' : ''
                                     }`}>
+                                        {msg.sender === 'ai' && (
+                                            <div className="flex justify-end mb-2">
+                                                <EvidenceChip citations={msg.citations} label="Assistant answer" />
+                                            </div>
+                                        )}
                                         <MessageRenderer text={msg.text} />
                                     </div>
 

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import type { Matrix, MatrixRow, MatrixColumn, MatrixColumnType, Species, ProjectFile, SkillConfiguration, ConditionalFormattingRule } from '../types';
+import type { Matrix, MatrixRow, MatrixColumn, MatrixColumnType, Species, ProjectFile, SkillConfiguration, ConditionalFormattingRule, MatrixCell } from '../types';
 import { 
     PlusIcon, SparklesIcon, TableIcon, XIcon, RefreshIcon, 
     CheckCircleIcon, MoreHorizontalIcon, 
@@ -13,6 +13,7 @@ import BaseModal from './BaseModal';
 import { aiService } from '../services/aiService';
 import ColumnSettingsModal from './ColumnSettingsModal';
 import { MessageRenderer } from './MessageRenderer';
+import EvidenceGlow from './EvidenceGlow';
 
 interface MatrixViewProps {
     matrices: Matrix[];
@@ -131,12 +132,22 @@ const MatrixInput: React.FC<{ value: string|number; type: MatrixColumnType; opti
     );
 };
 
-const RichCellRenderer: React.FC<{ value: string|number, column: MatrixColumn, onInspect?: () => void }> = ({ value, column, onInspect }) => {
+const RichCellRenderer: React.FC<{ value: string|number, column: MatrixColumn, cell?: MatrixCell, onInspect?: () => void }> = ({ value, column, cell, onInspect }) => {
     const stringVal = String(value || '');
-    const isAI = column.type === 'ai';
+    const isAI = column.type === 'ai' || column.title.toLowerCase().includes('ai');
     const { hasReasoning, value: displayValue } = isAI ? parseCellContent(stringVal) : { hasReasoning: false, value: stringVal };
+
+    const evidenceStatus: 'generated' | 'verified' | 'warning' | 'error' =
+        cell?.status === 'error' ? 'error' :
+        (cell?.citations && cell.citations.length > 0) ? 'verified' :
+        isAI ? 'generated' : 'generated';
+
+    const provenance = isAI ? {
+        label: `AI cell • ${column.title}`,
+        sources: (cell?.citations || []).map((c) => c.source).filter(Boolean),
+    } : undefined;
     
-    return (
+    const inner = (
         <div className={`truncate w-full px-3 text-sm flex items-center gap-2 group/cell relative h-full ${!value ? 'text-slate-300 italic' : 'text-slate-700'}`}>
             <span className="truncate flex-1">{displayValue || stringVal || 'Empty'}</span>
             {hasReasoning && <InfoIcon className="h-3 w-3 text-weflora-teal flex-shrink-0"/>}
@@ -153,6 +164,12 @@ const RichCellRenderer: React.FC<{ value: string|number, column: MatrixColumn, o
             )}
         </div>
     );
+
+    if (isAI && (value || cell?.status === 'error' || cell?.citations?.length)) {
+        return <EvidenceGlow status={evidenceStatus} provenance={provenance} className="w-full h-full">{inner}</EvidenceGlow>;
+    }
+
+    return inner;
 };
 
 const MatrixView: React.FC<MatrixViewProps> = ({ 
@@ -405,6 +422,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                                                             <RichCellRenderer 
                                                                 value={cell?.value ?? ''} 
                                                                 column={col} 
+                                                                cell={cell}
                                                                 onInspect={
                                                                     (col.isPrimaryKey && onInspectEntity) 
                                                                     ? () => onInspectEntity(String(cell?.value || '')) 

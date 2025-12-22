@@ -14,6 +14,12 @@ interface DestinationModalState {
     message: ChatMessage | null;
 }
 
+export type EvidenceProvenance = {
+    label: string;
+    sources?: string[];
+    generatedAt?: string;
+};
+
 interface UIContextType {
     // Sidebar State
     isSidebarOpen: boolean;
@@ -49,6 +55,11 @@ interface UIContextType {
     previewItem: ProjectFile | KnowledgeItem | null;
     openFilePreview: (item: ProjectFile | KnowledgeItem) => void;
     closeFilePreview: () => void;
+
+    // Evidence Panel (Global, right-side)
+    activeEvidence: EvidenceProvenance | null;
+    openEvidencePanel: (provenance: EvidenceProvenance) => void;
+    closeEvidencePanel: () => void;
 }
 
 const UIContext = createContext<UIContextType | undefined>(undefined);
@@ -69,6 +80,7 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     });
 
     const [previewItem, setPreviewItem] = useState<ProjectFile | KnowledgeItem | null>(null);
+    const [activeEvidence, setActiveEvidence] = useState<EvidenceProvenance | null>(null);
 
     const toggleSidebarCollapse = () => setIsSidebarCollapsed(prev => !prev);
 
@@ -109,6 +121,14 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
         setPreviewItem(null);
     };
 
+    const openEvidencePanel = (provenance: EvidenceProvenance) => {
+        setActiveEvidence(provenance);
+    };
+
+    const closeEvidencePanel = () => {
+        setActiveEvidence(null);
+    };
+
     return (
         <UIContext.Provider value={{
             isSidebarOpen, setIsSidebarOpen,
@@ -119,7 +139,8 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
             navigateToProject, navigateToHome,
             sessionOpenOrigin, setSessionOpenOrigin,
             destinationModal, openDestinationModal, closeDestinationModal,
-            previewItem, openFilePreview, closeFilePreview
+            previewItem, openFilePreview, closeFilePreview,
+            activeEvidence, openEvidencePanel, closeEvidencePanel
         }}>
             {children}
         </UIContext.Provider>

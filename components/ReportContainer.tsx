@@ -8,6 +8,7 @@ import {
     FilePdfIcon, FileCodeIcon, BookIcon
 } from './icons';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import EvidenceGlow from './EvidenceGlow';
 
 interface ReportContainerProps {
     document: ReportDocument;
@@ -35,6 +36,9 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
     const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
     const downloadMenuRef = useRef<HTMLDivElement>(null);
     const [pendingDeleteTabId, setPendingDeleteTabId] = useState<string | null>(null);
+    const [assistantArmedAt, setAssistantArmedAt] = useState<string | null>(null);
+    const [assistantMarks, setAssistantMarks] = useState<Record<string, string>>({});
+    const lastContentRef = useRef<Record<string, string>>({});
 
     useEffect(() => {
         if (!reportDoc.tabs.find(t => t.id === activeTabId) && reportDoc.tabs.length > 0) {
@@ -61,6 +65,11 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
     }, [isDownloadMenuOpen]);
 
     const activeReport = reportDoc.tabs.find(t => t.id === activeTabId);
+    useEffect(() => {
+        if (activeReport) {
+            lastContentRef.current[activeReport.id] = activeReport.content;
+        }
+    }, [activeReport?.id]);
 
     // --- Handlers ---
 
@@ -92,6 +101,13 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
     };
 
     const handleReportUpdate = (updatedReport: Report) => {
+        // Heuristic: if the assistant panel was opened and content changed, mark as AI-generated.
+        const prev = lastContentRef.current[updatedReport.id] ?? '';
+        if (assistantArmedAt && updatedReport.content !== prev) {
+            setAssistantMarks(prevMarks => ({ ...prevMarks, [updatedReport.id]: assistantArmedAt }));
+            setAssistantArmedAt(null);
+        }
+        lastContentRef.current[updatedReport.id] = updatedReport.content;
         const newTabs = reportDoc.tabs.map(t => t.id === updatedReport.id ? updatedReport : t);
         onUpdateDocument({ ...reportDoc, tabs: newTabs });
     };
@@ -260,14 +276,37 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
 
             {/* 2. Content Area (ReportEditorView - Toolbar Hidden) */}
             <div className="flex-1 overflow-hidden relative">
-                <ReportEditorView 
-                    report={activeReport}
-                    onUpdate={handleReportUpdate}
-                    onClose={() => {}} 
-                    hideToolbar={true}
-                    availableMatrices={availableMatrices}
-                    onToggleAssistant={onToggleAssistant} // Passed down
-                />
+                {assistantMarks[activeReport.id] ? (
+                    <EvidenceGlow
+                        status="generated"
+                        provenance={{ label: 'Assistant-inserted content', generatedAt: assistantMarks[activeReport.id] }}
+                        className="h-full"
+                    >
+                        <ReportEditorView 
+                            report={activeReport}
+                            onUpdate={handleReportUpdate}
+                            onClose={() => {}} 
+                            hideToolbar={true}
+                            availableMatrices={availableMatrices}
+                            onToggleAssistant={() => {
+                                setAssistantArmedAt(new Date().toLocaleString());
+                                onToggleAssistant?.();
+                            }}
+                        />
+                    </EvidenceGlow>
+                ) : (
+                    <ReportEditorView 
+                        report={activeReport}
+                        onUpdate={handleReportUpdate}
+                        onClose={() => {}} 
+                        hideToolbar={true}
+                        availableMatrices={availableMatrices}
+                        onToggleAssistant={() => {
+                            setAssistantArmedAt(new Date().toLocaleString());
+                            onToggleAssistant?.();
+                        }}
+                    />
+                )}
             </div>
 
             {/* 3. Bottom Tab Bar (Renamable) */}

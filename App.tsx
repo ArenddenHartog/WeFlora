@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import FilePreview from './components/FilePreview';
 import GlobalTopBar from './components/GlobalTopBar';
+import EvidencePanel from './components/EvidencePanel';
 import { DataProvider, useData } from './contexts/DataContext';
 import { ProjectProvider, useProject } from './contexts/ProjectContext';
 import { ChatProvider, useChat } from './contexts/ChatContext';
@@ -134,6 +135,7 @@ const AppContent: React.FC = () => {
                         onSelectProject={(id) => { setSelectedProjectId(id); navigate(`/project/${id}`); }}
                         onOpenMenu={() => setIsSidebarOpen(true)}
                     />
+                    <EvidencePanel />
                 </main>
             </div>
         </div>

@@ -1,7 +1,9 @@
 
-import React, { useState } from 'react';
-import { SparklesIcon, ChevronUpIcon, ChevronDownIcon } from './icons';
+import React, { useMemo, useState } from 'react';
+import { SparklesIcon, ChevronUpIcon, ChevronDownIcon, ShieldCheckIcon } from './icons';
 import { parseMarkdownTable } from '../utils/markdown';
+import type { Citation } from '../types';
+import { useUI } from '../contexts/UIContext';
 
 const ReasoningBlock = ({ text }: { text: string }) => {
     const [isOpen, setIsOpen] = useState(true);
@@ -42,6 +44,7 @@ const renderInlineStyles = (text: string) => {
 };
 
 export const MessageRenderer = ({ text }: { text: string }) => {
+    // Optional evidence chip support (call sites opt-in)
     let content = text;
     let reasoning = null;
 
@@ -129,5 +132,39 @@ export const MessageRenderer = ({ text }: { text: string }) => {
                 })}
             </div>
         </div>
+    );
+};
+
+type EvidenceChipProps = {
+    citations?: Citation[];
+    label?: string;
+};
+
+export const EvidenceChip: React.FC<EvidenceChipProps> = ({ citations, label }) => {
+    const { openEvidencePanel } = useUI();
+    const hasCitations = Boolean(citations && citations.length > 0);
+    const sources = useMemo(() => {
+        if (!citations) return [];
+        return Array.from(new Set(citations.map(c => c.source))).filter(Boolean);
+    }, [citations]);
+
+    return (
+        <button
+            onClick={() => openEvidencePanel({
+                label: label || (hasCitations ? 'Verified assistant answer' : 'Generated assistant answer'),
+                sources: sources.length > 0 ? sources : undefined,
+                generatedAt: new Date().toLocaleString(),
+            })}
+            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold border transition-colors ${
+                hasCitations
+                    ? 'bg-weflora-success/10 border-weflora-success/20 text-weflora-dark hover:bg-weflora-success/20'
+                    : 'bg-weflora-teal/10 border-weflora-teal/20 text-weflora-dark hover:bg-weflora-teal/20'
+            }`}
+            title="View evidence"
+            type="button"
+        >
+            {hasCitations ? <ShieldCheckIcon className="h-3 w-3" /> : <SparklesIcon className="h-3 w-3" />}
+            Evidence
+        </button>
     );
 };

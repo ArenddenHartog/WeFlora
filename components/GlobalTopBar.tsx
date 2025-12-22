@@ -18,6 +18,7 @@ import { useUI } from '../contexts/UIContext';
 import { useProject } from '../contexts/ProjectContext';
 import { useChat } from '../contexts/ChatContext';
 import BaseModal from './BaseModal';
+import { FEATURES } from '../src/config/features';
 
 type SearchResult =
   | { id: string; type: 'project'; title: string; subtitle: string; icon: any }
@@ -258,6 +259,18 @@ const GlobalTopBar: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
+          {FEATURES.quickAskPanel && (
+            <button
+              onClick={() => {
+                // TODO(PR2): implement a non-navigating quick ask side panel.
+                showNotification('Quick Ask panel is not available yet.', 'success');
+              }}
+              className="p-2 text-slate-600 hover:text-weflora-dark hover:bg-white/60 rounded-lg transition-colors"
+              title="Quick Ask"
+            >
+              <SparklesIcon className="h-5 w-5" />
+            </button>
+          )}
           <button
             onClick={() => setIsHelpOpen(true)}
             className="p-2 text-slate-600 hover:text-weflora-dark hover:bg-white/60 rounded-lg transition-colors"

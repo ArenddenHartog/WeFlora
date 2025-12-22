@@ -490,7 +490,6 @@ const ProjectWorkspace: React.FC = () => {
                         if (activeTab === 'worksheets' || activeTab === 'reports') toggleManage();
                         else showNotification('Project settings are available in Worksheets or Reports.', 'success');
                     }}
-                    onToggleAsk={toggleChat}
                     canShowSettings={(activeTab === 'worksheets' && matrices.length > 0) || (activeTab === 'reports' && reports.length > 0)}
                 />
                 <div className="flex-1 overflow-hidden bg-white relative">

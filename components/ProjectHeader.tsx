@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ChevronRightIcon, DatabaseIcon, SlidersIcon, SparklesIcon } from './icons';
+import { ChevronRightIcon, DatabaseIcon, SlidersIcon } from './icons';
 
 type ProjectSection = 'overview' | 'worksheets' | 'reports' | 'team' | 'files';
 
@@ -9,7 +9,6 @@ interface ProjectHeaderProps {
   onBackToProjects: () => void;
   onNavigateTab: (tab: ProjectSection) => void;
   onToggleSettings: () => void;
-  onToggleAsk: () => void;
   canShowSettings: boolean;
 }
 
@@ -21,7 +20,6 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   onBackToProjects,
   onNavigateTab,
   onToggleSettings,
-  onToggleAsk,
   canShowSettings,
 }) => {
   const tabs = useMemo(() => ['overview', 'worksheets', 'reports', 'team'] as const, []);
@@ -69,15 +67,6 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
             <span className="inline-flex items-center gap-2">
               <SlidersIcon className="h-4 w-4 text-weflora-teal" />
               Project Settings
-            </span>
-          </button>
-          <button
-            onClick={onToggleAsk}
-            className="px-3 py-1.5 rounded-lg text-sm font-bold bg-weflora-teal text-white hover:bg-weflora-dark transition-colors shadow-sm"
-          >
-            <span className="inline-flex items-center gap-2">
-              <SparklesIcon className="h-4 w-4" />
-              Ask FloraGPT
             </span>
           </button>
         </div>

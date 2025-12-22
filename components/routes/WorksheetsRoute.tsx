@@ -16,7 +16,7 @@ import ChatView from '../ChatView';
 import ManageWorksheetPanel from '../ManageWorksheetPanel';
 import SpeciesIntelligencePanel from '../SpeciesIntelligencePanel';
 import { 
-    DatabaseIcon, SlidersIcon, SparklesIcon, ChevronRightIcon, 
+    DatabaseIcon, SlidersIcon, ChevronRightIcon, 
     TableIcon, XIcon, LeafIcon
 } from '../icons';
 
@@ -224,7 +224,6 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
                          )}
                          <HeaderActionButton icon={DatabaseIcon} label="Files" active={rightPanel === 'files'} onClick={() => togglePanel('files')} />
                          <HeaderActionButton icon={SlidersIcon} label="Settings" active={rightPanel === 'manage'} onClick={() => togglePanel('manage')} />
-                         <HeaderActionButton icon={SparklesIcon} label="Ask FloraGPT" active={rightPanel === 'chat'} onClick={() => togglePanel('chat')} />
                     </div>
                 </header>
 

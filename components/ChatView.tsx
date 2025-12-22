@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Chat, ChatMessage, ContextItem } from '../types';
 import ChatInput from './ChatInput';
-import { MessageRenderer } from './MessageRenderer';
+import { MessageRenderer, EvidenceChip } from './MessageRenderer';
 import CitationsSidebar from './CitationsSidebar';
 import { 
     MenuIcon, ArrowUpIcon, RefreshIcon, CopyIcon, 
@@ -138,6 +138,11 @@ const ChatView: React.FC<ChatViewProps> = ({
 
                                     <div className={`flex-1 min-w-0 max-w-[85%] ${msg.sender === 'user' ? 'text-right' : ''}`}>
                                         <div className={`prose prose-sm max-w-none text-slate-700 leading-relaxed ${msg.sender === 'user' ? 'bg-white border border-slate-200 p-3 rounded-2xl rounded-tr-none shadow-sm text-left inline-block' : ''}`}>
+                                            {msg.sender === 'ai' && (
+                                                <div className="flex justify-end mb-2">
+                                                    <EvidenceChip citations={msg.citations} label="Assistant answer" />
+                                                </div>
+                                            )}
                                             <MessageRenderer text={msg.text} />
                                         </div>
                                         

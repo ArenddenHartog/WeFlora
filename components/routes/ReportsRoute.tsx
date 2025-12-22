@@ -135,7 +135,6 @@ const ReportsRoute: React.FC<ReportsRouteProps> = ({ onOpenDestinationModal }) =
                     <div className="flex items-center gap-2">
                         <HeaderActionButton icon={DatabaseIcon} label="Files" active={false} onClick={() => navigate('/files')} />
                         <HeaderActionButton icon={SlidersIcon} label="Settings" active={rightPanel === 'manage'} onClick={() => togglePanel('manage')} />
-                        <HeaderActionButton icon={SparklesIcon} label="Ask FloraGPT" active={rightPanel === 'chat'} onClick={() => togglePanel('chat')} primary />
                     </div>
                 </header>
 
