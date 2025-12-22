@@ -5,7 +5,7 @@ import MatrixView from './MatrixView';
 import { 
     TableIcon, PlusIcon, PencilIcon, CheckIcon, XIcon, MoreHorizontalIcon,
     ArrowUpIcon, HistoryIcon, DownloadIcon, BookmarkIcon, UploadIcon, RefreshIcon, CheckCircleIcon,
-    FileSheetIcon, FilePdfIcon, FileCodeIcon, CheckCircleIcon as FilledCheck, ChartBarIcon
+    FileSheetIcon, FilePdfIcon, FileCodeIcon, CheckCircleIcon as FilledCheck, ChartBarIcon, SparklesIcon
 } from './icons';
 import { useUI } from '../contexts/UIContext';
 import WorksheetAnalyticsPanel from './WorksheetAnalyticsPanel';
@@ -21,6 +21,9 @@ interface WorksheetContainerProps {
     speciesList?: Species[];
     onClose?: () => void;
     onOpenManage?: () => void;
+    onOpenAssistant?: () => void; // icon-only entry point
+    assistantActive?: boolean;
+    onActiveMatrixIdChange?: (matrixId: string) => void;
     projectFiles?: ProjectFile[];
     onUpload?: (files: File[]) => void;
     projectContext?: string;
@@ -29,7 +32,7 @@ interface WorksheetContainerProps {
 }
 
 const WorksheetContainer: React.FC<WorksheetContainerProps> = ({ 
-    document: worksheetDoc, initialActiveTabId, onUpdateDocument, onRunAICell, onAnalyze, speciesList, onClose, onOpenManage, projectFiles, onUpload, projectContext, onResolveFile, onInspectEntity
+    document: worksheetDoc, initialActiveTabId, onUpdateDocument, onRunAICell, onAnalyze, speciesList, onClose, onOpenManage, onOpenAssistant, assistantActive, onActiveMatrixIdChange, projectFiles, onUpload, projectContext, onResolveFile, onInspectEntity
 }) => {
     const { showNotification } = useUI();
     const [activeTabId, setActiveTabId] = useState<string>(initialActiveTabId || worksheetDoc.tabs[0]?.id || '');
@@ -75,6 +78,9 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
     }, [isDownloadMenuOpen]);
 
     const activeMatrix = worksheetDoc.tabs.find(t => t.id === activeTabId);
+    useEffect(() => {
+        if (activeMatrix?.id) onActiveMatrixIdChange?.(activeMatrix.id);
+    }, [activeMatrix?.id, onActiveMatrixIdChange]);
 
     const handleTitleSave = () => {
         if (titleInput.trim()) {
@@ -251,6 +257,17 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
                     <button onClick={handleSave} className={`flex items-center justify-center p-2 rounded-lg transition-colors ${isSaving ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Save Worksheet">
                         {isSaving ? (<RefreshIcon className="h-5 w-5 animate-spin" />) : (<CheckCircleIcon className="h-5 w-5" />)}
                     </button>
+                    {onOpenAssistant && (
+                        <button
+                            onClick={onOpenAssistant}
+                            className={`ml-1 p-2 rounded-lg transition-colors ${
+                                assistantActive ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10'
+                            }`}
+                            title="Assistant"
+                        >
+                            <SparklesIcon className="h-5 w-5" />
+                        </button>
+                    )}
                     {onClose && (
                         <button onClick={onClose} className="ml-2 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                             <XIcon className="h-5 w-5" />

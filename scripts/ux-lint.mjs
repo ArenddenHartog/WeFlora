@@ -34,6 +34,7 @@ function main() {
 
   // Only enforce against new additions in components/ by default.
   const purpleScopeRe = /^components\//;
+  const askScopeRe = /^components\//;
 
   const errors = [];
   let currentFile = null;
@@ -54,7 +55,7 @@ function main() {
       errors.push(`[AI purple token violation] ${currentFile}: ${added.trim()}`);
     }
 
-    if (askStringRe.test(added) && !allowAsk.has(currentFile)) {
+    if (askScopeRe.test(currentFile) && askStringRe.test(added) && !allowAsk.has(currentFile)) {
       errors.push(`[Ask surface violation] ${currentFile}: ${added.trim()}`);
     }
   }

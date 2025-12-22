@@ -5,7 +5,7 @@ import ReportEditorView from './ReportEditorView';
 import { 
     FileTextIcon, PlusIcon, PencilIcon, CheckIcon, XIcon, 
     ArrowUpIcon, HistoryIcon, DownloadIcon, BookmarkIcon, CheckCircleIcon, RefreshIcon,
-    FilePdfIcon, FileCodeIcon, BookIcon
+    FilePdfIcon, FileCodeIcon, BookIcon, SparklesIcon
 } from './icons';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import EvidenceGlow from './EvidenceGlow';
@@ -17,10 +17,13 @@ interface ReportContainerProps {
     onClose?: () => void;
     availableMatrices?: Matrix[]; 
     onToggleAssistant?: () => void; // New Prop
+    onOpenAssistantChat?: () => void; // icon-only entry point (entity chat)
+    assistantChatActive?: boolean;
+    onActiveReportIdChange?: (reportId: string) => void;
 }
 
 const ReportContainer: React.FC<ReportContainerProps> = ({ 
-    document: reportDoc, initialActiveTabId, onUpdateDocument, onClose, availableMatrices, onToggleAssistant 
+    document: reportDoc, initialActiveTabId, onUpdateDocument, onClose, availableMatrices, onToggleAssistant, onOpenAssistantChat, assistantChatActive, onActiveReportIdChange
 }) => {
     const [activeTabId, setActiveTabId] = useState<string>(initialActiveTabId || reportDoc.tabs[0]?.id || '');
     const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -65,6 +68,9 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
     }, [isDownloadMenuOpen]);
 
     const activeReport = reportDoc.tabs.find(t => t.id === activeTabId);
+    useEffect(() => {
+        if (activeReport?.id) onActiveReportIdChange?.(activeReport.id);
+    }, [activeReport?.id, onActiveReportIdChange]);
     useEffect(() => {
         if (activeReport) {
             lastContentRef.current[activeReport.id] = activeReport.content;
@@ -268,6 +274,17 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
                     <button onClick={handleSave} className={`flex items-center justify-center p-2 rounded-lg transition-colors ${isSaving ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10'}`}>
                         {isSaving ? (<RefreshIcon className="h-5 w-5 animate-spin" />) : (<CheckCircleIcon className="h-5 w-5" />)}
                     </button>
+                    {onOpenAssistantChat && (
+                        <button
+                            onClick={onOpenAssistantChat}
+                            className={`ml-1 p-2 rounded-lg transition-colors ${
+                                assistantChatActive ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10'
+                            }`}
+                            title="Assistant"
+                        >
+                            <SparklesIcon className="h-5 w-5" />
+                        </button>
+                    )}
                     <button onClick={onClose} className="ml-2 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                         <XIcon className="h-5 w-5" />
                     </button>

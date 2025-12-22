@@ -13,7 +13,7 @@ import BaseModal from './BaseModal';
 import { aiService } from '../services/aiService';
 import ColumnSettingsModal from './ColumnSettingsModal';
 import { MessageRenderer } from './MessageRenderer';
-import EvidenceGlow from './EvidenceGlow';
+import { useUI } from '../contexts/UIContext';
 
 interface MatrixViewProps {
     matrices: Matrix[];
@@ -40,6 +40,10 @@ interface MatrixViewProps {
 // --- Constants ---
 const ROW_HEIGHT = 48;
 const OVERSCAN = 5;
+
+const isAIDerivedColumn = (col: MatrixColumn) => {
+    return col.type === 'ai' || Boolean(col.skillConfig) || col.title.toLowerCase().includes('ai');
+};
 
 // --- Helper: Get Format Instruction ---
 const getFormatInstruction = (type?: 'text' | 'badge' | 'score' | 'currency') => {
@@ -91,7 +95,11 @@ const parseCellContent = (text: string) => {
 const ColumnHeader: React.FC<any> = ({ column, onUpdate, onDelete, onRunColumnAI, onEditSettings }) => {
     const buttonRef = useRef(null);
     return (
-        <div className={`flex-shrink-0 border-r border-b text-left relative group select-none flex items-center justify-between px-3 py-2 h-10 transition-colors ${column.type === 'ai' ? 'bg-weflora-mint/10 border-weflora-teal/20' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`} style={{ width: column.width }}>
+        <div className={`flex-shrink-0 border-r border-b text-left relative group select-none flex items-center justify-between px-3 py-2 h-10 transition-colors ${
+            isAIDerivedColumn(column)
+                ? 'bg-weflora-teal/5 border-weflora-teal/20 hover:bg-weflora-teal/10'
+                : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+        }`} style={{ width: column.width }}>
             <div className="flex items-center gap-2 truncate font-bold text-sm text-slate-700">{column.title}</div>
             <button ref={buttonRef} onClick={() => { onEditSettings(column.id); }} className="p-1 rounded hover:bg-slate-200 text-slate-400 opacity-0 group-hover:opacity-100 transition-all"><MoreHorizontalIcon className="h-4 w-4" /></button>
         </div>
@@ -134,18 +142,8 @@ const MatrixInput: React.FC<{ value: string|number; type: MatrixColumnType; opti
 
 const RichCellRenderer: React.FC<{ value: string|number, column: MatrixColumn, cell?: MatrixCell, onInspect?: () => void }> = ({ value, column, cell, onInspect }) => {
     const stringVal = String(value || '');
-    const isAI = column.type === 'ai' || column.title.toLowerCase().includes('ai');
+    const isAI = isAIDerivedColumn(column);
     const { hasReasoning, value: displayValue } = isAI ? parseCellContent(stringVal) : { hasReasoning: false, value: stringVal };
-
-    const evidenceStatus: 'generated' | 'verified' | 'warning' | 'error' =
-        cell?.status === 'error' ? 'error' :
-        (cell?.citations && cell.citations.length > 0) ? 'verified' :
-        isAI ? 'generated' : 'generated';
-
-    const provenance = isAI ? {
-        label: `AI cell • ${column.title}`,
-        sources: (cell?.citations || []).map((c) => c.source).filter(Boolean),
-    } : undefined;
     
     const inner = (
         <div className={`truncate w-full px-3 text-sm flex items-center gap-2 group/cell relative h-full ${!value ? 'text-slate-300 italic' : 'text-slate-700'}`}>
@@ -164,11 +162,6 @@ const RichCellRenderer: React.FC<{ value: string|number, column: MatrixColumn, c
             )}
         </div>
     );
-
-    if (isAI && (value || cell?.status === 'error' || cell?.citations?.length)) {
-        return <EvidenceGlow status={evidenceStatus} provenance={provenance} className="w-full h-full">{inner}</EvidenceGlow>;
-    }
-
     return inner;
 };
 
@@ -178,6 +171,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
     onRunAICell, onAnalyze, onOpenWizard, onClose, onOpenManage, hideToolbar,
     speciesList = [], projectFiles = [], projectContext, onUpload, onResolveFile
 }) => {
+    const { openEvidencePanel } = useUI();
     const activeMatrix = matrices.find(m => m.id === activeId);
     const activeMatrixRef = useRef(activeMatrix);
     useEffect(() => { activeMatrixRef.current = activeMatrix; }, [activeMatrix]);
@@ -396,13 +390,31 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                                         const cell = row.cells[col.id];
                                         const isEditing = editingCell?.rowId === row.id && editingCell?.colId === col.id;
                                         const isProcessing = cell?.status === 'loading';
+                                        const isAIDerived = isAIDerivedColumn(col);
                                         
                                         // AUTOCOMPLETE LOGIC: Check if this is a species column
                                         const isSpeciesColumn = col.title.toLowerCase().includes('species') || col.title.toLowerCase().includes('scientific') || col.isPrimaryKey;
                                         const suggestions = isSpeciesColumn ? speciesList.map(s => s.scientificName) : [];
 
                                         return (
-                                            <div key={col.id} className={`border-r border-slate-100 relative p-0 ${isEditing ? 'z-10 ring-2 ring-weflora-teal' : ''}`} style={{ width: col.width }} onDoubleClick={() => !isProcessing && setEditingCell({ rowId: row.id, colId: col.id })}>
+                                            <div
+                                                key={col.id}
+                                                className={`border-r border-slate-100 relative p-0 transition-colors ${
+                                                    isEditing ? 'z-10 ring-2 ring-weflora-teal' : ''
+                                                } ${isAIDerived && !isEditing ? 'bg-weflora-teal/5 hover:bg-weflora-teal/10 hover:ring-1 hover:ring-weflora-teal/20' : ''}`}
+                                                style={{ width: col.width }}
+                                                onClick={() => !isProcessing && setEditingCell({ rowId: row.id, colId: col.id })}
+                                                onDoubleClick={() => {
+                                                    if (!isAIDerived) return;
+                                                    if (!cell) return;
+                                                    if (!(cell.citations?.length || cell.status === 'error')) return;
+                                                    openEvidencePanel({
+                                                        label: `Column evidence • ${col.title}`,
+                                                        sources: cell.citations?.map(c => c.source).filter(Boolean),
+                                                        generatedAt: new Date().toLocaleString(),
+                                                    });
+                                                }}
+                                            >
                                                 {isProcessing && <div className="absolute inset-0 bg-white/50 z-20 flex items-center justify-center"><RefreshIcon className="h-4 w-4 animate-spin text-weflora-teal" /></div>}
                                                 {isEditing ? (
                                                     <MatrixInput 

@@ -72,7 +72,7 @@ const ProjectWorkspace: React.FC = () => {
     } = useProject();
     
     const { species, worksheetTemplates, reportTemplates } = useData();
-    const { setActiveThreadId, chats, messages, isGenerating, sendMessage } = useChat();
+    const { setActiveThreadId, chats, messages, isGenerating, sendMessage, entityThreads, sendEntityMessage } = useChat();
     const { showNotification, selectedChatId, openDestinationModal, openFilePreview } = useUI(); // Added openFilePreview
     
     // --- Data Filtering ---
@@ -105,6 +105,11 @@ const ProjectWorkspace: React.FC = () => {
     const [focusedWorksheetTabId, setFocusedWorksheetTabId] = useState<string | undefined>(undefined);
     const [focusedReportTabId, setFocusedReportTabId] = useState<string | undefined>(undefined);
 
+    // Contextual assistant scope (right-side panel)
+    const [assistantScope, setAssistantScope] = useState<'project' | 'worksheet' | 'report'>('project');
+    const [activeWorksheetMatrixId, setActiveWorksheetMatrixId] = useState<string | null>(null);
+    const [activeReportId, setActiveReportId] = useState<string | null>(null);
+
     useEffect(() => {
         const navState = location.state as any;
         if (typeof navState?.focusWorksheetTabId === 'string') {
@@ -114,6 +119,20 @@ const ProjectWorkspace: React.FC = () => {
             setFocusedReportTabId(navState.focusReportTabId);
         }
     }, [location.state]);
+
+    useEffect(() => {
+        if (!activeWorksheetMatrixId && matrices.length > 0) setActiveWorksheetMatrixId(matrices[0].id);
+        if (activeWorksheetMatrixId && !matrices.some(m => m.id === activeWorksheetMatrixId)) {
+            setActiveWorksheetMatrixId(matrices[0]?.id || null);
+        }
+    }, [matrices, activeWorksheetMatrixId]);
+
+    useEffect(() => {
+        if (!activeReportId && reports.length > 0) setActiveReportId(reports[0].id);
+        if (activeReportId && !reports.some(r => r.id === activeReportId)) {
+            setActiveReportId(reports[0]?.id || null);
+        }
+    }, [reports, activeReportId]);
 
     // Sync tab navigation
     const handleTabChange = (tab: string) => {
@@ -125,10 +144,12 @@ const ProjectWorkspace: React.FC = () => {
 
     // --- Handlers ---
 
-    const toggleChat = () => {
+    const toggleAssistant = (scope: 'project' | 'worksheet' | 'report') => {
+        setAssistantScope(scope);
         setRightPanel(current => {
-            if (current === 'chat') return 'none';
-            setActiveThreadId(null);
+            const isSame = current === 'chat' && assistantScope === scope;
+            if (isSame) return 'none';
+            if (scope === 'project') setActiveThreadId(null);
             return 'chat';
         });
     };
@@ -282,10 +303,72 @@ const ProjectWorkspace: React.FC = () => {
 
     const renderRightPanelContent = () => {
         if (rightPanel === 'chat') {
+            if (assistantScope === 'worksheet') {
+                const matrix = matrices.find(m => m.id === activeWorksheetMatrixId) || matrices[0];
+                if (!matrix) return <div className="p-6 text-center text-slate-400">Open a worksheet to use the assistant.</div>;
+
+                const contextData = `
+Active Worksheet: "${matrix.title}"
+Columns: ${matrix.columns.map(c => c.title).join(', ')}
+Rows Count: ${matrix.rows.length}
+Data Preview (First 5 rows):
+${matrix.rows.slice(0, 5).map(r => matrix.columns.map(c => `${c.title}: ${r.cells[c.id]?.value}`).join(' | ')).join('\n')}
+                `.trim();
+
+                const msgs = entityThreads[matrix.id] || [];
+                return (
+                    <div className="h-full flex flex-col bg-white">
+                        <ChatView 
+                            chat={{ id: `proj-ws-chat-${matrix.id}`, title: 'Worksheet Assistant', description: `About: ${matrix.title}`, icon: SparklesIcon, time: 'Now' }} 
+                            messages={msgs} 
+                            onBack={() => setRightPanel('none')}
+                            onSendMessage={(text, files) => sendEntityMessage(matrix.id, text, contextData, files)}
+                            isGenerating={isGenerating}
+                            onRegenerateMessage={() => {}}
+                            onOpenMenu={() => {}}
+                            variant="panel"
+                            contextProjectId={project.id}
+                            onContinueInReport={(msg) => openDestinationModal('report', msg)}
+                            onContinueInWorksheet={(msg) => openDestinationModal('worksheet', msg)}
+                        />
+                    </div>
+                );
+            }
+
+            if (assistantScope === 'report') {
+                const report = reports.find(r => r.id === activeReportId) || reports[0];
+                if (!report) return <div className="p-6 text-center text-slate-400">Open a report to use the assistant.</div>;
+
+                const contextData = `
+Active Report: "${report.title}"
+Content:
+${report.content.substring(0, 3000)}${report.content.length > 3000 ? '...(truncated)' : ''}
+                `.trim();
+
+                const msgs = entityThreads[report.id] || [];
+                return (
+                    <div className="h-full flex flex-col bg-white">
+                        <ChatView 
+                            chat={{ id: `proj-rep-chat-${report.id}`, title: 'Report Assistant', description: `About: ${report.title}`, icon: SparklesIcon, time: 'Now' }} 
+                            messages={msgs} 
+                            onBack={() => setRightPanel('none')}
+                            onSendMessage={(text, files) => sendEntityMessage(report.id, text, contextData, files)}
+                            isGenerating={isGenerating}
+                            onRegenerateMessage={() => {}}
+                            onOpenMenu={() => {}}
+                            variant="panel"
+                            contextProjectId={project.id}
+                            onContinueInReport={(msg) => openDestinationModal('report', msg)}
+                            onContinueInWorksheet={(msg) => openDestinationModal('worksheet', msg)}
+                        />
+                    </div>
+                );
+            }
+
             return (
                 <div className="h-full flex flex-col bg-white">
                     <ChatView 
-                        chat={selectedChat || { id: 'proj-chat', title: 'Ask FloraGPT', description: 'Ask about this project', icon: SparklesIcon, time: 'Now' }} 
+                        chat={selectedChat || { id: 'proj-chat', title: 'Project Assistant', description: 'Ask about this project', icon: SparklesIcon, time: 'Now' }} 
                         messages={messages} 
                         onBack={() => setRightPanel('none')}
                         onSendMessage={sendMessage}
@@ -422,6 +505,9 @@ const ProjectWorkspace: React.FC = () => {
                         onAnalyze={aiService.analyzeDocuments}
                         speciesList={species}
                         onOpenManage={() => setRightPanel('manage')}
+                        onOpenAssistant={() => toggleAssistant('worksheet')}
+                        assistantActive={rightPanel === 'chat' && assistantScope === 'worksheet'}
+                        onActiveMatrixIdChange={(id) => setActiveWorksheetMatrixId(id)}
                         onClose={() => {}}
                         projectFiles={files}
                         onUpload={(fs) => fs.forEach(f => uploadProjectFile(f, projectId))}
@@ -455,6 +541,9 @@ const ProjectWorkspace: React.FC = () => {
                         onClose={() => {}}
                         availableMatrices={allMatrices} 
                         onToggleAssistant={() => togglePanel('writing_assistant')} 
+                        onOpenAssistantChat={() => toggleAssistant('report')}
+                        assistantChatActive={rightPanel === 'chat' && assistantScope === 'report'}
+                        onActiveReportIdChange={(id) => setActiveReportId(id)}
                     />
                 );
             case 'team':
@@ -486,6 +575,9 @@ const ProjectWorkspace: React.FC = () => {
                         if (tab === 'overview') handleTabChange('overview');
                         else handleTabChange(tab);
                     }}
+                    showAsk={activeTab === 'overview' || activeTab === 'files' || activeTab === 'team'}
+                    askActive={rightPanel === 'chat' && assistantScope === 'project'}
+                    onToggleAsk={() => toggleAssistant('project')}
                     onToggleSettings={() => {
                         if (activeTab === 'worksheets' || activeTab === 'reports') toggleManage();
                         else showNotification('Project settings are available in Worksheets or Reports.', 'success');

@@ -135,6 +135,17 @@ const ReportsRoute: React.FC<ReportsRouteProps> = ({ onOpenDestinationModal }) =
                     <div className="flex items-center gap-2">
                         <HeaderActionButton icon={DatabaseIcon} label="Files" active={false} onClick={() => navigate('/files')} />
                         <HeaderActionButton icon={SlidersIcon} label="Settings" active={rightPanel === 'manage'} onClick={() => togglePanel('manage')} />
+                        <button
+                            onClick={() => togglePanel('chat')}
+                            className={`h-9 w-9 flex items-center justify-center rounded-lg transition-colors border ${
+                                rightPanel === 'chat'
+                                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal'
+                                    : 'bg-white border-slate-200 text-slate-500 hover:text-weflora-teal hover:bg-weflora-mint/10'
+                            }`}
+                            title="Assistant"
+                        >
+                            <SparklesIcon className="h-4 w-4" />
+                        </button>
                     </div>
                 </header>
 

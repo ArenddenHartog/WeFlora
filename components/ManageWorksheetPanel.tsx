@@ -229,7 +229,7 @@ const ManageWorksheetPanel: React.FC<{
                                 onDragOver={handleDragOver}
                                 onDrop={(e) => handleDrop(e, col.id)}
                                 className={`flex items-center gap-2 p-2 bg-white border rounded-lg group shadow-sm transition-all ${
-                                    draggedColId === col.id ? 'opacity-50 ring-2 ring-blue-400' : 'border-slate-200 hover:border-slate-300'
+                                    draggedColId === col.id ? 'opacity-50 ring-2 ring-weflora-teal/40' : 'border-slate-200 hover:border-slate-300'
                                 }`}
                             >
                                 <div className="cursor-grab text-slate-300 hover:text-slate-500 flex-shrink-0">

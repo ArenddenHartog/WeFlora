@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ChevronRightIcon, DatabaseIcon, SlidersIcon } from './icons';
+import { ChevronRightIcon, DatabaseIcon, SlidersIcon, SparklesIcon } from './icons';
 
 type ProjectSection = 'overview' | 'worksheets' | 'reports' | 'team' | 'files';
 
@@ -9,6 +9,9 @@ interface ProjectHeaderProps {
   onBackToProjects: () => void;
   onNavigateTab: (tab: ProjectSection) => void;
   onToggleSettings: () => void;
+  onToggleAsk?: () => void;
+  showAsk?: boolean;
+  askActive?: boolean;
   canShowSettings: boolean;
 }
 
@@ -20,6 +23,9 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   onBackToProjects,
   onNavigateTab,
   onToggleSettings,
+  onToggleAsk,
+  showAsk,
+  askActive,
   canShowSettings,
 }) => {
   const tabs = useMemo(() => ['overview', 'worksheets', 'reports', 'team'] as const, []);
@@ -41,6 +47,19 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          {showAsk && onToggleAsk && (
+            <button
+              onClick={onToggleAsk}
+              className={`h-9 w-9 flex items-center justify-center rounded-lg transition-colors border ${
+                askActive
+                  ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal'
+                  : 'bg-white border-slate-200 text-slate-500 hover:text-weflora-teal hover:bg-weflora-mint/10'
+              }`}
+              title="Assistant"
+            >
+              <SparklesIcon className="h-4 w-4" />
+            </button>
+          )}
           <button
             onClick={() => onNavigateTab('files')}
             className={`px-3 py-1.5 rounded-lg text-sm font-bold border transition-colors ${
