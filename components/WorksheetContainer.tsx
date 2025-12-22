@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import type { WorksheetDocument, Matrix, MatrixColumn, Species, ProjectFile } from '../types';
 import MatrixView from './MatrixView';
 import { 
@@ -11,6 +11,9 @@ import { useUI } from '../contexts/UIContext';
 import WorksheetAnalyticsPanel from './WorksheetAnalyticsPanel';
 import { ResizablePanel } from './ResizablePanel';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface WorksheetContainerProps {
     document: WorksheetDocument;
@@ -142,6 +145,82 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
     const handleTabKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') saveTabName();
         if (e.key === 'Escape') setEditingTabId(null);
+    };
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+    );
+
+    const rootTab = useMemo(() => worksheetDoc.tabs.find(t => t.id === worksheetDoc.id) || null, [worksheetDoc.id, worksheetDoc.tabs]);
+    const reorderableTabs = useMemo(() => {
+        if (!rootTab) return worksheetDoc.tabs;
+        return worksheetDoc.tabs.filter(t => t.id !== worksheetDoc.id);
+    }, [rootTab, worksheetDoc.id, worksheetDoc.tabs]);
+
+    const handleTabsReorder = (activeId: string, overId: string) => {
+        const tabsToMove = reorderableTabs;
+        const oldIndex = tabsToMove.findIndex(t => t.id === activeId);
+        const newIndex = tabsToMove.findIndex(t => t.id === overId);
+        if (oldIndex < 0 || newIndex < 0) return;
+
+        const moved = arrayMove(tabsToMove, oldIndex, newIndex);
+        const nextTabs = rootTab ? [rootTab, ...moved] : moved;
+        // TODO(SCHEMA_CONTRACT.md): persist tab order to DB once matrices.order is supported server-side.
+        const withOrder = nextTabs.map((t, idx) => ({ ...t, order: idx }));
+        onUpdateDocument({ ...worksheetDoc, tabs: withOrder });
+    };
+
+    const SortableTab: React.FC<{
+        tab: Matrix;
+    }> = ({ tab }) => {
+        const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id });
+        const style = {
+            transform: CSS.Transform.toString(transform),
+            transition,
+        } as React.CSSProperties;
+
+        return (
+            <div
+                ref={setNodeRef}
+                style={style}
+                {...attributes}
+                {...listeners}
+                onClick={() => setActiveTabId(tab.id)}
+                onDoubleClick={() => startRenamingTab(tab)}
+                className={`
+                    group flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-t-md cursor-pointer select-none min-w-[100px] max-w-[200px] border-b-2 transition-colors relative flex-shrink-0
+                    ${isDragging ? 'opacity-80 ring-2 ring-weflora-teal/30 bg-weflora-teal/10' : ''}
+                    ${activeTabId === tab.id 
+                        ? 'bg-white text-weflora-teal border-weflora-teal shadow-sm' 
+                        : 'bg-transparent text-slate-500 border-transparent hover:bg-slate-100 hover:text-slate-700'
+                    }
+                `}
+                title="Drag to reorder"
+            >
+                {editingTabId === tab.id ? (
+                    <input
+                        type="text"
+                        value={tabNameInput}
+                        onChange={(e) => setTabNameInput(e.target.value)}
+                        onBlur={saveTabName}
+                        onKeyDown={handleTabKeyDown}
+                        className="w-full bg-white border border-weflora-teal rounded px-1 outline-none text-xs font-bold"
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()} 
+                    />
+                ) : (
+                    <span className="truncate flex-1">{tab.tabTitle || tab.title}</span>
+                )}
+                {!editingTabId && (
+                    <button 
+                        onClick={(e) => handleDeleteTab(e, tab.id)}
+                        className={`h-8 w-8 flex items-center justify-center cursor-pointer rounded hover:bg-weflora-red/20 hover:text-weflora-red opacity-0 group-hover:opacity-100 transition-opacity ${activeTabId === tab.id ? 'text-slate-300' : 'text-slate-400'}`}
+                    >
+                        <XIcon className="h-3 w-3" />
+                    </button>
+                )}
+            </div>
+        );
     };
 
     const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -303,44 +382,51 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
                     <PlusIcon className="h-4 w-4" />
                 </button>
 
-                {worksheetDoc.tabs.map(tab => (
-                    <div 
-                        key={tab.id}
-                        onClick={() => setActiveTabId(tab.id)}
-                        onDoubleClick={() => startRenamingTab(tab)}
-                        className={`
-                            group flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-t-md cursor-pointer select-none min-w-[100px] max-w-[200px] border-b-2 transition-colors relative flex-shrink-0
-                            ${activeTabId === tab.id 
-                                ? 'bg-white text-weflora-teal border-weflora-teal shadow-sm' 
-                                : 'bg-transparent text-slate-500 border-transparent hover:bg-slate-100 hover:text-slate-700'
-                            }
-                        `}
-                    >
-                        {editingTabId === tab.id ? (
-                            <input
-                                type="text"
-                                value={tabNameInput}
-                                onChange={(e) => setTabNameInput(e.target.value)}
-                                onBlur={saveTabName}
-                                onKeyDown={handleTabKeyDown}
-                                className="w-full bg-white border border-weflora-teal rounded px-1 outline-none text-xs font-bold"
-                                autoFocus
-                                onClick={(e) => e.stopPropagation()} 
-                            />
-                        ) : (
-                            <span className="truncate flex-1">{tab.tabTitle || tab.title}</span>
-                        )}
-                        
-                        {!editingTabId && (
-                            <button 
-                                onClick={(e) => handleDeleteTab(e, tab.id)}
-                                className={`h-8 w-8 flex items-center justify-center cursor-pointer rounded hover:bg-weflora-red/20 hover:text-weflora-red opacity-0 group-hover:opacity-100 transition-opacity ${activeTabId === tab.id ? 'text-slate-300' : 'text-slate-400'}`}
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={({ active, over }) => {
+                        if (!over) return;
+                        if (active.id === over.id) return;
+                        handleTabsReorder(String(active.id), String(over.id));
+                    }}
+                >
+                    <SortableContext items={reorderableTabs.map(t => t.id)} strategy={horizontalListSortingStrategy}>
+                        {rootTab && (
+                            <div
+                                key={rootTab.id}
+                                onClick={() => setActiveTabId(rootTab.id)}
+                                onDoubleClick={() => startRenamingTab(rootTab)}
+                                className={`
+                                    group flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-t-md cursor-pointer select-none min-w-[100px] max-w-[200px] border-b-2 transition-colors relative flex-shrink-0
+                                    ${activeTabId === rootTab.id 
+                                        ? 'bg-white text-weflora-teal border-weflora-teal shadow-sm' 
+                                        : 'bg-transparent text-slate-500 border-transparent hover:bg-slate-100 hover:text-slate-700'
+                                    }
+                                `}
                             >
-                                <XIcon className="h-3 w-3" />
-                            </button>
+                                {editingTabId === rootTab.id ? (
+                                    <input
+                                        type="text"
+                                        value={tabNameInput}
+                                        onChange={(e) => setTabNameInput(e.target.value)}
+                                        onBlur={saveTabName}
+                                        onKeyDown={handleTabKeyDown}
+                                        className="w-full bg-white border border-weflora-teal rounded px-1 outline-none text-xs font-bold"
+                                        autoFocus
+                                        onClick={(e) => e.stopPropagation()} 
+                                    />
+                                ) : (
+                                    <span className="truncate flex-1">{rootTab.tabTitle || rootTab.title}</span>
+                                )}
+                            </div>
                         )}
-                    </div>
-                ))}
+
+                        {reorderableTabs.map(tab => (
+                            <SortableTab key={tab.id} tab={tab} />
+                        ))}
+                    </SortableContext>
+                </DndContext>
             </div>
 
             {/* Analytics Panel */}

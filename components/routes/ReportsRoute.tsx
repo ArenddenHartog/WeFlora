@@ -69,9 +69,12 @@ const ReportsRoute: React.FC<ReportsRouteProps> = ({ onOpenDestinationModal }) =
 
     const reportDoc: ReportDocument | null = useMemo(() => {
         if (!activeRootReport) return null;
-        const tabs = reports
-            .filter(r => r.id === activeRootReport.id || r.parentId === activeRootReport.id)
-            .sort((a, b) => (a.id === activeRootReport.id ? -1 : b.id === activeRootReport.id ? 1 : 0));
+        const allTabs = reports.filter(r => r.id === activeRootReport.id || r.parentId === activeRootReport.id);
+        const root = allTabs.find(t => t.id === activeRootReport.id);
+        const children = allTabs
+            .filter(t => t.id !== activeRootReport.id)
+            .sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER));
+        const tabs = root ? [root, ...children] : children;
         return {
             id: activeRootReport.id,
             projectId: undefined,

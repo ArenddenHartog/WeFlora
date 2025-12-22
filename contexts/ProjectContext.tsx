@@ -376,6 +376,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             columns: (data as any).columns ?? optimisticMatrix.columns,
             rows: (data as any).rows ?? optimisticMatrix.rows,
             tabTitle: optimisticMatrix.tabTitle,
+            order: (data as any).order ?? optimisticMatrix.order,
             updatedAt: (data as any).updated_at ?? new Date().toISOString()
         };
 
@@ -476,6 +477,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
             content: (data as any).content,
             tags: (data as any).tags ?? report.tags,
             tabTitle: report.tabTitle,
+            order: (data as any).order ?? report.order,
             lastModified: (data as any).updated_at ?? (data as any).last_modified ?? new Date().toISOString()
         };
 

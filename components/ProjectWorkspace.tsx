@@ -215,7 +215,9 @@ const ProjectWorkspace: React.FC = () => {
         title: project?.name || 'Project', 
         createdAt: project?.date || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        tabs: project ? matrices : []
+        tabs: project
+            ? [...matrices].sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER))
+            : []
     }), [project, projectId, matrices]);
 
     const handleUpdateWorksheetDoc = async (doc: WorksheetDocument) => {
@@ -242,7 +244,9 @@ const ProjectWorkspace: React.FC = () => {
         title: 'Project Reports',
         createdAt: project?.date || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        tabs: project ? reports : []
+        tabs: project
+            ? [...reports].sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER))
+            : []
     }), [project, projectId, reports]);
 
     if (!project || !projectId) return <div className="p-8 text-center text-slate-400">Project not found.</div>;

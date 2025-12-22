@@ -103,8 +103,12 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
         description: activeMatrix.description,
         createdAt: activeMatrix.updatedAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        tabs: matrices.filter(m => m.id === activeMatrix.id || m.parentId === activeMatrix.id)
-            .sort((a, b) => (a.id === activeMatrix.id ? -1 : 1))
+        tabs: (() => {
+            const allTabs = matrices.filter(m => m.id === activeMatrix.id || m.parentId === activeMatrix.id);
+            const root = allTabs.find(t => t.id === activeMatrix.id);
+            const children = allTabs.filter(t => t.id !== activeMatrix.id).sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER));
+            return root ? [root, ...children] : children;
+        })()
     } : null;
 
     const handleUpdateDoc = async (doc: WorksheetDocument) => {
