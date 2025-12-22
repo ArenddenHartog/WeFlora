@@ -218,14 +218,18 @@ const ProjectWorkspace: React.FC = () => {
         tabs: project ? matrices : []
     }), [project, projectId, matrices]);
 
-    const handleUpdateWorksheetDoc = (doc: WorksheetDocument) => {
+    const handleUpdateWorksheetDoc = async (doc: WorksheetDocument) => {
         const currentIds = new Set(matrices.map(m => m.id));
         const newIds = new Set(doc.tabs.map(t => t.id));
         
-        doc.tabs.forEach(tab => {
-            if (currentIds.has(tab.id)) updateMatrix(tab);
-            else createMatrix({ ...tab, projectId: project.id });
-        });
+        for (const tab of doc.tabs) {
+            if (currentIds.has(tab.id)) {
+                updateMatrix(tab);
+            } else {
+                const created = await createMatrix({ ...tab, projectId: project.id });
+                if (created?.id) setFocusedWorksheetTabId(created.id);
+            }
+        }
 
         matrices.forEach(m => {
             if (!newIds.has(m.id)) deleteMatrix(m.id);
@@ -243,14 +247,18 @@ const ProjectWorkspace: React.FC = () => {
 
     if (!project || !projectId) return <div className="p-8 text-center text-slate-400">Project not found.</div>;
 
-    const handleUpdateReportDoc = (doc: ReportDocument) => {
+    const handleUpdateReportDoc = async (doc: ReportDocument) => {
         const currentIds = new Set(reports.map(r => r.id));
         const newIds = new Set(doc.tabs.map(t => t.id));
 
-        doc.tabs.forEach(tab => {
-            if (currentIds.has(tab.id)) updateReport(tab);
-            else createReport({ ...tab, projectId: project.id });
-        });
+        for (const tab of doc.tabs) {
+            if (currentIds.has(tab.id)) {
+                updateReport(tab);
+            } else {
+                const created = await createReport({ ...tab, projectId: project.id });
+                if (created?.id) setFocusedReportTabId(created.id);
+            }
+        }
 
         reports.forEach(r => {
             if (!newIds.has(r.id)) deleteReport(r.id);

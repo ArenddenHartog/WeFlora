@@ -57,6 +57,7 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
     const [panelWidth, setPanelWidth] = useState(400);
     const [isWizardOpen, setIsWizardOpen] = useState(false);
     const [inspectedEntity, setInspectedEntity] = useState<string | null>(null);
+    const [focusTabId, setFocusTabId] = useState<string | undefined>(undefined);
 
     // Derived Data
     const standaloneMatrices = matrices.filter(m => !m.projectId);
@@ -106,7 +107,7 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
             .sort((a, b) => (a.id === activeMatrix.id ? -1 : 1))
     } : null;
 
-    const handleUpdateDoc = (doc: WorksheetDocument) => {
+    const handleUpdateDoc = async (doc: WorksheetDocument) => {
         const currentTabs = matrices.filter(m => m.id === doc.id || m.parentId === doc.id);
         const newTabs = doc.tabs;
 
@@ -116,15 +117,16 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
         }
 
         // Handle Tab CRUD
-        newTabs.forEach(tab => {
+        for (const tab of newTabs) {
             const existing = currentTabs.find(t => t.id === tab.id);
             if (!existing) {
                 // Mark as standalone if parent has no project
-                createMatrix({ ...tab, projectId: undefined });
+                const created = await createMatrix({ ...tab, projectId: undefined });
+                if (created?.id) setFocusTabId(created.id);
             } else if (JSON.stringify(existing) !== JSON.stringify(tab)) {
                 handleUpdate(tab);
             }
-        });
+        }
 
         currentTabs.forEach(oldTab => {
             if (!newTabs.find(t => t.id === oldTab.id)) {
@@ -242,6 +244,7 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
                     <div className="flex-1 min-w-0 h-full">
                         <WorksheetContainer 
                             document={worksheetDoc}
+                            initialActiveTabId={focusTabId}
                             onUpdateDocument={handleUpdateDoc}
                             onRunAICell={(p, f) => aiService.runAICell(p, f)}
                             onAnalyze={(f, c, cols) => aiService.analyzeDocuments(f, c, cols)}

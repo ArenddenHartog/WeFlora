@@ -6,6 +6,7 @@ import { useUI } from './UIContext';
 import { FEATURES } from '../src/config/features';
 import type { PinnedProject, ProjectFile, Matrix, Report, Task, TeamComment, ProjectData } from '../types';
 import { FolderIcon, FileSheetIcon, FilePdfIcon, FileCodeIcon } from '../components/icons';
+import { dbIdOrUndefined, isUuid } from '../utils/ids';
 
 const emptyProjectData: ProjectData = {
     analytics: { costs: [], water: [], diversity: [] },
@@ -285,9 +286,17 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         const userId = (await supabase.auth.getUser()).data.user?.id;
         if (!userId) return null;
 
-        const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
         if (matrix.projectId && !isUuid(matrix.projectId)) {
-            console.error('[createMatrix] refusing non-uuid projectId', { projectId: matrix.projectId });
+            console.error('[createMatrix:error]', {
+                id: matrix.id,
+                projectId: matrix.projectId,
+                parentId: matrix.parentId,
+                isUuid: {
+                    id: Boolean(matrix.id && isUuid(matrix.id)),
+                    projectId: Boolean(matrix.projectId && isUuid(matrix.projectId)),
+                    parentId: Boolean(matrix.parentId && isUuid(matrix.parentId))
+                }
+            });
             showNotification("Cannot save: project not yet persisted.", 'error');
             return null;
         }
@@ -314,16 +323,19 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         setMatrices(prev => [...prev, optimisticMatrix]);
 
         const tempId = optimisticMatrix.id;
-        const shouldDbGenerateId = tempId.includes('new') || tempId.includes('mtx-'); // Let DB gen if temp ID
+        if (tempId && !isUuid(tempId)) {
+            console.info('[id:temp]', { id: tempId });
+        }
 
         const insertPayload = {
-            id: shouldDbGenerateId ? undefined : tempId,
-            project_id: optimisticMatrix.projectId,
+            // IDs are UUID in DB; UI may use temp IDs; DB must generate UUID.
+            id: dbIdOrUndefined(tempId),
+            project_id: dbIdOrUndefined(optimisticMatrix.projectId),
             title: optimisticMatrix.title,
             description: optimisticMatrix.description,
             columns: optimisticMatrix.columns,
             rows: optimisticMatrix.rows,
-            parent_id: optimisticMatrix.parentId,
+            parent_id: dbIdOrUndefined(optimisticMatrix.parentId),
             user_id: userId
         };
 
@@ -343,7 +355,11 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                     rowsCount: Array.isArray(optimisticMatrix.rows) ? optimisticMatrix.rows.length : 0,
                     columnsIsArray: Array.isArray(optimisticMatrix.columns),
                     rowsIsArray: Array.isArray(optimisticMatrix.rows),
-                    idKind: shouldDbGenerateId ? 'temp' : (isUuid(tempId) ? 'uuid' : 'custom')
+                    isUuid: {
+                        id: Boolean(tempId && isUuid(tempId)),
+                        projectId: Boolean(optimisticMatrix.projectId && isUuid(optimisticMatrix.projectId)),
+                        parentId: Boolean(optimisticMatrix.parentId && isUuid(optimisticMatrix.parentId))
+                    }
                 }
             });
             showNotification("Failed to save worksheet.", 'error');
@@ -412,9 +428,17 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         const userId = (await supabase.auth.getUser()).data.user?.id;
         if (!userId) return null;
 
-        const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
         if (report.projectId && !isUuid(report.projectId)) {
-            console.error('[createReport] refusing non-uuid projectId', { projectId: report.projectId });
+            console.error('[createReport:error]', {
+                id: report.id,
+                projectId: report.projectId,
+                parentId: report.parentId,
+                isUuid: {
+                    id: Boolean(report.id && isUuid(report.id)),
+                    projectId: Boolean(report.projectId && isUuid(report.projectId)),
+                    parentId: Boolean(report.parentId && isUuid(report.parentId))
+                }
+            });
             showNotification("Cannot save: project not yet persisted.", 'error');
             return null;
         }
@@ -422,15 +446,18 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         setReports(prev => [...prev, report]);
 
         const tempId = report.id;
-        const shouldDbGenerateId = tempId.includes('rep-') || tempId.includes('new');
+        if (tempId && !isUuid(tempId)) {
+            console.info('[id:temp]', { id: tempId });
+        }
 
         const { data, error } = await supabase.from('reports').insert({
-            id: shouldDbGenerateId ? undefined : tempId,
-            project_id: report.projectId,
+            // IDs are UUID in DB; UI may use temp IDs; DB must generate UUID.
+            id: dbIdOrUndefined(tempId),
+            project_id: dbIdOrUndefined(report.projectId),
             title: report.title,
             content: report.content,
             tags: report.tags,
-            parent_id: report.parentId,
+            parent_id: dbIdOrUndefined(report.parentId),
             user_id: userId
         }).select('*').single();
 
