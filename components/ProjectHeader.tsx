@@ -27,6 +27,19 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   quickAskActive,
 }) => {
   const tabs = useMemo(() => ['overview', 'worksheets', 'reports', 'team'] as const, []);
+  const settingsLabel =
+    activeTab === 'worksheets'
+      ? 'Worksheet Settings'
+      : activeTab === 'reports'
+        ? 'Report Settings'
+        : 'Project Settings';
+
+  const askLabel =
+    activeTab === 'worksheets'
+      ? 'Worksheet Assistant'
+      : activeTab === 'reports'
+        ? 'Report Assistant'
+        : 'Project Assistant';
 
   return (
     <header className="w-full bg-white border-b border-slate-200">
@@ -35,7 +48,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onBackToProjects}
-            className="flex items-center gap-1 text-slate-500 hover:text-weflora-dark transition-colors"
+            className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium transition-colors"
             title="Back to Projects"
           >
             <ChevronRightIcon className="h-4 w-4 rotate-180" />
@@ -83,19 +96,24 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
             title="Project Settings"
           >
             <SlidersIcon className="h-4 w-4 text-weflora-teal" />
-            <span>Project Settings</span>
+            <span>{settingsLabel}</span>
           </button>
           <button
             onClick={onQuickAsk}
             aria-label="Ask FloraGPT"
-            className={`h-9 w-9 flex items-center justify-center rounded-lg transition-colors border ${
+            className={`group flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-colors shadow-sm ${
               quickAskActive
-                ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal'
-                : 'bg-white border-slate-200 text-slate-500 hover:text-weflora-teal hover:bg-weflora-mint/10'
+                ? 'bg-weflora-success/10 border-weflora-success/20 text-slate-600'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
             title="Ask FloraGPT"
           >
-            <SparklesIcon className="h-4 w-4" />
+            <SparklesIcon
+              className={`h-4 w-4 transition-colors ${
+                quickAskActive ? 'text-weflora-success' : 'text-slate-500 group-hover:text-weflora-success'
+              }`}
+            />
+            <span className="hidden md:inline">{askLabel}</span>
           </button>
         </div>
       </div>

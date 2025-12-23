@@ -517,8 +517,6 @@ ${report.content.substring(0, 3000)}${report.content.length > 3000 ? '...(trunca
                         onAnalyze={aiService.analyzeDocuments}
                         speciesList={species}
                         onOpenManage={() => setRightPanel('manage')}
-                        onOpenAssistant={() => toggleAssistant('worksheet')}
-                        assistantActive={rightPanel === 'chat' && assistantScope === 'worksheet'}
                         onActiveMatrixIdChange={(id) => setActiveWorksheetMatrixId(id)}
                         onClose={() => {}}
                         projectFiles={files}
@@ -553,8 +551,6 @@ ${report.content.substring(0, 3000)}${report.content.length > 3000 ? '...(trunca
                         onClose={() => {}}
                         availableMatrices={allMatrices} 
                         onToggleAssistant={() => togglePanel('writing_assistant')} 
-                        onOpenAssistantChat={() => toggleAssistant('report')}
-                        assistantChatActive={rightPanel === 'chat' && assistantScope === 'report'}
                         onActiveReportIdChange={(id) => setActiveReportId(id)}
                     />
                 );
