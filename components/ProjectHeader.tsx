@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ChevronRightIcon, FolderIcon, DatabaseIcon, SlidersIcon, SparklesIcon } from './icons';
+import { ChevronRightIcon, FolderIcon, SparklesIcon } from './icons';
 
 type ProjectSection = 'overview' | 'worksheets' | 'reports' | 'team';
 
@@ -10,6 +10,7 @@ interface ProjectHeaderProps {
   onNavigateTab: (tab: ProjectSection) => void;
   onOpenProjectFiles: () => void;
   onOpenProjectSettings: () => void;
+  settingsOpen?: boolean;
   onQuickAsk: () => void;
   quickAskActive?: boolean;
 }
@@ -23,6 +24,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   onNavigateTab,
   onOpenProjectFiles,
   onOpenProjectSettings,
+  settingsOpen,
   onQuickAsk,
   quickAskActive,
 }) => {
@@ -40,6 +42,8 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
       : activeTab === 'reports'
         ? 'Report Assistant'
         : 'Project Assistant';
+
+  const settingsButtonLabel = settingsOpen ? settingsLabel : 'Settings';
 
   return (
     <header className="w-full bg-white border-b border-slate-200">
@@ -84,36 +88,33 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onOpenProjectFiles}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
-            title="Project Files"
+            className="flex items-center px-3 py-1.5 rounded-lg text-sm font-bold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
+            title="Files"
           >
-            <DatabaseIcon className="h-4 w-4 text-weflora-teal" />
-            <span>Project Files</span>
+            <span>Files</span>
           </button>
           <button
             onClick={onOpenProjectSettings}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
-            title="Project Settings"
+            className="flex items-center px-3 py-1.5 rounded-lg text-sm font-bold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
+            title={settingsButtonLabel}
           >
-            <SlidersIcon className="h-4 w-4 text-weflora-teal" />
-            <span>{settingsLabel}</span>
+            <span>{settingsButtonLabel}</span>
           </button>
           <button
             onClick={onQuickAsk}
-            aria-label="Ask FloraGPT"
-            className={`group flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-colors shadow-sm ${
+            aria-label={askLabel}
+            className={`group flex items-center justify-center h-9 w-9 rounded-lg border transition-colors shadow-sm ${
               quickAskActive
                 ? 'bg-weflora-success/10 border-weflora-success/20 text-slate-600'
                 : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
-            title="Ask FloraGPT"
+            title={askLabel}
           >
             <SparklesIcon
               className={`h-4 w-4 transition-colors ${
                 quickAskActive ? 'text-weflora-success' : 'text-slate-500 group-hover:text-weflora-success'
               }`}
             />
-            <span className="hidden md:inline">{askLabel}</span>
           </button>
         </div>
       </div>

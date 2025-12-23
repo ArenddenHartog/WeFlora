@@ -396,15 +396,56 @@ ${report.content.substring(0, 3000)}${report.content.length > 3000 ? '...(trunca
             );
         }
         if (rightPanel === 'manage') {
+            const settingsHeader =
+                activeTab === 'worksheets'
+                    ? 'Worksheet Settings'
+                    : activeTab === 'reports'
+                        ? 'Report Settings'
+                        : 'Project Settings';
+
             if (activeTab === 'worksheets') {
                 const matrixToManage = matrices.length > 0 ? matrices[0] : undefined; 
-                return <ManageWorksheetPanel matrix={matrixToManage} onUpdate={updateMatrix} onClose={() => setRightPanel('none')} onUpload={(fs) => fs.forEach(f => uploadProjectFile(f, projectId))} />;
+                if (matrixToManage) {
+                    return (
+                        <ManageWorksheetPanel
+                            matrix={matrixToManage}
+                            onUpdate={updateMatrix}
+                            onClose={() => setRightPanel('none')}
+                            onUpload={(fs) => fs.forEach(f => uploadProjectFile(f, projectId))}
+                        />
+                    );
+                }
             }
             if (activeTab === 'reports') {
                 const report = reports.length > 0 ? reports[0] : undefined;
                 if (report) return <ManageReportPanel report={report} onUpdate={updateReport} onClose={() => setRightPanel('none')} />;
             }
-            return <div className="p-6 text-center text-slate-400">Select a worksheet or report to view settings.</div>;
+
+            const placeholder =
+                activeTab === 'reports'
+                    ? 'Select a report to view settings.'
+                    : activeTab === 'worksheets'
+                        ? 'Select a worksheet to view settings.'
+                        : 'Select a worksheet or report to view settings.';
+
+            return (
+                <div className="h-full flex flex-col bg-white">
+                    <div className="flex-none h-14 border-b border-slate-200 bg-white flex items-center justify-between px-4 z-40">
+                        <div className="font-semibold text-slate-900">{settingsHeader}</div>
+                        <button
+                            onClick={() => setRightPanel('none')}
+                            className="h-9 w-9 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+                            title="Close"
+                            type="button"
+                        >
+                            <XIcon className="h-4 w-4" />
+                        </button>
+                    </div>
+                    <div className="flex-1 p-6 text-center text-slate-400 flex items-center justify-center">
+                        <div className="max-w-xs">{placeholder}</div>
+                    </div>
+                </div>
+            );
         }
         if (rightPanel === 'writing_assistant') {
             const activeReport = reports.length > 0 ? reports[0] : undefined;
@@ -582,6 +623,7 @@ ${report.content.substring(0, 3000)}${report.content.length > 3000 ? '...(trunca
                     onNavigateTab={(tab) => handleTabChange(tab)}
                     onOpenProjectFiles={() => handleTabChange('files')}
                     onOpenProjectSettings={() => setRightPanel(current => current === 'manage' ? 'none' : 'manage')}
+                    settingsOpen={rightPanel === 'manage'}
                     onQuickAsk={() => toggleAssistant(
                         activeTab === 'worksheets' ? 'worksheet'
                         : activeTab === 'reports' ? 'report'
