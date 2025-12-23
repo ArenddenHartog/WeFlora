@@ -31,6 +31,120 @@ const parseJSONSafely = (text: string) => {
     }
 };
 
+// --- Helper: Deterministic markdown pipe-table parsing (Copy → Worksheet) ---
+export const MARKDOWN_TABLE_MAX_COLUMNS = 25;
+
+const collapseWhitespace = (s: string) => s.replace(/\s+/g, ' ').trim();
+
+const splitPipeRow = (line: string) => {
+    // Tolerate missing leading/trailing pipes and uneven whitespace.
+    const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+    return trimmed.split('|').map((c) => collapseWhitespace(c));
+};
+
+const isSeparatorCell = (cell: string) => {
+    const c = cell.trim();
+    // Markdown allows alignment markers :---:, :---, ---:
+    return /^:?-{3,}:?$/.test(c);
+};
+
+const isSeparatorRow = (line: string) => {
+    if (!line.includes('|')) return false;
+    const cells = splitPipeRow(line);
+    if (cells.length < 2) return false;
+    return cells.every((c) => c === '' || isSeparatorCell(c));
+};
+
+const findFirstMarkdownPipeTable = (text: string) => {
+    const lines = text.split(/\r?\n/);
+    for (let i = 0; i < lines.length - 1; i++) {
+        const headerLine = lines[i];
+        const sepLine = lines[i + 1];
+        if (!headerLine.includes('|')) continue;
+        if (!isSeparatorRow(sepLine)) continue;
+
+        const headerCells = splitPipeRow(headerLine).filter((c) => c !== '');
+        if (headerCells.length < 2) continue;
+
+        const rowLines: string[] = [];
+        for (let j = i + 2; j < lines.length; j++) {
+            const l = lines[j];
+            if (!l.trim()) break;
+            if (!l.includes('|')) break;
+            rowLines.push(l);
+        }
+
+        if (rowLines.length === 0) continue;
+        return { headerCells, rowLines };
+    }
+    return null;
+};
+
+export const hasMarkdownPipeTable = (text: string) => Boolean(findFirstMarkdownPipeTable(text));
+
+export const parseMarkdownPipeTableAsMatrix = (
+    text: string,
+    opts?: { maxColumns?: number }
+): { columns: MatrixColumn[]; rows: MatrixRow[] } | null => {
+    const maxCols = opts?.maxColumns ?? MARKDOWN_TABLE_MAX_COLUMNS;
+    const found = findFirstMarkdownPipeTable(text);
+    if (!found) return null;
+
+    const { headerCells, rowLines } = found;
+
+    // Guardrail: require a real table.
+    if (headerCells.length < 2 || rowLines.length === 0) return null;
+
+    const now = Date.now();
+
+    const needsNotesColumn = headerCells.length > maxCols;
+    const effectiveHeaderCells = needsNotesColumn
+        ? [...headerCells.slice(0, Math.max(1, maxCols - 1)), 'Notes']
+        : headerCells.slice(0, maxCols);
+
+    // Guardrail: still must be at least 2 columns.
+    if (effectiveHeaderCells.length < 2) return null;
+
+    const columns: MatrixColumn[] = effectiveHeaderCells.map((title, idx) => {
+        const col: MatrixColumn = {
+            id: `col-md-${idx}-${now}`,
+            title: title || `Column ${idx + 1}`,
+            type: 'text',
+            width: idx === 0 ? 250 : idx === effectiveHeaderCells.length - 1 && needsNotesColumn ? 400 : 150,
+            isPrimaryKey: idx === 0,
+        };
+        return col;
+    });
+
+    const rows: MatrixRow[] = rowLines.map((line, rowIdx) => {
+        const rawCells = splitPipeRow(line);
+        const cells: Record<string, { columnId: string; value: string }> = {};
+
+        const baseCount = needsNotesColumn ? effectiveHeaderCells.length - 1 : effectiveHeaderCells.length;
+        const baseValues = rawCells.slice(0, baseCount);
+        while (baseValues.length < baseCount) baseValues.push('');
+
+        const notesValue = needsNotesColumn ? rawCells.slice(baseCount).filter(Boolean).join(' | ') : '';
+
+        columns.forEach((col, colIdx) => {
+            let value = baseValues[colIdx] ?? '';
+            if (needsNotesColumn && colIdx === columns.length - 1) value = notesValue;
+            cells[col.id] = { columnId: col.id, value: String(value ?? '') };
+        });
+
+        return {
+            id: `row-md-${rowIdx}-${now}`,
+            entityName: baseValues[0] || `Item ${rowIdx + 1}`,
+            cells: cells as any,
+        };
+    });
+
+    // Final guardrail: don't claim table success if it's effectively empty.
+    if (columns.length < 2 || rows.length === 0) return null;
+
+    return { columns, rows };
+};
+
 export class AIService {
   
   constructor() {
@@ -69,6 +183,11 @@ export class AIService {
   }
 
   async structureTextAsMatrix(text: string): Promise<{ columns: MatrixColumn[], rows: MatrixRow[] }> {
+        // PR1: If input contains a real markdown pipe table, prefer deterministic parsing
+        // to avoid collapsing the entire table into a single cell.
+        const parsed = parseMarkdownPipeTableAsMatrix(text);
+        if (parsed) return parsed;
+
         try {
             const schema: Schema = {
                 type: Type.OBJECT,
@@ -177,6 +296,16 @@ export class AIService {
                     cells
                 };
             });
+
+            // If the model returns a degenerate table (e.g., single column / most rows single value),
+            // but the input looks table-ish, re-try the deterministic markdown parser.
+            const degenerate =
+                columns.length <= 1 ||
+                (rowsData.length > 0 && rowsData.filter((v: any[]) => (v?.length || 0) <= 1).length / rowsData.length >= 0.6);
+            if (degenerate && hasMarkdownPipeTable(text)) {
+                const retryParsed = parseMarkdownPipeTableAsMatrix(text);
+                if (retryParsed) return retryParsed;
+            }
 
             return { columns, rows };
 

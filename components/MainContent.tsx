@@ -12,7 +12,7 @@ import ReportsRoute from './routes/ReportsRoute';
 import GlobalLayout from './GlobalLayout';
 import BaseModal from './BaseModal';
 import { DatabaseIcon, FolderIcon, PlusIcon, CheckIcon, SparklesIcon, RefreshIcon } from './icons';
-import { aiService } from '../services/aiService';
+import { aiService, hasMarkdownPipeTable, parseMarkdownPipeTableAsMatrix } from '../services/aiService';
 import { useProject } from '../contexts/ProjectContext';
 import { useData } from '../contexts/DataContext';
 import { useUI } from '../contexts/UIContext';
@@ -194,6 +194,45 @@ const MainContent: React.FC<MainContentProps> = ({
                 closeDestinationModal();
             } catch (error) {
                 console.error("Extraction failed", error);
+
+                // PR1: If the input contains a markdown pipe table, try deterministic parsing
+                // before falling back to "single cell raw content".
+                if (hasMarkdownPipeTable(message.text)) {
+                    const parsed = parseMarkdownPipeTableAsMatrix(message.text);
+                    if (parsed) {
+                        const newMatrix: Matrix = {
+                            id: `mtx-chat-${Date.now()}`,
+                            title: 'Extracted Data',
+                            description: 'Generated from chat analysis',
+                            columns: parsed.columns,
+                            rows: parsed.rows
+                        };
+                        const created = await handleCreateMatrix(newMatrix, destination);
+                        if (!created) {
+                            // Keep the user in place on failure (do not close modal or navigate).
+                            return;
+                        }
+                        console.info('[create-flow] copy to worksheet', {
+                            kind: 'worksheet',
+                            withinProject: Boolean(created.projectId),
+                            projectId: created.projectId,
+                            matrixId: created.id,
+                            tabId: Boolean(created.projectId) ? created.id : undefined
+                        });
+                        navigateToCreatedEntity({
+                            navigate,
+                            kind: 'worksheet',
+                            withinProject: Boolean(created.projectId),
+                            projectId: created.projectId,
+                            matrixId: created.id,
+                            focusTabId: created.id
+                        });
+                        showNotification('Worksheet created from chat');
+                        closeDestinationModal();
+                        return;
+                    }
+                }
+
                 const fallbackMatrix = {
                     id: `mtx-chat-${Date.now()}`,
                     title: 'Raw Content',
