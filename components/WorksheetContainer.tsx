@@ -19,6 +19,7 @@ interface WorksheetContainerProps {
     speciesList?: Species[];
     onClose?: () => void;
     onOpenManage?: () => void;
+    hideHeader?: boolean;
     projectFiles?: ProjectFile[];
     onUpload?: (files: File[]) => void;
     projectContext?: string;
@@ -27,7 +28,7 @@ interface WorksheetContainerProps {
 }
 
 const WorksheetContainer: React.FC<WorksheetContainerProps> = ({ 
-    document: worksheetDoc, onUpdateDocument, onRunAICell, onAnalyze, speciesList, onClose, onOpenManage, projectFiles, onUpload, projectContext, onResolveFile, onInspectEntity
+    document: worksheetDoc, onUpdateDocument, onRunAICell, onAnalyze, speciesList, onClose, onOpenManage, hideHeader = false, projectFiles, onUpload, projectContext, onResolveFile, onInspectEntity
 }) => {
     const { showNotification } = useUI();
     const [activeTabId, setActiveTabId] = useState<string>(worksheetDoc.tabs[0]?.id || '');
@@ -203,58 +204,60 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
 
     return (
         <div className="flex flex-col h-full bg-white relative">
-            <header className="flex-none h-14 border-b border-slate-200 bg-white flex items-center justify-between px-4 z-40 print:hidden">
-                <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 bg-weflora-mint/20 rounded-lg flex items-center justify-center text-weflora-teal"><TableIcon className="h-5 w-5" /></div>
-                    {isEditingTitle ? (
-                        <div className="flex items-center gap-1">
-                            <input type="text" value={titleInput} onChange={(e) => setTitleInput(e.target.value)} onBlur={handleTitleSave} onKeyDown={(e) => e.key === 'Enter' && handleTitleSave()} className="px-2 py-1 border border-weflora-teal rounded text-lg font-bold text-slate-900 outline-none focus:ring-2 focus:ring-weflora-mint/50 bg-white" autoFocus />
-                            <button onClick={handleTitleSave} className="p-1 text-green-600 hover:bg-green-50 rounded"><CheckIcon className="h-4 w-4" /></button>
-                        </div>
-                    ) : (
-                        <div className="group flex items-center gap-2 cursor-pointer" onClick={() => setIsEditingTitle(true)}>
-                            <h1 className="text-lg font-bold text-slate-900 group-hover:text-weflora-teal transition-colors">{worksheetDoc.title}</h1>
-                            <PencilIcon className="h-3 w-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                    )}
-                    <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Workbook</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1 mr-4">
-                        <button 
-                            onClick={() => setIsAnalyticsOpen(!isAnalyticsOpen)} 
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${isAnalyticsOpen ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark' : 'bg-white border-transparent text-slate-500 hover:bg-slate-50'}`}
-                            title="Visualize Data"
-                        >
-                            <ChartBarIcon className="h-4 w-4" /> Visualize
-                        </button>
-                        <div className="h-6 w-px bg-slate-200 mx-2"></div>
-                        <button onClick={() => importInputRef.current?.click()} className={`p-2 rounded-lg transition-colors relative ${isImporting ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Import Data" disabled={isImporting}>{isImporting ? <RefreshIcon className="h-4 w-4 animate-spin" /> : <UploadIcon className="h-4 w-4" />}</button>
-                        <input type="file" ref={importInputRef} className="hidden" accept=".csv,.xlsx,.xls,.pdf,.json" onChange={handleImportFile} />
-                        <button onClick={handleShare} className="p-2 text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10 rounded-lg transition-colors" title="Share Link"><ArrowUpIcon className="h-4 w-4 rotate-45" /></button>
-                        <div className="relative" ref={downloadMenuRef}>
-                            <button onClick={() => setIsDownloadMenuOpen(!isDownloadMenuOpen)} className={`p-2 rounded-lg transition-colors ${isDownloadMenuOpen ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Download"><DownloadIcon className="h-4 w-4" /></button>
-                            {isDownloadMenuOpen && (
-                                <div className="absolute top-full right-0 mt-2 w-40 bg-white rounded-lg shadow-xl border border-slate-200 z-[100] animate-fadeIn overflow-hidden">
-                                    <button onClick={() => handleDownload('csv')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"><FileCodeIcon className="h-4 w-4 text-green-600" /> CSV</button>
-                                    <button onClick={() => handleDownload('xlsx')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"><FileSheetIcon className="h-4 w-4 text-green-600" /> Excel</button>
-                                    <button onClick={() => handleDownload('pdf')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"><FilePdfIcon className="h-4 w-4 text-red-600" /> PDF (Print)</button>
-                                </div>
-                            )}
-                        </div>
+            {!hideHeader && (
+                <header className="flex-none h-14 border-b border-slate-200 bg-white flex items-center justify-between px-4 z-40 print:hidden">
+                    <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 bg-weflora-mint/20 rounded-lg flex items-center justify-center text-weflora-teal"><TableIcon className="h-5 w-5" /></div>
+                        {isEditingTitle ? (
+                            <div className="flex items-center gap-1">
+                                <input type="text" value={titleInput} onChange={(e) => setTitleInput(e.target.value)} onBlur={handleTitleSave} onKeyDown={(e) => e.key === 'Enter' && handleTitleSave()} className="px-2 py-1 border border-weflora-teal rounded text-lg font-bold text-slate-900 outline-none focus:ring-2 focus:ring-weflora-mint/50 bg-white" autoFocus />
+                                <button onClick={handleTitleSave} className="p-1 text-green-600 hover:bg-green-50 rounded"><CheckIcon className="h-4 w-4" /></button>
+                            </div>
+                        ) : (
+                            <div className="group flex items-center gap-2 cursor-pointer" onClick={() => setIsEditingTitle(true)}>
+                                <h1 className="text-lg font-bold text-slate-900 group-hover:text-weflora-teal transition-colors">{worksheetDoc.title}</h1>
+                                <PencilIcon className="h-3 w-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                        )}
+                        <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Workbook</span>
                     </div>
-                    <div className="h-6 w-px bg-slate-200 mr-2"></div>
-                    <button onClick={handleSave} className={`flex items-center justify-center p-2 rounded-lg transition-colors ${isSaving ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Save Worksheet">
-                        {isSaving ? (<RefreshIcon className="h-5 w-5 animate-spin" />) : (<CheckCircleIcon className="h-5 w-5" />)}
-                    </button>
-                    {onClose && (
-                        <button onClick={onClose} className="ml-2 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-                            <XIcon className="h-5 w-5" />
+
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 mr-4">
+                            <button 
+                                onClick={() => setIsAnalyticsOpen(!isAnalyticsOpen)} 
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${isAnalyticsOpen ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark' : 'bg-white border-transparent text-slate-500 hover:bg-slate-50'}`}
+                                title="Visualize Data"
+                            >
+                                <ChartBarIcon className="h-4 w-4" /> Visualize
+                            </button>
+                            <div className="h-6 w-px bg-slate-200 mx-2"></div>
+                            <button onClick={() => importInputRef.current?.click()} className={`p-2 rounded-lg transition-colors relative ${isImporting ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Import Data" disabled={isImporting}>{isImporting ? <RefreshIcon className="h-4 w-4 animate-spin" /> : <UploadIcon className="h-4 w-4" />}</button>
+                            <input type="file" ref={importInputRef} className="hidden" accept=".csv,.xlsx,.xls,.pdf,.json" onChange={handleImportFile} />
+                            <button onClick={handleShare} className="p-2 text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10 rounded-lg transition-colors" title="Share Link"><ArrowUpIcon className="h-4 w-4 rotate-45" /></button>
+                            <div className="relative" ref={downloadMenuRef}>
+                                <button onClick={() => setIsDownloadMenuOpen(!isDownloadMenuOpen)} className={`p-2 rounded-lg transition-colors ${isDownloadMenuOpen ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Download"><DownloadIcon className="h-4 w-4" /></button>
+                                {isDownloadMenuOpen && (
+                                    <div className="absolute top-full right-0 mt-2 w-40 bg-white rounded-lg shadow-xl border border-slate-200 z-[100] animate-fadeIn overflow-hidden">
+                                        <button onClick={() => handleDownload('csv')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"><FileCodeIcon className="h-4 w-4 text-green-600" /> CSV</button>
+                                        <button onClick={() => handleDownload('xlsx')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"><FileSheetIcon className="h-4 w-4 text-green-600" /> Excel</button>
+                                        <button onClick={() => handleDownload('pdf')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"><FilePdfIcon className="h-4 w-4 text-red-600" /> PDF (Print)</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="h-6 w-px bg-slate-200 mr-2"></div>
+                        <button onClick={handleSave} className={`flex items-center justify-center p-2 rounded-lg transition-colors ${isSaving ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Save Worksheet">
+                            {isSaving ? (<RefreshIcon className="h-5 w-5 animate-spin" />) : (<CheckCircleIcon className="h-5 w-5" />)}
                         </button>
-                    )}
-                </div>
-            </header>
+                        {onClose && (
+                            <button onClick={onClose} className="ml-2 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                                <XIcon className="h-5 w-5" />
+                            </button>
+                        )}
+                    </div>
+                </header>
+            )}
 
             <div className="flex-1 overflow-hidden relative">
                 <MatrixView 

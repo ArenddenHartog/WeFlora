@@ -26,6 +26,7 @@ interface ReportEditorViewProps {
     onAIQuery?: (query: string, context?: string) => void;
     onClose?: () => void;
     hideToolbar?: boolean;
+    hideAssistantButton?: boolean;
 }
 
 export const ManageReportPanel: React.FC<{
@@ -110,7 +111,7 @@ export const ManageReportPanel: React.FC<{
 };
 
 const ReportEditorView: React.FC<ReportEditorViewProps> = ({ 
-    report: singleReport, reports, activeReportId, onActiveReportIdChange, onUpdate, onCreateReport, onDeleteReport, availableMatrices = [], onToggleAssistant, onClose, hideToolbar
+    report: singleReport, reports, activeReportId, onActiveReportIdChange, onUpdate, onCreateReport, onDeleteReport, availableMatrices = [], onToggleAssistant, onClose, hideToolbar, hideAssistantButton = false
 }) => {
     const { showNotification } = useUI();
     const activeReport = (reports && activeReportId) ? reports.find(r => r.id === activeReportId) : singleReport || (reports && reports.length > 0 ? reports[0] : undefined);
@@ -318,7 +319,7 @@ const ReportEditorView: React.FC<ReportEditorViewProps> = ({
                         <div className="h-4 w-px bg-slate-300 mx-1"></div>
                         <button onClick={() => setIsPreviewOpen(!isPreviewOpen)} className={`flex items-center justify-center p-2 rounded-lg transition-all border ${isPreviewOpen ? 'bg-weflora-teal text-white border-weflora-teal' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`} title={isPreviewOpen ? "Edit" : "Preview"}><EyeIcon className="h-3.5 w-3.5" /></button>
                         <div className="h-4 w-px bg-slate-300 mx-1"></div>
-                        {onToggleAssistant && <button onClick={onToggleAssistant} className="flex items-center gap-1.5 px-3 py-1.5 bg-weflora-mint/20 text-weflora-teal-dark border border-weflora-teal hover:bg-weflora-mint/30 rounded-lg transition-colors" title="Open Writing Assistant"><SparklesIcon className="h-3.5 w-3.5" /><span className="text-xs font-bold hidden sm:inline">Assistant</span></button>}
+                        {onToggleAssistant && !hideAssistantButton && <button onClick={onToggleAssistant} className="flex items-center gap-1.5 px-3 py-1.5 bg-weflora-mint/20 text-weflora-teal-dark border border-weflora-teal hover:bg-weflora-mint/30 rounded-lg transition-colors" title="Open Writing Assistant"><SparklesIcon className="h-3.5 w-3.5" /><span className="text-xs font-bold hidden sm:inline">Assistant</span></button>}
                     </div>
                 </div>
                 

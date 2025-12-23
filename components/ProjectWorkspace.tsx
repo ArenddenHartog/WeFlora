@@ -136,6 +136,23 @@ const ProjectWorkspace: React.FC = () => {
         });
     };
 
+    const settingsLabel =
+        activeTab === 'overview' ? 'Project Settings'
+        : activeTab === 'worksheets' ? 'Worksheet Settings'
+        : activeTab === 'reports' ? 'Report Settings'
+        : 'Settings';
+
+    const assistantLabel =
+        activeTab === 'worksheets' ? 'Worksheet Assistant'
+        : activeTab === 'reports' ? 'Report Assistant'
+        : 'Project Assistant';
+
+    const assistantPanel: 'chat' | 'writing_assistant' =
+        activeTab === 'reports' ? 'writing_assistant' : 'chat';
+
+    const isAssistantActive =
+        assistantPanel === 'chat' ? rightPanel === 'chat' : rightPanel === 'writing_assistant';
+
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             Array.from(e.target.files).forEach(f => uploadProjectFile(f, projectId));
@@ -247,7 +264,7 @@ const ProjectWorkspace: React.FC = () => {
             return (
                 <div className="h-full flex flex-col bg-white">
                     <ChatView 
-                        chat={selectedChat || { id: 'proj-chat', title: 'Ask FloraGPT', description: 'Ask about this project', icon: SparklesIcon, time: 'Now' }} 
+                        chat={selectedChat || { id: 'proj-chat', title: assistantLabel, description: 'Ask about this project', icon: SparklesIcon, time: 'Now' }} 
                         messages={messages} 
                         onBack={() => setRightPanel('none')}
                         onSendMessage={sendMessage}
@@ -384,6 +401,7 @@ const ProjectWorkspace: React.FC = () => {
                         speciesList={species}
                         onOpenManage={() => setRightPanel('manage')}
                         onClose={() => {}}
+                        hideHeader={true}
                         projectFiles={files}
                         onUpload={(fs) => fs.forEach(f => uploadProjectFile(f, projectId))}
                         projectContext={projectContextSummary}
@@ -415,6 +433,8 @@ const ProjectWorkspace: React.FC = () => {
                         onClose={() => {}}
                         availableMatrices={allMatrices} 
                         onToggleAssistant={() => togglePanel('writing_assistant')} 
+                        hideHeader={true}
+                        hideAssistantButton={true}
                     />
                 );
             case 'team':
@@ -440,7 +460,7 @@ const ProjectWorkspace: React.FC = () => {
             <div className="flex flex-col h-full bg-white relative">
                 <header className="flex-none h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30 gap-4">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => navigate('/projects')} className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium pr-2">
+                        <button onClick={() => navigate('/projects')} className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium pr-3 border-r border-slate-200 h-6">
                             <ChevronRightIcon className="h-4 w-4 rotate-180" />
                             Back
                         </button>
@@ -476,44 +496,37 @@ const ProjectWorkspace: React.FC = () => {
                             <span>Project Files</span>
                         </button>
 
-                        {activeTab === 'worksheets' && matrices.length > 0 && (
+                        {(['overview', 'worksheets', 'reports'] as const).includes(activeTab) && (
                             <button 
                                 onClick={toggleManage}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
                                     rightPanel === 'manage'
                                     ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark' 
-                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                                 }`}
+                                title={settingsLabel}
                             >
-                                <SlidersIcon className="h-4 w-4 text-weflora-teal" />
-                                <span className="hidden sm:inline">Worksheet Setting</span>
-                            </button>
-                        )}
-                        
-                        {activeTab === 'reports' && reports.length > 0 && (
-                            <button 
-                                onClick={toggleManage}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
-                                    rightPanel === 'manage'
-                                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark' 
-                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                                }`}
-                            >
-                                <PencilIcon className="h-4 w-4 text-weflora-teal" />
-                                <span className="hidden sm:inline">Report Setting</span>
+                                <SlidersIcon className={`h-4 w-4 ${rightPanel === 'manage' ? 'text-weflora-teal-dark' : 'text-slate-500'}`} />
+                                <span className="hidden sm:inline">{settingsLabel}</span>
                             </button>
                         )}
 
                         <button 
-                            onClick={toggleChat}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
-                                rightPanel === 'chat'
+                            onClick={() => togglePanel(assistantPanel)}
+                            className={`group flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
+                                isAssistantActive
                                 ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark'
                                 : 'bg-white border-slate-200 text-slate-600 hover:bg-weflora-mint/10 hover:text-weflora-teal hover:border-weflora-teal'
                             }`}
                         >
-                            <SparklesIcon className={`h-4 w-4 ${rightPanel === 'chat' ? 'text-weflora-teal' : 'text-weflora-teal'}`} />
-                            <span>Ask FloraGPT</span>
+                            <SparklesIcon
+                                className={`h-4 w-4 transition-colors ${
+                                    isAssistantActive
+                                        ? 'text-weflora-teal'
+                                        : 'text-slate-500 group-hover:text-weflora-teal'
+                                }`}
+                            />
+                            <span>{assistantLabel}</span>
                         </button>
                     </div>
                 </header>
