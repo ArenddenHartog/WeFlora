@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import type { 
     PinnedProject, Chat, ProjectFile, Matrix, Report, 
     ChatMessage, DiscoveredStructure, MatrixColumn
@@ -29,8 +29,9 @@ const MainContent: React.FC<MainContentProps> = ({
     onNavigate, onSelectProject, onOpenMenu 
 }) => {
     const navigate = useNavigate();
+    const location = useLocation();
     // Hooks for data access
-    const { projects, createProject, createMatrix, createReport } = useProject();
+    const { projects, matrices, createProject, createMatrix, createReport, updateMatrix } = useProject();
     const { currentWorkspace } = useData();
     const { showNotification, destinationModal, openDestinationModal, closeDestinationModal } = useUI();
 
@@ -114,6 +115,13 @@ const MainContent: React.FC<MainContentProps> = ({
         const { type, message } = destinationModal;
         if (!message) return;
 
+        // PR2: If user is currently inside a standalone worksheet editor (/worksheets/:matrixId),
+        // "Copy → Worksheet" should append rows into that worksheet (no new routes/UI).
+        const appendTargetMatrixId = (() => {
+            const m = location.pathname.match(/^\/worksheets\/([^/]+)$/);
+            return m?.[1] || null;
+        })();
+
         let destination: { type: 'project' | 'standalone' | 'new_project', projectId?: string, newProjectName?: string };
 
         if (destMode === 'project') {
@@ -163,6 +171,139 @@ const MainContent: React.FC<MainContentProps> = ({
             setIsExtracting(true);
             try {
                 const result = await aiService.structureTextAsMatrix(message.text);
+
+                // Append mode: only when in standalone worksheet editor AND the user chose General Library.
+                if (appendTargetMatrixId && destination.type === 'standalone') {
+                    const target = matrices.find(m => m.id === appendTargetMatrixId);
+                    if (target) {
+                        // Merge columns (map by title) and append rows.
+                        const normalize = (s: string) => String(s || '').trim().toLowerCase();
+                        const existingCols = [...target.columns];
+                        const existingByTitle = new Map(existingCols.map(c => [normalize(c.title), c]));
+
+                        // Canonical columns should not be duplicated if they already exist.
+                        const canonicalTitles = new Set([
+                            'species (scientific)',
+                            'cultivar',
+                            'common name',
+                            'notes',
+                            'source'
+                        ]);
+
+                        const ensureColumn = (incomingCol: any) => {
+                            const key = normalize(incomingCol.title);
+                            const found = existingByTitle.get(key);
+                            if (found) return found;
+                            // Avoid duplicate canonicals by title
+                            if (canonicalTitles.has(key) && existingByTitle.has(key)) return existingByTitle.get(key)!;
+                            const newCol = { ...incomingCol, id: `col-app-${Date.now()}-${Math.random().toString(16).slice(2)}`, visible: true };
+                            existingCols.push(newCol);
+                            existingByTitle.set(key, newCol);
+                            return newCol;
+                        };
+
+                        // Build mapping for incoming columns -> existing columns (creating as needed).
+                        // Guardrail: cap newly-added attribute columns; overflow goes into Notes.
+                        const ATTR_CAP = 30;
+                        const isCanonical = (title: string) => canonicalTitles.has(normalize(title));
+                        const existingAttrCount = existingCols.filter(c => !isCanonical(c.title)).length;
+                        let remainingAttrSlots = Math.max(0, ATTR_CAP - existingAttrCount);
+
+                        // Find/ensure Notes column (only if needed).
+                        const notesKey = normalize('Notes');
+                        const getNotesCol = () => existingByTitle.get(notesKey) || null;
+
+                        const colMap = new Map<string, { id: string; title: string } | null>();
+                        for (const col of result.columns) {
+                            if (isCanonical(col.title)) {
+                                const ensured = ensureColumn(col);
+                                colMap.set(col.id, { id: ensured.id, title: ensured.title });
+                                continue;
+                            }
+                            if (remainingAttrSlots > 0) {
+                                const ensured = ensureColumn(col);
+                                colMap.set(col.id, { id: ensured.id, title: ensured.title });
+                                remainingAttrSlots -= normalize(col.title) === normalize(ensured.title) ? 0 : 0;
+                            } else {
+                                colMap.set(col.id, null);
+                            }
+                        }
+
+                        // Duplicate detection (scientific)
+                        const speciesCol = existingByTitle.get(normalize('Species (scientific)')) || existingByTitle.get(normalize('Species')) || null;
+                        const existingSpecies = new Set<string>();
+                        if (speciesCol) {
+                            target.rows.forEach(r => {
+                                const v = String(r.cells?.[speciesCol.id]?.value ?? '').trim();
+                                if (v) existingSpecies.add(v);
+                            });
+                        }
+
+                        const now = Date.now();
+                        let duplicateCount = 0;
+                        let firstDup: string | null = null;
+
+                        const appendedRows = result.rows.map((r, idx) => {
+                            const newId = `row-app-${now}-${idx}`;
+                            const newCells: any = {};
+                            const extras: string[] = [];
+
+                            for (const inCol of result.columns) {
+                                const mapping = colMap.get(inCol.id) || null;
+                                const v = String(r.cells?.[inCol.id]?.value ?? '');
+                                if (mapping) {
+                                    newCells[mapping.id] = { columnId: mapping.id, value: v };
+                                } else {
+                                    const vv = v.trim();
+                                    if (vv) extras.push(`${inCol.title}=${vv}`);
+                                }
+                            }
+
+                            // Notes for missing species and overflow extras
+                            const speciesVal = speciesCol ? String(newCells[speciesCol.id]?.value ?? '').trim() : '';
+                            if (speciesVal && existingSpecies.has(speciesVal)) {
+                                duplicateCount += 1;
+                                if (!firstDup) firstDup = speciesVal;
+                            }
+
+                            if (extras.length > 0 || !speciesVal) {
+                                const notesCol = getNotesCol() || ensureColumn({ id: 'notes', title: 'Notes', type: 'text', width: 400 });
+                                const existingNote = String(newCells[notesCol.id]?.value ?? '').trim();
+                                const parts = [];
+                                if (existingNote) parts.push(existingNote);
+                                if (!speciesVal) parts.push('Missing species');
+                                if (extras.length > 0) parts.push(`Extra: ${extras.join('; ')}`);
+                                newCells[notesCol.id] = { columnId: notesCol.id, value: parts.join(' • ') };
+                            }
+
+                            return { ...r, id: newId, cells: newCells };
+                        });
+
+                        const updated: Matrix = {
+                            ...target,
+                            columns: existingCols,
+                            rows: [...target.rows, ...appendedRows],
+                            updatedAt: new Date().toISOString()
+                        };
+
+                        await updateMatrix(updated);
+
+                        if (duplicateCount > 0) {
+                            showNotification(
+                                duplicateCount === 1 && firstDup
+                                    ? `Note: ${firstDup} already exists in this worksheet — added as a new row.`
+                                    : `Note: ${duplicateCount} species already exist in this worksheet — added as new rows.`
+                            );
+                        } else {
+                            showNotification('Added rows to worksheet');
+                        }
+
+                        closeDestinationModal();
+                        return;
+                    }
+                    // If target matrix not found, fall through to "create new worksheet" behavior.
+                }
+
                 const newMatrix: Matrix = {
                     id: `mtx-chat-${Date.now()}`,
                     title: 'Extracted Data',

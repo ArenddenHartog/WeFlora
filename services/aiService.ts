@@ -145,6 +145,317 @@ export const parseMarkdownPipeTableAsMatrix = (
     return { columns, rows };
 };
 
+// --- PR2: Species-first shaping (Copy → Worksheet) ---
+
+const SPECIES_HEADER_ALIASES = [
+    'species',
+    'species name',
+    'scientific name',
+    'latin name',
+    'botanical name',
+    'taxon',
+    'plant name',
+    'plantnaam',
+    'soort',
+    'boomsoort',
+    'tree species',
+];
+
+const CANONICAL_COLUMN_ORDER = [
+    'Species (scientific)',
+    'Cultivar',
+    'Common name',
+    'Notes',
+    'Source',
+] as const;
+
+type CanonicalColumnTitle = typeof CANONICAL_COLUMN_ORDER[number];
+
+const normalizeHeader = (s: string) =>
+    collapseWhitespace(String(s || ''))
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s()_-]+/gu, '')
+        .trim();
+
+const headerMatchesSpecies = (header: string) => {
+    const h = normalizeHeader(header);
+    // Exact match for short aliases, contains-match for longer variants.
+    return SPECIES_HEADER_ALIASES.some((a) => {
+        const aa = normalizeHeader(a);
+        if (!aa) return false;
+        if (aa.length <= 7) return h === aa;
+        return h.includes(aa);
+    });
+};
+
+const looksMostlyNumeric = (values: string[]) => {
+    const nonEmpty = values.map((v) => String(v ?? '').trim()).filter(Boolean);
+    if (nonEmpty.length === 0) return false;
+    const numericCount = nonEmpty.filter((v) => /^[-+]?[\d.,]+$/.test(v.replace(/\s/g, ''))).length;
+    return numericCount / nonEmpty.length >= 0.7;
+};
+
+const binomialRe = /^[A-Z][a-z]+ [a-z][a-z-]+$/;
+const cultivarHintsRe = /(\bcv\.\b)|['"][^'"]+['"]|(?:\s+[A-Z][a-z]+ [a-z][a-z-]+\s+['"][^'"]+['"])/;
+
+const scoreSpeciesColumnByContent = (rows: MatrixRow[], colId: string, maxRows: number) => {
+    let score = 0;
+    const sample = rows.slice(0, maxRows);
+    const values = sample.map((r) => String(r.cells?.[colId]?.value ?? '').trim());
+
+    if (looksMostlyNumeric(values)) score -= 8;
+
+    for (const raw of values) {
+        const v = collapseWhitespace(raw);
+        if (!v) continue;
+
+        if (binomialRe.test(v)) score += 3;
+        else if (cultivarHintsRe.test(v)) score += 2;
+        else if (/^[A-Za-z]{3,}$/.test(v) && v.length <= 24) score += 1;
+
+        // Penalize sentence-y / punctuation heavy values
+        if (v.length > 40 && /[.,;:()]/.test(v)) score -= 2;
+    }
+
+    return score;
+};
+
+const titleCase = (s: string) =>
+    collapseWhitespace(s)
+        .split(' ')
+        .map((w) => (w.length ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+        .join(' ');
+
+const parseSpeciesCell = (raw: string) => {
+    const v = collapseWhitespace(String(raw ?? ''));
+    if (!v) return { scientific: '', cultivar: '', common: '', needsConfirmation: false };
+
+    // Binomial + optional cultivar forms.
+    // Examples:
+    // - Acer campestre
+    // - Acer campestre 'Elsrijk'
+    // - Acer campestre cv. Elsrijk
+    const parts = v.split(' ');
+    if (parts.length >= 2 && /^[A-Z][a-z]+$/.test(parts[0]) && /^[a-z][a-z-]+$/.test(parts[1])) {
+        const scientific = `${parts[0]} ${parts[1]}`;
+        const remainder = v.slice(scientific.length).trim();
+
+        let cultivar = '';
+        const quoted = remainder.match(/['"]([^'"]+)['"]/);
+        if (quoted?.[1]) cultivar = quoted[1].trim();
+        else {
+            const cv = remainder.match(/\bcv\.\s*([A-Za-z0-9-]+(?:\s+[A-Za-z0-9-]+)*)/i);
+            if (cv?.[1]) cultivar = collapseWhitespace(cv[1]);
+        }
+
+        return { scientific, cultivar, common: '', needsConfirmation: false };
+    }
+
+    // Otherwise treat as a common name needing confirmation.
+    return { scientific: '', cultivar: '', common: v, needsConfirmation: true };
+};
+
+const getCanonicalTitle = (t: string): CanonicalColumnTitle | null => {
+    const n = normalizeHeader(t);
+    if (n === 'species (scientific)' || n === 'species scientific') return 'Species (scientific)';
+    if (n === 'cultivar') return 'Cultivar';
+    if (n === 'common name' || n === 'commonname') return 'Common name';
+    if (n === 'notes' || n === 'note') return 'Notes';
+    if (n === 'source' || n === 'sources') return 'Source';
+    return null;
+};
+
+const shapeSpeciesFirst = (
+    base: { columns: MatrixColumn[]; rows: MatrixRow[] },
+    opts?: { runSpeciesCorrectionPass?: boolean }
+): { columns: MatrixColumn[]; rows: MatrixRow[] } => {
+    const { columns, rows } = base;
+    if (!columns || columns.length === 0) return base;
+
+    // Step B1: header match
+    let speciesColIdx = columns.findIndex((c) => headerMatchesSpecies(c.title));
+    let headerTrusted = speciesColIdx !== -1;
+
+    // Step B2: content scoring
+    if (speciesColIdx === -1) {
+        const maxRows = 50;
+        const scored = columns
+            .map((c, idx) => ({ idx, id: c.id, score: scoreSpeciesColumnByContent(rows, c.id, maxRows) }))
+            .sort((a, b) => b.score - a.score);
+        const best = scored[0];
+        if (best && best.score >= 8) {
+            speciesColIdx = best.idx;
+            headerTrusted = false;
+        }
+    }
+
+    // Step B3: fail-safe
+    if (speciesColIdx === -1) {
+        console.info('[species-shape] no species column detected; leaving table unchanged');
+        return base;
+    }
+
+    const speciesCol = columns[speciesColIdx];
+
+    // Build canonical column values
+    const shapedRowsIntermediate = rows.map((r) => {
+        const speciesRaw = String(r.cells?.[speciesCol.id]?.value ?? '');
+        const parsed = parseSpeciesCell(speciesRaw);
+        return { row: r, parsed };
+    });
+
+    const anyCultivar = shapedRowsIntermediate.some((x) => Boolean(x.parsed.cultivar));
+    const anyCommon = shapedRowsIntermediate.some((x) => Boolean(x.parsed.common));
+
+    // Notes is conditional but will often be needed (missing species / overflow).
+    // We'll compute per-row notes and then decide if any is non-empty.
+    const canonicalNotes: string[] = [];
+
+    // Prepare attribute columns (all non-species original columns)
+    const canonicalTitlesSet = new Set<string>(CANONICAL_COLUMN_ORDER.map((t) => normalizeHeader(t)));
+    const attributeColumnsRaw = columns
+        .filter((_, idx) => idx !== speciesColIdx)
+        .map((c) => {
+            const maybeCanonical = getCanonicalTitle(c.title);
+            // Treat these titles as attributes if they collide with canonicals.
+            const baseTitle = titleCase(c.title || '');
+            const normalized = normalizeHeader(baseTitle);
+            const safeTitle = canonicalTitlesSet.has(normalized) ? `${baseTitle} (original)` : baseTitle;
+            return { col: c, title: safeTitle };
+        });
+
+    // Column cap (attributes): keep first 30, push extras to Notes.
+    const ATTRIBUTE_CAP = 30;
+    const keptAttributes = attributeColumnsRaw.slice(0, ATTRIBUTE_CAP);
+    const droppedAttributes = attributeColumnsRaw.slice(ATTRIBUTE_CAP);
+
+    // Canonical columns (created conditionally per spec)
+    const now = Date.now();
+    const outColumns: MatrixColumn[] = [];
+    const colIdByCanonical: Partial<Record<CanonicalColumnTitle, string>> = {};
+
+    // Species (scientific) required
+    colIdByCanonical['Species (scientific)'] = `col-sp-${now}`;
+    outColumns.push({
+        id: colIdByCanonical['Species (scientific)']!,
+        title: 'Species (scientific)',
+        type: 'text',
+        width: 250,
+        isPrimaryKey: true,
+    });
+
+    if (anyCultivar) {
+        colIdByCanonical['Cultivar'] = `col-cv-${now}`;
+        outColumns.push({ id: colIdByCanonical['Cultivar']!, title: 'Cultivar', type: 'text', width: 180 });
+    }
+    if (anyCommon) {
+        colIdByCanonical['Common name'] = `col-cn-${now}`;
+        outColumns.push({ id: colIdByCanonical['Common name']!, title: 'Common name', type: 'text', width: 180 });
+    }
+
+    // Attribute columns next (preserve type/options where possible)
+    const outAttributeColumns: MatrixColumn[] = [];
+    const usedTitles = new Set<string>(outColumns.map((c) => normalizeHeader(c.title)));
+    for (const a of keptAttributes) {
+        let t = a.title || 'Attribute';
+        let n = normalizeHeader(t);
+        let k = 2;
+        while (usedTitles.has(n)) {
+            t = `${a.title} (${k})`;
+            n = normalizeHeader(t);
+            k += 1;
+        }
+        usedTitles.add(n);
+        outAttributeColumns.push({
+            ...a.col,
+            id: `col-attr-${outColumns.length + outAttributeColumns.length}-${now}`,
+            title: t,
+            isPrimaryKey: false,
+        });
+    }
+
+    // Notes column is conditional; we'll decide after building rows (but need id reserved for mapping).
+    const notesColId = `col-notes-${now}`;
+    colIdByCanonical['Notes'] = notesColId;
+
+    // Source column exists only if any non-empty; we do not populate it in this PR.
+
+    // Build rows and map values
+    const outRows: MatrixRow[] = shapedRowsIntermediate.map(({ row, parsed }, idx) => {
+        const cells: any = {};
+
+        const speciesVal = parsed.scientific;
+        const cultivarVal = parsed.cultivar;
+        const commonVal = parsed.common;
+
+        // Canonicals
+        cells[colIdByCanonical['Species (scientific)']!] = { columnId: colIdByCanonical['Species (scientific)']!, value: speciesVal };
+        if (anyCultivar && colIdByCanonical['Cultivar']) {
+            cells[colIdByCanonical['Cultivar']] = { columnId: colIdByCanonical['Cultivar'], value: cultivarVal };
+        }
+        if (anyCommon && colIdByCanonical['Common name']) {
+            cells[colIdByCanonical['Common name']] = { columnId: colIdByCanonical['Common name'], value: commonVal };
+        }
+
+        let notes = '';
+        if (!speciesVal) {
+            notes = collapseWhitespace([notes, parsed.needsConfirmation ? 'Needs confirmation' : '', 'Missing species'].filter(Boolean).join(' • '));
+        } else if (parsed.needsConfirmation && !headerTrusted) {
+            notes = collapseWhitespace([notes, 'Needs confirmation'].filter(Boolean).join(' • '));
+        }
+
+        // Attributes
+        keptAttributes.forEach((a, colIdx) => {
+            const outCol = outAttributeColumns[colIdx];
+            const v = row.cells?.[a.col.id]?.value;
+            cells[outCol.id] = { columnId: outCol.id, value: String(v ?? '') };
+        });
+
+        // Dropped attributes go into notes
+        if (droppedAttributes.length > 0) {
+            const extras = droppedAttributes
+                .map((a) => {
+                    const v = String(row.cells?.[a.col.id]?.value ?? '').trim();
+                    if (!v) return '';
+                    return `${a.title}=${v}`;
+                })
+                .filter(Boolean)
+                .join('; ');
+            if (extras) {
+                notes = collapseWhitespace([notes, `Extra: ${extras}`].filter(Boolean).join(' • '));
+            }
+        }
+
+        canonicalNotes.push(notes);
+        // We'll attach notes later only if needed.
+
+        return {
+            id: `row-sp-${idx}-${now}`,
+            entityName: speciesVal || commonVal || row.entityName || `Item ${idx + 1}`,
+            cells,
+        };
+    });
+
+    const anyNotes = canonicalNotes.some((n) => Boolean(n));
+    if (anyNotes) {
+        outColumns.push(...outAttributeColumns);
+        outColumns.push({ id: notesColId, title: 'Notes', type: 'text', width: 400 });
+        outRows.forEach((r, i) => {
+            r.cells[notesColId] = { columnId: notesColId, value: canonicalNotes[i] || '' };
+        });
+    } else {
+        outColumns.push(...outAttributeColumns);
+    }
+
+    // Optional correction pass (off by default). Non-blocking; best-effort.
+    if (opts?.runSpeciesCorrectionPass) {
+        console.info('[species-shape] runSpeciesCorrectionPass=true (not wired by default)');
+        // Intentionally non-blocking in PR2. (Hook for future LLM normalization.)
+    }
+
+    return { columns: outColumns, rows: outRows };
+};
+
 export class AIService {
   
   constructor() {
@@ -182,11 +493,14 @@ export class AIService {
       }
   }
 
-  async structureTextAsMatrix(text: string): Promise<{ columns: MatrixColumn[], rows: MatrixRow[] }> {
+  async structureTextAsMatrix(
+      text: string,
+      opts?: { runSpeciesCorrectionPass?: boolean }
+  ): Promise<{ columns: MatrixColumn[], rows: MatrixRow[] }> {
         // PR1: If input contains a real markdown pipe table, prefer deterministic parsing
         // to avoid collapsing the entire table into a single cell.
         const parsed = parseMarkdownPipeTableAsMatrix(text);
-        if (parsed) return parsed;
+        if (parsed) return shapeSpeciesFirst(parsed, opts);
 
         try {
             const schema: Schema = {
@@ -304,10 +618,10 @@ export class AIService {
                 (rowsData.length > 0 && rowsData.filter((v: any[]) => (v?.length || 0) <= 1).length / rowsData.length >= 0.6);
             if (degenerate && hasMarkdownPipeTable(text)) {
                 const retryParsed = parseMarkdownPipeTableAsMatrix(text);
-                if (retryParsed) return retryParsed;
+                if (retryParsed) return shapeSpeciesFirst(retryParsed, opts);
             }
 
-            return { columns, rows };
+            return shapeSpeciesFirst({ columns, rows }, opts);
 
         } catch (e) {
             console.error("Structuring failed:", e);
