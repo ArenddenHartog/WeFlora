@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ChevronRightIcon, FolderIcon, SparklesIcon } from './icons';
+import { ChevronRightIcon, FolderIcon, DatabaseIcon, SlidersIcon, SparklesIcon } from './icons';
 
 type ProjectSection = 'overview' | 'worksheets' | 'reports' | 'team';
 
@@ -88,16 +88,24 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onOpenProjectFiles}
-            className="flex items-center px-3 py-1.5 rounded-lg text-sm font-bold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
             title="Files"
           >
+            <DatabaseIcon className="h-4 w-4 text-weflora-teal" />
             <span>Files</span>
           </button>
           <button
             onClick={onOpenProjectSettings}
-            className="flex items-center px-3 py-1.5 rounded-lg text-sm font-bold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
+            className={`
+              flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap
+              ${settingsOpen 
+                ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }
+            `}
             title={settingsButtonLabel}
           >
+            <SlidersIcon className={`h-4 w-4 ${settingsOpen ? 'text-weflora-teal' : 'text-weflora-teal'}`} />
             <span>{settingsButtonLabel}</span>
           </button>
           <button
