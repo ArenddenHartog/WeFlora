@@ -159,7 +159,7 @@ const ProjectTeamView: React.FC<ProjectTeamViewProps> = ({
             <div className="w-full lg:w-96 flex flex-col h-full min-h-[400px]">
                 <div className="flex items-center justify-between mb-4 flex-shrink-0">
                     <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3">
-                        <div className="p-2 bg-blue-50 rounded-lg text-blue-500">
+                        <div className="p-2 bg-weflora-teal/10 rounded-lg text-weflora-teal">
                             <MessageSquareIcon className="h-6 w-6" />
                         </div>
                         Discussion

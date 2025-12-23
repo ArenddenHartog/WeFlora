@@ -29,8 +29,8 @@ const COLORS = [
     { value: 'green', bg: 'bg-weflora-success' },
     { value: 'amber', bg: 'bg-weflora-amber' },
     { value: 'red', bg: 'bg-weflora-red' },
-    // NOTE: No WeFlora “info blue” token yet; keep Tailwind blue for user-selectable (non-status) color swatch.
-    { value: 'blue', bg: 'bg-blue-500' },
+    // NOTE: No WeFlora “info blue” token; use teal for selectable "blue" to avoid non-token colors.
+    { value: 'blue', bg: 'bg-weflora-teal' },
     { value: 'slate', bg: 'bg-slate-400' },
 ];
 

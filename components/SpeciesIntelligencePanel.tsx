@@ -178,7 +178,7 @@ const SpeciesIntelligencePanel: React.FC<SpeciesIntelligencePanelProps> = ({ spe
                                 <span className="text-[10px] text-slate-400">Exposure</span>
                             </div>
                             <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
-                                <DropletIcon className="h-5 w-5 text-blue-400 mb-1" />
+                                <DropletIcon className="h-5 w-5 text-weflora-teal mb-1" />
                                 <span className="text-xs font-bold text-slate-800 truncate w-full" title={data.waterNeeds}>{data.waterNeeds}</span>
                                 <span className="text-[10px] text-slate-400">Water</span>
                             </div>

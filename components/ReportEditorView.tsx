@@ -340,7 +340,7 @@ const ReportEditorView: React.FC<ReportEditorViewProps> = ({
                     </div>
                     {isPreviewOpen && (
                         <div className="w-1/2 h-full bg-slate-50 overflow-y-auto p-8 animate-fadeIn border-l border-slate-200 flex-none relative">
-                            <div className="prose prose-sm max-w-none prose-headings:font-bold prose-a:text-blue-600"><MessageRenderer text={content || '*No content to preview*'} /></div>
+                            <div className="prose prose-sm max-w-none prose-headings:font-bold prose-a:text-weflora-teal"><MessageRenderer text={content || '*No content to preview*'} /></div>
                         </div>
                     )}
                 </div>
