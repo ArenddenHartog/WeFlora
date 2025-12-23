@@ -267,7 +267,7 @@ const getCanonicalTitle = (t: string): CanonicalColumnTitle | null => {
 
 const shapeSpeciesFirst = (
     base: { columns: MatrixColumn[]; rows: MatrixRow[] },
-    opts?: { runSpeciesCorrectionPass?: boolean }
+    _opts?: { runSpeciesCorrectionPass?: boolean }
 ): { columns: MatrixColumn[]; rows: MatrixRow[] } => {
     const { columns, rows } = base;
     if (!columns || columns.length === 0) return base;
@@ -447,13 +447,174 @@ const shapeSpeciesFirst = (
         outColumns.push(...outAttributeColumns);
     }
 
-    // Optional correction pass (off by default). Non-blocking; best-effort.
-    if (opts?.runSpeciesCorrectionPass) {
-        console.info('[species-shape] runSpeciesCorrectionPass=true (not wired by default)');
-        // Intentionally non-blocking in PR2. (Hook for future LLM normalization.)
+    return { columns: outColumns, rows: outRows };
+};
+
+const getColumnByNormalizedTitle = (columns: MatrixColumn[], title: string) => {
+    const key = normalizeHeader(title);
+    return columns.find((c) => normalizeHeader(c.title) === key) || null;
+};
+
+const ensureColumn = (
+    matrix: { columns: MatrixColumn[]; rows: MatrixRow[] },
+    title: CanonicalColumnTitle,
+    colId: string,
+    width: number
+) => {
+    const existing = getColumnByNormalizedTitle(matrix.columns, title);
+    if (existing) return existing;
+    const col: MatrixColumn = {
+        id: colId,
+        title,
+        type: 'text',
+        width,
+        isPrimaryKey: title === 'Species (scientific)',
+    };
+    matrix.columns.push(col);
+    return col;
+};
+
+const withTimeout = async <T,>(p: Promise<T>, ms: number): Promise<{ ok: true; value: T } | { ok: false }> => {
+    let timeoutId: any = null;
+    const timeout = new Promise<{ ok: false }>((resolve) => {
+        timeoutId = setTimeout(() => resolve({ ok: false }), ms);
+    });
+    const result = await Promise.race([p.then((value) => ({ ok: true as const, value })), timeout]);
+    if (timeoutId) clearTimeout(timeoutId);
+    return result as any;
+};
+
+const applySpeciesCorrectionPass = async (
+    shaped: { columns: MatrixColumn[]; rows: MatrixRow[] }
+): Promise<{ columns: MatrixColumn[]; rows: MatrixRow[] }> => {
+    const speciesCol = getColumnByNormalizedTitle(shaped.columns, 'Species (scientific)') || getColumnByNormalizedTitle(shaped.columns, 'Species');
+    if (!speciesCol) return shaped; // only run after species-column detection
+
+    const cultivarCol = getColumnByNormalizedTitle(shaped.columns, 'Cultivar');
+    const commonCol = getColumnByNormalizedTitle(shaped.columns, 'Common name');
+    const notesCol = getColumnByNormalizedTitle(shaped.columns, 'Notes');
+
+    const MAX_ROWS = 50;
+    const sample = shaped.rows.slice(0, MAX_ROWS).map((r, idx) => {
+        const scientific = String(r.cells?.[speciesCol.id]?.value ?? '').trim();
+        const cultivar = cultivarCol ? String(r.cells?.[cultivarCol.id]?.value ?? '').trim() : '';
+        const commonName = commonCol ? String(r.cells?.[commonCol.id]?.value ?? '').trim() : '';
+        return { index: idx, scientific, cultivar, commonName };
+    });
+
+    // If nothing to correct, skip.
+    const hasAnyInput = sample.some((x) => Boolean(x.scientific || x.cultivar || x.commonName));
+    if (!hasAnyInput) return shaped;
+
+    const schema: Schema = {
+        type: Type.OBJECT,
+        properties: {
+            items: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        index: { type: Type.NUMBER },
+                        scientific: { type: Type.STRING },
+                        cultivar: { type: Type.STRING },
+                        commonName: { type: Type.STRING },
+                        needsConfirmation: { type: Type.BOOLEAN },
+                        note: { type: Type.STRING }
+                    },
+                    required: ['index', 'scientific', 'needsConfirmation']
+                }
+            }
+        },
+        required: ['items']
+    };
+
+    const prompt = `You are a botanist and data normalizer.
+Given rows with (scientific, cultivar, commonName), normalize scientific names (Genus species) and cultivar.
+If only a common name is present, suggest the most likely scientific name, but set needsConfirmation=true if uncertain.
+Return JSON only, matching the schema. Preserve order using the provided index.
+
+Rows:
+${JSON.stringify(sample)}`;
+
+    const correctionPromise = ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: schema
+        }
+    });
+
+    const timed = await withTimeout(correctionPromise, 4500);
+    if (!timed.ok) {
+        console.info('[species-correction] failed, continuing without correction');
+        return shaped;
     }
 
-    return { columns: outColumns, rows: outRows };
+    let data: any;
+    try {
+        data = JSON.parse((timed.value as any).text || '{}');
+    } catch {
+        console.info('[species-correction] failed, continuing without correction');
+        return shaped;
+    }
+
+    const items: any[] = Array.isArray(data?.items) ? data.items : [];
+    if (items.length === 0) return shaped;
+
+    // Apply corrections into a shallow-cloned matrix (avoid mutating caller unexpectedly).
+    const out: { columns: MatrixColumn[]; rows: MatrixRow[] } = {
+        columns: [...shaped.columns],
+        rows: shaped.rows.map((r) => ({ ...r, cells: { ...r.cells } }))
+    };
+
+    // Ensure canonical columns only if they will have values.
+    const anyCultivar = items.some((i) => Boolean(String(i?.cultivar ?? '').trim()));
+    const anyCommon = items.some((i) => Boolean(String(i?.commonName ?? '').trim()));
+    const anyNote = items.some((i) => Boolean(String(i?.note ?? '').trim()) || i?.needsConfirmation === true);
+
+    const now = Date.now();
+    const ensuredSpecies = ensureColumn(out, 'Species (scientific)', speciesCol.id, 250);
+    const ensuredCultivar = anyCultivar ? ensureColumn(out, 'Cultivar', cultivarCol?.id || `col-cv-corr-${now}`, 180) : null;
+    const ensuredCommon = anyCommon ? ensureColumn(out, 'Common name', commonCol?.id || `col-cn-corr-${now}`, 180) : null;
+    const ensuredNotes = anyNote ? ensureColumn(out, 'Notes', notesCol?.id || `col-notes-corr-${now}`, 400) : null;
+
+    const byIndex = new Map<number, any>();
+    items.forEach((i) => {
+        const idx = typeof i?.index === 'number' ? i.index : NaN;
+        if (Number.isFinite(idx)) byIndex.set(idx, i);
+    });
+
+    for (let i = 0; i < Math.min(out.rows.length, MAX_ROWS); i++) {
+        const corr = byIndex.get(i);
+        if (!corr) continue;
+
+        const scientific = String(corr?.scientific ?? '').trim();
+        const cultivar = String(corr?.cultivar ?? '').trim();
+        const commonName = String(corr?.commonName ?? '').trim();
+        const needsConfirmation = Boolean(corr?.needsConfirmation);
+        const note = String(corr?.note ?? '').trim();
+
+        if (scientific) {
+            out.rows[i].cells[ensuredSpecies.id] = { columnId: ensuredSpecies.id, value: scientific };
+        }
+        if (ensuredCultivar && cultivar) {
+            out.rows[i].cells[ensuredCultivar.id] = { columnId: ensuredCultivar.id, value: cultivar };
+        }
+        if (ensuredCommon && commonName) {
+            out.rows[i].cells[ensuredCommon.id] = { columnId: ensuredCommon.id, value: commonName };
+        }
+        if (ensuredNotes && (note || needsConfirmation)) {
+            const prev = String(out.rows[i].cells?.[ensuredNotes.id]?.value ?? '').trim();
+            const parts = [];
+            if (prev) parts.push(prev);
+            if (needsConfirmation) parts.push('Needs confirmation');
+            if (note) parts.push(note);
+            out.rows[i].cells[ensuredNotes.id] = { columnId: ensuredNotes.id, value: parts.join(' • ') };
+        }
+    }
+
+    return out;
 };
 
 export class AIService {
@@ -500,7 +661,17 @@ export class AIService {
         // PR1: If input contains a real markdown pipe table, prefer deterministic parsing
         // to avoid collapsing the entire table into a single cell.
         const parsed = parseMarkdownPipeTableAsMatrix(text);
-        if (parsed) return shapeSpeciesFirst(parsed, opts);
+        if (parsed) {
+            const shaped = shapeSpeciesFirst(parsed, opts);
+            if (opts?.runSpeciesCorrectionPass) {
+                try {
+                    return await applySpeciesCorrectionPass(shaped);
+                } catch {
+                    console.info('[species-correction] failed, continuing without correction');
+                }
+            }
+            return shaped;
+        }
 
         try {
             const schema: Schema = {
@@ -618,10 +789,30 @@ export class AIService {
                 (rowsData.length > 0 && rowsData.filter((v: any[]) => (v?.length || 0) <= 1).length / rowsData.length >= 0.6);
             if (degenerate && hasMarkdownPipeTable(text)) {
                 const retryParsed = parseMarkdownPipeTableAsMatrix(text);
-                if (retryParsed) return shapeSpeciesFirst(retryParsed, opts);
+                if (retryParsed) {
+                    const shaped = shapeSpeciesFirst(retryParsed, opts);
+                    if (opts?.runSpeciesCorrectionPass) {
+                        try {
+                            return await applySpeciesCorrectionPass(shaped);
+                        } catch {
+                            console.info('[species-correction] failed, continuing without correction');
+                        }
+                    }
+                    return shaped;
+                }
             }
 
-            return shapeSpeciesFirst({ columns, rows }, opts);
+            {
+                const shaped = shapeSpeciesFirst({ columns, rows }, opts);
+                if (opts?.runSpeciesCorrectionPass) {
+                    try {
+                        return await applySpeciesCorrectionPass(shaped);
+                    } catch {
+                        console.info('[species-correction] failed, continuing without correction');
+                    }
+                }
+                return shaped;
+            }
 
         } catch (e) {
             console.error("Structuring failed:", e);

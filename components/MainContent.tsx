@@ -96,6 +96,7 @@ const MainContent: React.FC<MainContentProps> = ({
     const [selectedDestProject, setSelectedDestProject] = useState('');
     const [newDestProjectName, setNewDestProjectName] = useState('');
     const [isExtracting, setIsExtracting] = useState(false);
+    const [runSpeciesCorrectionPass, setRunSpeciesCorrectionPass] = useState(false);
 
     // Effect to reset state when modal opens
     useEffect(() => {
@@ -104,6 +105,7 @@ const MainContent: React.FC<MainContentProps> = ({
             setSelectedDestProject('');
             setNewDestProjectName('');
             setIsExtracting(false);
+            setRunSpeciesCorrectionPass(false);
         }
     }, [destinationModal.isOpen]);
 
@@ -170,7 +172,7 @@ const MainContent: React.FC<MainContentProps> = ({
         } else {
             setIsExtracting(true);
             try {
-                const result = await aiService.structureTextAsMatrix(message.text);
+                const result = await aiService.structureTextAsMatrix(message.text, { runSpeciesCorrectionPass });
 
                 // Append mode: only when in standalone worksheet editor AND the user chose General Library.
                 if (appendTargetMatrixId && destination.type === 'standalone') {
@@ -339,14 +341,14 @@ const MainContent: React.FC<MainContentProps> = ({
                 // PR1: If the input contains a markdown pipe table, try deterministic parsing
                 // before falling back to "single cell raw content".
                 if (hasMarkdownPipeTable(message.text)) {
-                    const parsed = parseMarkdownPipeTableAsMatrix(message.text);
-                    if (parsed) {
+                    try {
+                        const shaped = await aiService.structureTextAsMatrix(message.text, { runSpeciesCorrectionPass });
                         const newMatrix: Matrix = {
                             id: `mtx-chat-${Date.now()}`,
                             title: 'Extracted Data',
                             description: 'Generated from chat analysis',
-                            columns: parsed.columns,
-                            rows: parsed.rows
+                            columns: shaped.columns,
+                            rows: shaped.rows
                         };
                         const created = await handleCreateMatrix(newMatrix, destination);
                         if (!created) {
@@ -371,6 +373,31 @@ const MainContent: React.FC<MainContentProps> = ({
                         showNotification('Worksheet created from chat');
                         closeDestinationModal();
                         return;
+                    } catch (e) {
+                        console.info('[species-correction] failed, continuing without correction');
+                        const parsed = parseMarkdownPipeTableAsMatrix(message.text);
+                        if (parsed) {
+                            const newMatrix: Matrix = {
+                                id: `mtx-chat-${Date.now()}`,
+                                title: 'Extracted Data',
+                                description: 'Generated from chat analysis',
+                                columns: parsed.columns,
+                                rows: parsed.rows
+                            };
+                            const created = await handleCreateMatrix(newMatrix, destination);
+                            if (!created) return;
+                            navigateToCreatedEntity({
+                                navigate,
+                                kind: 'worksheet',
+                                withinProject: Boolean(created.projectId),
+                                projectId: created.projectId,
+                                matrixId: created.id,
+                                focusTabId: created.id
+                            });
+                            showNotification('Worksheet created from chat');
+                            closeDestinationModal();
+                            return;
+                        }
                     }
                 }
 
@@ -553,6 +580,25 @@ const MainContent: React.FC<MainContentProps> = ({
                                     )}
                                 </label>
                             </div>
+
+                            {destinationModal.type === 'worksheet' && (
+                                <div className="pt-2">
+                                    <label className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg bg-white">
+                                        <input
+                                            type="checkbox"
+                                            checked={runSpeciesCorrectionPass}
+                                            onChange={(e) => setRunSpeciesCorrectionPass(e.target.checked)}
+                                            className="mt-1 h-4 w-4 rounded border-slate-300 text-weflora-teal focus:ring-weflora-teal/30"
+                                        />
+                                        <div className="min-w-0">
+                                            <div className="text-sm font-bold text-slate-800">Run species correction (optional)</div>
+                                            <div className="text-xs text-slate-500">
+                                                Suggest scientific names and flag uncertain species. Creation will not be blocked.
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            )}
                         </>
                     )}
                 </div>
