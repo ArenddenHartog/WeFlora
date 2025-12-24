@@ -103,7 +103,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
         } else {
             setPreviewPrompt(skillConfig.promptTemplate || '');
         }
-    }, [skillConfig.templateId, skillConfig.params, skillConfig.promptTemplate]);
+    }, [skillConfig.templateId, skillConfig.params, skillConfig.promptTemplate, skillConfig.outputType]);
 
     // Sync editedCol with Skill Config on Save
     const handleSave = () => {
