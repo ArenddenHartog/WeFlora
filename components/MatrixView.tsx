@@ -14,6 +14,7 @@ import { aiService } from '../services/aiService';
 import ColumnSettingsModal from './ColumnSettingsModal';
 import { MessageRenderer } from './MessageRenderer';
 import { useUI } from '../contexts/UIContext';
+import { SKILL_TEMPLATES } from '../services/skillTemplates';
 
 interface MatrixViewProps {
     matrices: Matrix[];
@@ -53,7 +54,7 @@ const getFormatInstruction = (type?: 'text' | 'badge' | 'score' | 'currency') =>
         case 'score':
             return "\n\nStrict Output Format Rule: You must return the answer in the format 'Score/100 - Key Reason' (e.g., '85/100 - High durability').";
         case 'currency':
-            return "\n\nStrict Output Format Rule: You must return the answer in the format '$Amount' (e.g., '$150'). Include the currency symbol.";
+            return "\n\nStrict Output Format Rule: You must return the answer in the format '€Amount' (e.g., '€150'). Include the currency symbol.";
         default:
             return ""; // Free text
     }
@@ -143,12 +144,30 @@ const MatrixInput: React.FC<{ value: string|number; type: MatrixColumnType; opti
 const RichCellRenderer: React.FC<{ value: string|number, column: MatrixColumn, cell?: MatrixCell, onInspect?: () => void }> = ({ value, column, cell, onInspect }) => {
     const stringVal = String(value || '');
     const isAI = isAIDerivedColumn(column);
-    const { hasReasoning, value: displayValue } = isAI ? parseCellContent(stringVal) : { hasReasoning: false, value: stringVal };
+    const hasError = cell?.status === 'error';
+    
+    // Prefer displayValue if available (new Skills runner)
+    // Fallback to parseCellContent logic for legacy
+    let displayValue = cell?.displayValue || stringVal;
+    let hasReasoning = Boolean(cell?.reasoning);
+
+    if (!cell?.displayValue && isAI) {
+        // Fallback parsing for legacy free-form outputs
+        const parsed = parseCellContent(stringVal);
+        displayValue = parsed.value;
+        hasReasoning = parsed.hasReasoning;
+    }
+
+    if (hasError) {
+        displayValue = "Error"; // Or keep old value?
+    }
     
     const inner = (
         <div className={`truncate w-full px-3 text-sm flex items-center gap-2 group/cell relative h-full ${!value ? 'text-slate-300 italic' : 'text-slate-700'}`}>
-            <span className="truncate flex-1">{displayValue || stringVal || 'Empty'}</span>
-            {hasReasoning && <InfoIcon className="h-3 w-3 text-weflora-teal flex-shrink-0"/>}
+            <span className={`truncate flex-1 ${hasError ? 'text-weflora-red' : ''}`}>{displayValue || 'Empty'}</span>
+            
+            {hasReasoning && !hasError && <InfoIcon className="h-3 w-3 text-weflora-teal flex-shrink-0"/>}
+            {hasError && <AlertTriangleIcon className="h-3 w-3 text-weflora-red flex-shrink-0" title={cell?.reasoning || "Error executing skill"}/>}
             
             {/* Quick Look / Inspect Button for Primary Keys */}
             {column.isPrimaryKey && value && onInspect && (
@@ -229,12 +248,20 @@ const MatrixView: React.FC<MatrixViewProps> = ({
         setEditingCell(null);
     };
 
-    const updateRowSafe = (rowId: string, colId: string, status: 'loading' | 'success' | 'error', val?: string) => {
+    const updateRowSafe = (rowId: string, colId: string, status: 'loading' | 'success' | 'error', cellData?: Partial<MatrixCell>) => {
          const currentMatrix = activeMatrixRef.current;
          if (!currentMatrix) return;
          const newRows = currentMatrix.rows.map(r => r.id === rowId ? {
              ...r,
-             cells: { ...r.cells, [colId]: { ...r.cells[colId], columnId: colId, value: val !== undefined ? val : r.cells[colId]?.value || '', status } }
+             cells: { 
+                ...r.cells, 
+                [colId]: { 
+                    ...r.cells[colId], 
+                    columnId: colId, 
+                    status,
+                    ...cellData
+                } 
+             }
          } : r);
          onUpdateMatrix({ ...currentMatrix, rows: newRows });
     };
@@ -242,31 +269,24 @@ const MatrixView: React.FC<MatrixViewProps> = ({
     const runSingleCellAI = async (rowId: string, colId: string, promptTemplate: string, rowName: string, rowData: MatrixRow, skillConfig?: SkillConfiguration) => {
         updateRowSafe(rowId, colId, 'loading');
         
-        let prompt = promptTemplate.replace('{Row}', rowName || '');
-        const currentMatrix = activeMatrixRef.current;
-        if(currentMatrix) {
-            currentMatrix.columns.forEach(c => {
-                const cellVal = rowData.cells[c.id]?.value || '';
-                prompt = prompt.replace(`{${c.title}}`, String(cellVal));
-            });
-        }
-
-        if (skillConfig?.outputType) {
-            prompt += getFormatInstruction(skillConfig.outputType);
-        }
-
         // Resolving Context Files
         const contextFiles: File[] = [];
+        const fileNames: string[] = []; // For template promptBuilder
+
         if (skillConfig && skillConfig.attachedContextIds.length > 0) {
             // Use local projectFiles cache if available, else use resolver
             for (const fileId of skillConfig.attachedContextIds) {
                 const localFile = projectFiles?.find(f => f.id === fileId);
                 if (localFile && localFile.file) {
                     contextFiles.push(localFile.file);
+                    fileNames.push(localFile.name);
                 } else if (onResolveFile) {
                     try {
                         const resolved = await onResolveFile(fileId);
-                        if (resolved) contextFiles.push(resolved);
+                        if (resolved) {
+                            contextFiles.push(resolved);
+                            fileNames.push(resolved.name);
+                        }
                     } catch (err) {
                         console.warn(`Failed to resolve file ${fileId}`, err);
                     }
@@ -275,40 +295,130 @@ const MatrixView: React.FC<MatrixViewProps> = ({
         }
 
         try {
-            if(onRunAICell) {
-                const res = await onRunAICell(prompt, contextFiles, projectContext);
-                updateRowSafe(rowId, colId, 'success', res);
-                return true;
+            // Path 1: Locked Template (Skills DSL)
+            if (skillConfig?.templateId && SKILL_TEMPLATES[skillConfig.templateId]) {
+                const template = SKILL_TEMPLATES[skillConfig.templateId];
+                
+                // Build robust row context
+                const rowContext: Record<string, any> = { 'Entity': rowName };
+                // Add canonical columns if they exist in the matrix
+                const currentMatrix = activeMatrixRef.current;
+                if (currentMatrix) {
+                    const speciesCol = currentMatrix.columns.find(c => c.title.toLowerCase().includes('species') || c.isPrimaryKey);
+                    const cultivarCol = currentMatrix.columns.find(c => c.title.toLowerCase() === 'cultivar');
+                    const commonCol = currentMatrix.columns.find(c => c.title.toLowerCase().includes('common'));
+                    
+                    if (speciesCol) rowContext['Species'] = rowData.cells[speciesCol.id]?.value;
+                    if (cultivarCol) rowContext['Cultivar'] = rowData.cells[cultivarCol.id]?.value;
+                    if (commonCol) rowContext['Common Name'] = rowData.cells[commonCol.id]?.value;
+                    
+                    // Add all other columns too just in case
+                    currentMatrix.columns.forEach(c => {
+                         if (!rowContext[c.title]) rowContext[c.title] = rowData.cells[c.id]?.value;
+                    });
+                }
+
+                // Build params
+                const params: Record<string, any> = {};
+                template.parameters.forEach(p => {
+                    params[p.id] = skillConfig.params?.[p.id] !== undefined ? skillConfig.params[p.id] : p.defaultValue;
+                });
+
+                // Compile Prompt
+                const compiledPrompt = template.promptBuilder(rowContext, params, fileNames);
+
+                // Run Skill
+                const result = await aiService.runSkillCell({
+                    prompt: compiledPrompt,
+                    outputType: template.outputType,
+                    validator: template.validator,
+                    contextFiles: contextFiles,
+                    globalContext: projectContext,
+                    evidenceRequired: template.evidencePolicy.evidenceRequired,
+                    noGuessing: template.evidencePolicy.noGuessing
+                });
+
+                updateRowSafe(rowId, colId, result.ok ? 'success' : 'error', {
+                    value: result.rawText,
+                    displayValue: result.displayValue,
+                    reasoning: result.reasoning,
+                    normalized: result.normalized,
+                    outputType: result.outputType,
+                    provenance: {
+                        skillTemplateId: template.id,
+                        model: result.model,
+                        ranAt: new Date().toISOString(),
+                        contextFileIds: skillConfig.attachedContextIds,
+                        promptHash: result.promptHash
+                    }
+                });
+                return result.ok;
+
+            } else {
+                // Path 2: Legacy Free-Form Prompt
+                let prompt = promptTemplate.replace('{Row}', rowName || '');
+                const currentMatrix = activeMatrixRef.current;
+                if(currentMatrix) {
+                    currentMatrix.columns.forEach(c => {
+                        const cellVal = rowData.cells[c.id]?.value || '';
+                        prompt = prompt.replace(`{${c.title}}`, String(cellVal));
+                    });
+                }
+
+                if (skillConfig?.outputType) {
+                    prompt += getFormatInstruction(skillConfig.outputType);
+                }
+
+                if(onRunAICell) {
+                    const res = await onRunAICell(prompt, contextFiles, projectContext);
+                    updateRowSafe(rowId, colId, 'success', { value: res });
+                    return true;
+                }
             }
-        } catch {
-            updateRowSafe(rowId, colId, 'error');
+        } catch (e: any) {
+            console.error("Skill Execution Error", e);
+            updateRowSafe(rowId, colId, 'error', { reasoning: e.message || "Execution Failed" });
         }
         return false;
     };
 
     const handleRunAICell = async (rowId: string, colId: string) => {
         const startMatrix = activeMatrixRef.current;
-        if (!startMatrix || !onRunAICell) return;
+        if (!startMatrix) return;
         const col = startMatrix.columns.find(c => c.id === colId);
         const row = startMatrix.rows.find(r => r.id === rowId);
-        const promptTemplate = col?.skillConfig?.promptTemplate || col?.aiPrompt;
-        if (!col || !row || !promptTemplate) return;
+        
+        // Determine prompt source: legacy vs template
+        const promptTemplate = col?.skillConfig?.promptTemplate || col?.aiPrompt || '';
+        const isTemplate = !!col?.skillConfig?.templateId;
+
+        if (!col || !row) return;
+        if (!promptTemplate && !isTemplate) return;
+
         await runSingleCellAI(rowId, colId, promptTemplate, row.entityName || '', row, col.skillConfig);
     };
 
     const handleRunColumnAI = async (colId: string) => {
         const matrix = activeMatrixRef.current;
-        if (!matrix || !onRunAICell) return;
+        if (!matrix) return;
         const col = matrix.columns.find(c => c.id === colId);
-        const promptTemplate = col?.skillConfig?.promptTemplate || col?.aiPrompt;
-        if (!col || !promptTemplate) return;
+        const promptTemplate = col?.skillConfig?.promptTemplate || col?.aiPrompt || '';
+        const isTemplate = !!col?.skillConfig?.templateId;
         
+        if (!col) return;
+        if (!promptTemplate && !isTemplate) return;
+        
+        // Default Policy: Run only on empty or error cells (matching previous behavior request, though spec says "prompt user", we default to smart fill for now)
         const targetRows = matrix.rows.filter(r => {
             const cell = r.cells[colId];
             return !cell?.value || cell.status === 'error' || cell.value === '';
         });
         
-        if(targetRows.length === 0) { alert("No empty cells found."); return; }
+        if(targetRows.length === 0) { 
+            // If full, maybe ask? For now just alert.
+            alert("No empty cells found."); 
+            return; 
+        }
         
         setBatchProgress({ current: 0, total: targetRows.length });
         stopBatchRef.current = false;
@@ -407,11 +517,16 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                                                 onDoubleClick={() => {
                                                     if (!isAIDerived) return;
                                                     if (!cell) return;
-                                                    if (!(cell.citations?.length || cell.status === 'error')) return;
+                                                    // Allow inspection even if error, to see reasoning
+                                                    if (!(cell.citations?.length || cell.status === 'error' || cell.reasoning)) return;
+                                                    
+                                                    // Show panel with reasoning and raw output if error
                                                     openEvidencePanel({
                                                         label: `Column evidence • ${col.title}`,
                                                         sources: cell.citations?.map(c => c.source).filter(Boolean),
-                                                        generatedAt: new Date().toLocaleString(),
+                                                        generatedAt: cell.provenance?.ranAt || new Date().toLocaleString(),
+                                                        // Pass reasoning as a pseudo-source or description if panel supports it?
+                                                        // For now just existing behavior.
                                                     });
                                                 }}
                                             >
