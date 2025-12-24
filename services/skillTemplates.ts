@@ -75,6 +75,9 @@ export interface SkillTemplate {
   defaultUnit?: string;
   allowedPeriods?: ("day" | "week" | "month" | "year")[];
 
+  // Legacy prompt template for compatibility, or when no builder logic exists (less prioritized)
+  promptTemplate?: string;
+
   params: SkillParamDef[];
 
   buildPrompt: (args: {

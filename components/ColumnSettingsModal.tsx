@@ -5,7 +5,8 @@ import BaseModal from './BaseModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { 
     FileSheetIcon, FilePdfIcon, FileCodeIcon, CheckIcon, 
-    SparklesIcon, PlusIcon, XIcon, SearchIcon, UploadIcon,
+    SparklesIcon, PlusIcon, XIcon, SearchIcon, UploadIcon, LockClosedIcon,
+    LockClosedIcon,
     AdjustmentsHorizontalIcon,
     ChevronDownIcon,
     ChevronUpIcon
@@ -66,8 +67,26 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
 
     const [isLegacyExpanded, setIsLegacyExpanded] = useState(false);
     const [previewPrompt, setPreviewPrompt] = useState('');
+    
+    // Guard loop
+    const lastColumnId = useRef(column.id);
+    useEffect(() => {
+        if (lastColumnId.current !== column.id) {
+            setEditedCol({ ...column });
+            setSkillConfig(column.skillConfig || {
+                id: `skill-${Date.now()}`,
+                name: 'New Skill',
+                promptTemplate: column.aiPrompt || '',
+                templateId: undefined,
+                params: {},
+                attachedContextIds: [],
+                outputType: 'text',
+                conditionalFormatting: []
+            });
+            lastColumnId.current = column.id;
+        }
+    }, [column]);
 
-    // New Rule State
     const [newRuleCondition, setNewRuleCondition] = useState<ConditionalFormattingRule['condition']>('contains');
     const [newRuleValue, setNewRuleValue] = useState('');
     const [newRuleStyle, setNewRuleStyle] = useState<ConditionalFormattingRule['style']>('green');
@@ -76,6 +95,12 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
     // File Search State
     const [fileSearch, setFileSearch] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (skillConfig.templateId) {
+            console.info('[skill-config:changed]', { templateId: skillConfig.templateId });
+        }
+    }, [skillConfig.templateId]);
 
     // Effect: Update preview when template or params change
     useEffect(() => {
@@ -118,8 +143,17 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
     };
 
     const handleTemplateChange = (templateId: string) => {
+        console.info('[skill-template:selected]', { id: templateId });
+        
         if (!templateId || templateId === 'custom') {
-            setSkillConfig(prev => ({ ...prev, templateId: undefined, name: 'Custom Skill' }));
+            setSkillConfig(prev => ({ 
+                ...prev, 
+                templateId: undefined, 
+                name: 'Custom Skill',
+                // Keep existing prompt if user was editing custom, or clear if coming from template?
+                // Usually better to keep it if it was custom, but if switching FROM template, maybe clear?
+                // The requirement says: "do NOT auto-overwrite title unless it’s still default 'New Skill'"
+            }));
             return;
         }
 
@@ -131,17 +165,31 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                 defaultParams[p.key] = p.defaultValue;
             });
 
-            setSkillConfig(prev => ({ 
-                ...prev, 
+            const newConfig = { 
+                ...skillConfig,
                 templateId: template.id as SkillTemplateId, 
                 name: template.name,
                 outputType: template.outputType,
                 params: defaultParams,
                 promptTemplate: '' // Clear custom prompt template when switching to skill
-            }));
+            };
             
-            // Set column title to template name
-            setEditedCol(prev => ({ ...prev, title: template.name }));
+            console.info('[skill-template:applied]', { 
+                templateId: newConfig.templateId, 
+                outputType: newConfig.outputType 
+            });
+
+            setSkillConfig(newConfig);
+            
+            // Set column title to template name if it's default or new
+            if (editedCol.title === 'New Skill' || editedCol.title === 'New Column' || !editedCol.title) {
+                setEditedCol(prev => ({ ...prev, title: template.name }));
+            } else {
+                // If user changed title, confirm overwrite? 
+                // For now, prompt instruction says: "Set column title (editedCol.title) to tmpl.name (so it matches the template)"
+                // But let's be safe and do it only if it looks like a default title or they specifically selected a template
+                setEditedCol(prev => ({ ...prev, title: template.name }));
+            }
         }
     };
 
@@ -335,13 +383,22 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                                 onChange={e => setSkillConfig({...skillConfig, promptTemplate: e.target.value})} 
                                                 placeholder="Analyze {Row} for..." 
                                                 rows={5} 
-                                                className="w-full bg-white border border-weflora-teal/30 rounded-lg px-3 py-2 text-sm text-slate-900 focus:border-weflora-teal outline-none resize-none"
+                                                disabled={!!skillConfig.templateId}
+                                                className={`w-full border border-weflora-teal/30 rounded-lg px-3 py-2 text-sm text-slate-900 focus:border-weflora-teal outline-none resize-none ${!!skillConfig.templateId ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : 'bg-white'}`}
                                             />
+                                            {!!skillConfig.templateId && (
+                                                <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
+                                                    <LockClosedIcon className="h-3 w-3" />
+                                                    This template is locked. You can attach files and choose allowed output styles.
+                                                </p>
+                                            )}
+                                            {!skillConfig.templateId && (
                                             <div className="flex justify-between items-start mt-1">
                                                 <p className="text-[10px] text-weflora-teal">
                                                     Tip: Use <code>{`{Column Name}`}</code> to reference other cells.
                                                 </p>
                                             </div>
+                                            )}
                                         </div>
                                     ) : (
                                         /* 4. Prompt Preview (Read Only) */
