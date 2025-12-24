@@ -71,7 +71,9 @@ const ManageWorksheetPanel: React.FC<{
 
     // Skill Adder
     const handleAddSkill = (template: SkillTemplate) => {
-        if (matrix.columns.some(c => c.title === template.name)) return;
+        if (matrix.columns.some(c => c.type === 'ai' && c.skillConfig?.templateId === template.id)) return;
+        
+        console.info('[skills:add]', { matrixId: matrix.id, templateId: template.id });
 
         const defaultParams: Record<string, any> = {};
         template.parameters.forEach(p => { defaultParams[p.key] = p.defaultValue; });
@@ -232,7 +234,7 @@ const ManageWorksheetPanel: React.FC<{
                     </h3>
                     <div className="space-y-2">
                         {skillTemplatesList.map((tmpl) => {
-                            const exists = matrix.columns.some(c => c.title === tmpl.name);
+                            const exists = matrix.columns.some(c => c.type === 'ai' && c.skillConfig?.templateId === tmpl.id);
                             return (
                                 <button
                                     key={tmpl.id}

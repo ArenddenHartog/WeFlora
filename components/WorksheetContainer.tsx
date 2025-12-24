@@ -32,6 +32,7 @@ interface WorksheetContainerProps {
     projectContext?: string;
     onResolveFile?: (fileId: string) => Promise<File | null>;
     onInspectEntity?: (entityName: string) => void;
+    onActiveTabChange?: (tabId: string) => void;
 }
 
 const getExportCellContent = (cell?: MatrixCell) => {
@@ -77,6 +78,10 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
     // UI State for toggles
     const [isBookmarked, setIsBookmarked] = useState(false);
     const [pendingDeleteTabId, setPendingDeleteTabId] = useState<string | null>(null);
+
+    useEffect(() => {
+        onActiveTabChange?.(activeTabId);
+    }, [activeTabId, onActiveTabChange]);
 
     useEffect(() => {
         if (!worksheetDoc.tabs.find(t => t.id === activeTabId) && worksheetDoc.tabs.length > 0) {
