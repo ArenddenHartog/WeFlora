@@ -520,13 +520,18 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                                                     // Allow inspection even if error, to see reasoning
                                                     if (!(cell.citations?.length || cell.status === 'error' || cell.reasoning)) return;
                                                     
-                                                    // Show panel with reasoning and raw output if error
+                                                    // Show panel with reasoning and rich provenance
                                                     openEvidencePanel({
-                                                        label: `Column evidence • ${col.title}`,
+                                                        label: `Skill Evidence • ${col.title}`,
                                                         sources: cell.citations?.map(c => c.source).filter(Boolean),
                                                         generatedAt: cell.provenance?.ranAt || new Date().toLocaleString(),
-                                                        // Pass reasoning as a pseudo-source or description if panel supports it?
-                                                        // For now just existing behavior.
+                                                        // Pass extended fields to panel
+                                                        reasoning: cell.reasoning,
+                                                        displayValue: cell.displayValue,
+                                                        outputType: cell.outputType,
+                                                        templateId: cell.provenance?.skillTemplateId,
+                                                        model: cell.provenance?.model,
+                                                        promptHash: cell.provenance?.promptHash,
                                                     });
                                                 }}
                                             >

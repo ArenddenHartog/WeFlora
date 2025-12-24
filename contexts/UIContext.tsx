@@ -18,6 +18,13 @@ export type EvidenceProvenance = {
     label: string;
     sources?: string[];
     generatedAt?: string;
+    // Extended fields for Skills DSL
+    reasoning?: string;
+    displayValue?: string;
+    outputType?: string;
+    templateId?: string;
+    model?: string;
+    promptHash?: string;
 };
 
 interface UIContextType {
