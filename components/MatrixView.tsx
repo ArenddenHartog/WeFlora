@@ -98,7 +98,7 @@ const ColumnHeader: React.FC<any> = ({ column, onUpdate, onDelete, onRunColumnAI
     return (
         <div className={`flex-shrink-0 border-r border-b text-left relative group select-none flex items-center justify-between px-3 py-2 h-10 transition-colors ${
             isAIDerivedColumn(column)
-                ? 'bg-weflora-teal/5 border-weflora-teal/20 hover:bg-weflora-teal/10'
+                ? 'bg-weflora-teal/10 border-weflora-teal/20 hover:bg-weflora-teal/20 ring-inset ring-1 ring-weflora-teal/20'
                 : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
         }`} style={{ width: column.width }}>
             <div className="flex items-center gap-2 truncate font-bold text-sm text-slate-700">{column.title}</div>
@@ -500,6 +500,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                                         const cell = row.cells[col.id];
                                         const isEditing = editingCell?.rowId === row.id && editingCell?.colId === col.id;
                                         const isProcessing = cell?.status === 'loading';
+                                        const isError = cell?.status === 'error';
                                         const isAIDerived = isAIDerivedColumn(col);
                                         
                                         // AUTOCOMPLETE LOGIC: Check if this is a species column
@@ -509,23 +510,24 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                                         return (
                                             <div
                                                 key={col.id}
-                                                className={`border-r border-slate-100 relative p-0 transition-colors ${
-                                                    isEditing ? 'z-10 ring-2 ring-weflora-teal' : ''
-                                                } ${isAIDerived && !isEditing ? 'bg-weflora-teal/5 hover:bg-weflora-teal/10 hover:ring-1 hover:ring-weflora-teal/20' : ''}`}
+                                                className={`border-r border-slate-100 relative p-0 transition-colors 
+                                                    ${isEditing ? 'z-10 ring-2 ring-weflora-teal' : ''} 
+                                                    ${isAIDerived && !isEditing 
+                                                        ? (isError ? 'bg-red-50 hover:bg-red-100 hover:ring-1 hover:ring-red-200' : 'bg-weflora-teal/10 hover:bg-weflora-teal/20 hover:ring-1 hover:ring-weflora-teal/20')
+                                                        : ''
+                                                    }
+                                                `}
                                                 style={{ width: col.width }}
                                                 onClick={() => !isProcessing && setEditingCell({ rowId: row.id, colId: col.id })}
                                                 onDoubleClick={() => {
                                                     if (!isAIDerived) return;
                                                     if (!cell) return;
-                                                    // Allow inspection even if error, to see reasoning
                                                     if (!(cell.citations?.length || cell.status === 'error' || cell.reasoning)) return;
                                                     
-                                                    // Show panel with reasoning and rich provenance
                                                     openEvidencePanel({
                                                         label: `Skill Evidence • ${col.title}`,
                                                         sources: cell.citations?.map(c => c.source).filter(Boolean),
                                                         generatedAt: cell.provenance?.ranAt || new Date().toLocaleString(),
-                                                        // Pass extended fields to panel
                                                         reasoning: cell.reasoning,
                                                         displayValue: cell.displayValue,
                                                         outputType: cell.outputType,
