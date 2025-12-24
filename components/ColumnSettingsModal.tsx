@@ -87,7 +87,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
             // Build params with defaults + overrides
             const params: Record<string, any> = {};
             template.parameters.forEach(p => {
-                params[p.id] = skillConfig.params?.[p.id] !== undefined ? skillConfig.params[p.id] : p.defaultValue;
+                params[p.key] = skillConfig.params?.[p.key] !== undefined ? skillConfig.params[p.key] : p.defaultValue;
             });
 
             try {
@@ -128,7 +128,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
             // Initialize params with defaults
             const defaultParams: Record<string, any> = {};
             template.parameters.forEach(p => {
-                defaultParams[p.id] = p.defaultValue;
+                defaultParams[p.key] = p.defaultValue;
             });
 
             setSkillConfig(prev => ({ 
@@ -289,14 +289,14 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                         <div className="bg-white border border-weflora-teal/20 rounded-lg p-3 space-y-3">
                                             <h4 className="text-xs font-bold text-weflora-teal uppercase tracking-wide mb-2">Parameters</h4>
                                             {selectedTemplate.parameters.map(param => (
-                                                <div key={param.id}>
+                                                <div key={param.key}>
                                                     <label className="block text-xs font-medium text-slate-700 mb-1">
                                                         {param.label} {param.required && <span className="text-red-400">*</span>}
                                                     </label>
                                                     {param.type === 'select' ? (
                                                         <select
-                                                            value={skillConfig.params?.[param.id] || param.defaultValue || ''}
-                                                            onChange={(e) => handleParamChange(param.id, e.target.value)}
+                                                            value={skillConfig.params?.[param.key] || param.defaultValue || ''}
+                                                            onChange={(e) => handleParamChange(param.key, e.target.value)}
                                                             className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 bg-slate-50 focus:bg-white outline-none focus:border-weflora-teal"
                                                         >
                                                             {param.options?.map(opt => (
@@ -306,8 +306,8 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                                     ) : (
                                                         <input
                                                             type={param.type === 'number' ? 'number' : 'text'}
-                                                            value={skillConfig.params?.[param.id] || param.defaultValue || ''}
-                                                            onChange={(e) => handleParamChange(param.id, e.target.value)}
+                                                            value={skillConfig.params?.[param.key] || param.defaultValue || ''}
+                                                            onChange={(e) => handleParamChange(param.key, e.target.value)}
                                                             className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 bg-slate-50 focus:bg-white outline-none focus:border-weflora-teal"
                                                         />
                                                     )}

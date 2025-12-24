@@ -1,5 +1,7 @@
 import React from 'react';
-import { SkillTemplateId, SkillOutputType } from './services/skillTemplates';
+import type { SkillTemplateId } from './services/skillTemplates';
+
+export type SkillOutputType = 'text' | 'badge' | 'score' | 'currency' | 'quantity' | 'enum' | 'range';
 
 export interface User {
   name: string;
@@ -261,7 +263,7 @@ export interface SkillConfiguration {
     requiredColumnIds?: string[]; // e.g. This skill needs 'DBH' and 'Species' to work
     
     // The "Output" (Visuals)
-    outputType: 'text' | 'badge' | 'score' | 'currency';
+    outputType: SkillOutputType;
     outputConfig?: {
         badgeColors?: { [key: string]: string }; // Legacy support
     };
