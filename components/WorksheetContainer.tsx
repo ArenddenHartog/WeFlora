@@ -32,7 +32,7 @@ interface WorksheetContainerProps {
     projectContext?: string;
     onResolveFile?: (fileId: string) => Promise<File | null>;
     onInspectEntity?: (entityName: string) => void;
-    onActiveTabChange?: (tabId: string) => void;
+    onActiveTabChange?: (matrixId: string) => void;
 }
 
 const getExportCellContent = (cell?: MatrixCell) => {
@@ -57,7 +57,7 @@ const getExportCellContent = (cell?: MatrixCell) => {
 };
 
 const WorksheetContainer: React.FC<WorksheetContainerProps> = ({ 
-    document: worksheetDoc, initialActiveTabId, onUpdateDocument, onRunAICell, onAnalyze, speciesList, onClose, onOpenManage, onOpenAssistant, assistantActive, onActiveMatrixIdChange, projectFiles, onUpload, projectContext, onResolveFile, onInspectEntity
+    document: worksheetDoc, initialActiveTabId, onUpdateDocument, onRunAICell, onAnalyze, speciesList, onClose, onOpenManage, onOpenAssistant, assistantActive, onActiveMatrixIdChange, projectFiles, onUpload, projectContext, onResolveFile, onInspectEntity, onActiveTabChange
 }) => {
     const { showNotification } = useUI();
     const [activeTabId, setActiveTabId] = useState<string>(initialActiveTabId || worksheetDoc.tabs[0]?.id || '');
