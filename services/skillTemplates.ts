@@ -1,4 +1,4 @@
-import { MatrixRow } from '../types';
+import { validators, CanonicalResponse } from './skills/validators';
 
 // -- Types --
 
@@ -19,13 +19,7 @@ export interface SkillEvidencePolicy {
   noGuessing?: boolean;
 }
 
-export interface SkillValidationResult {
-  displayValue: string;
-  reasoning: string;
-  raw: string;
-  status: 'success' | 'error';
-  normalized?: any;
-}
+export type SkillValidationResult = CanonicalResponse;
 
 export type SkillPromptBuilder = (
   rowContext: Record<string, any>, // Key-value pairs of the row data (e.g. { "Species": "Oak" })
@@ -62,33 +56,6 @@ export type SkillTemplateId =
   | 'maintenance-schedule'
   | 'recommended-alternative';
 
-// -- Helper for mocked validation (since we don't have a real LLM here) --
-// In a real scenario, the LLM output would be parsed. 
-// Here we define what we expect the LLM to output (usually a structured string or JSON).
-// For this scaffold, we'll assume the LLM returns JSON or a specific format we can parse.
-const jsonValidator = (output: string): SkillValidationResult => {
-  try {
-    // Attempt to parse standard JSON output format: { "value": "...", "reasoning": "..." }
-    // Robustness: Handle code blocks if present
-    const cleanOutput = output.replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleanOutput);
-    return {
-      displayValue: String(parsed.value || parsed.displayValue || ''),
-      reasoning: parsed.reasoning || '',
-      raw: output,
-      status: 'success',
-      normalized: parsed.value
-    };
-  } catch (e) {
-    return {
-      displayValue: 'Error',
-      reasoning: 'Failed to parse model output',
-      raw: output,
-      status: 'error'
-    };
-  }
-};
-
 // -- Registry --
 
 export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
@@ -115,9 +82,9 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     promptBuilder: (row, params, files) => `
       Check if "${row['Entity'] || 'this item'}" complies with ${params.standard}.
       Reference these documents if relevant: ${files.join(', ')}.
-      Return JSON: { "value": "Compliant" | "Non-Compliant" | "Needs Review", "reasoning": "..." }
+      Format: "Compliant" | "Non-Compliant" | "Needs Review" — reason
     `,
-    validator: jsonValidator
+    validator: (output) => validators.badge(output, ['Compliant', 'Non-Compliant', 'Needs Review'])
   },
 
   'water-demand': {
@@ -132,19 +99,9 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     parameters: [],
     promptBuilder: (row, params, files) => `
       Estimate the annual water demand for "${row['Entity'] || 'this item'}".
-      Return JSON: { "value": number, "unit": "gal/year", "reasoning": "..." }
+      Format: N gal/year — reason
     `,
-    validator: (output) => {
-        const res = jsonValidator(output);
-        if (res.status === 'success') {
-            // refined validation for quantity
-            return {
-                ...res,
-                displayValue: `${res.normalized} gal/year` // Simplified for scaffold
-            };
-        }
-        return res;
-    }
+    validator: (output) => validators.quantity(output, ['gal/year', 'L/year', 'gal/week'])
   },
 
   'heat-resilience': {
@@ -157,9 +114,9 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     parameters: [],
     promptBuilder: (row, params, files) => `
       Rate the heat resilience of "${row['Entity'] || 'this item'}" on a scale of 0-100.
-      Return JSON: { "value": number, "reasoning": "..." }
+      Format: NN/100 — reason
     `,
-    validator: jsonValidator
+    validator: (output) => validators.score(output)
   },
 
   'pest-susceptibility': {
@@ -173,9 +130,9 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     parameters: [],
     promptBuilder: (row, params, files) => `
       Determine the pest susceptibility (High, Medium, Low) for "${row['Entity'] || 'this item'}".
-      Return JSON: { "value": "High" | "Medium" | "Low", "reasoning": "..." }
+      Format: High|Medium|Low — reason
     `,
-    validator: jsonValidator
+    validator: (output) => validators.enum(output, ['High', 'Medium', 'Low'])
   },
 
   'native-invasive-status': {
@@ -196,9 +153,9 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     ],
     promptBuilder: (row, params, files) => `
       Is "${row['Entity'] || 'this item'}" Native or Invasive in ${params.region}?
-      Return JSON: { "value": "Native" | "Invasive" | "Introduced", "reasoning": "..." }
+      Format: Native|Invasive|Introduced — reason
     `,
-    validator: jsonValidator
+    validator: (output) => validators.badge(output, ['Native', 'Invasive', 'Introduced'])
   },
 
   'maintenance-cost': {
@@ -212,15 +169,11 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     parameters: [],
     promptBuilder: (row, params, files) => `
       Estimate the annual maintenance cost for "${row['Entity'] || 'this item'}".
-      Return JSON: { "value": number, "currency": "USD", "reasoning": "..." }
+      Format: €NNN — reason (Convert to EUR if needed)
     `,
-    validator: (output) => {
-         const res = jsonValidator(output);
-         if (res.status === 'success') {
-             return { ...res, displayValue: `$${res.normalized}` };
-         }
-         return res;
-    }
+    // Previous scaffold used USD, but new requirement says "support € only for now". 
+    // I will switch this template to EUR as per the "currency" validator requirement.
+    validator: (output) => validators.currency(output)
   },
 
   'maintenance-schedule': {
@@ -234,9 +187,9 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     parameters: [],
     promptBuilder: (row, params, files) => `
       Recommend a maintenance schedule for "${row['Entity'] || 'this item'}".
-      Return JSON: { "value": "Weekly" | "Monthly" | "Quarterly" | "Annually", "reasoning": "..." }
+      Format: Weekly|Monthly|Quarterly|Annually — reason
     `,
-    validator: jsonValidator
+    validator: (output) => validators.enum(output, ['Weekly', 'Monthly', 'Quarterly', 'Annually'])
   },
 
   'recommended-alternative': {
@@ -257,16 +210,16 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     ],
     promptBuilder: (row, params, files) => `
       Suggest an alternative to "${row['Entity'] || 'this item'}" that is better for ${params.criteria}.
-      Return JSON: { "value": "Species Name", "reasoning": "..." }
+      Format: Species Name — reason
     `,
-    validator: jsonValidator
+    validator: (output) => validators.text(output)
   }
 };
 
 // -- Smoke Test --
 
 export function runSmokeTest() {
-  console.info('Starting Skill Templates Smoke Test...');
+  console.info('Starting Skill Templates Smoke Test (Strict Validators)...');
   
   const mockRow = { 'Entity': 'Quercus virginiana' };
   const mockFiles = ['specs.pdf'];
@@ -286,17 +239,30 @@ export function runSmokeTest() {
     const prompt = template.promptBuilder(mockRow, defaultParams, mockFiles);
     console.info('Generated Prompt Preview:', prompt.trim().substring(0, 100) + '...');
     
-    // 3. Test Validator with Mock Output
-    const mockOutput = JSON.stringify({ 
-        value: template.allowedEnums ? template.allowedEnums[0] : (template.outputType === 'score' ? 85 : (template.outputType === 'currency' ? 100 : 'Sample Value')),
-        reasoning: 'This is a test reasoning.'
-    });
-    
+    // 3. Test Validator with Correctly Formatted Mock Output
+    let mockOutput = "";
+    if (template.outputType === 'badge') {
+        mockOutput = "Compliant — This meets the zoning code.";
+        if (template.id === 'native-invasive-status') mockOutput = "Native — It is native to NA.";
+    } else if (template.outputType === 'quantity') {
+        mockOutput = "1500 gal/year — Based on typical usage.";
+    } else if (template.outputType === 'score') {
+        mockOutput = "85/100 — High heat tolerance.";
+    } else if (template.outputType === 'enum') {
+        mockOutput = (template.allowedEnums?.[0] || 'Val') + " — Because of reasons.";
+    } else if (template.outputType === 'currency') {
+        mockOutput = "€120 — Annual trimming cost.";
+    } else if (template.outputType === 'text') {
+        mockOutput = "Quercus fusiformis — Better drought tolerance.";
+    }
+
     const validationResult = template.validator(mockOutput);
-    console.info('Validation Result:', validationResult.status, validationResult.displayValue);
+    console.info('Validation Result:', validationResult.ok ? 'OK' : 'FAIL', validationResult.displayValue || validationResult.error);
     
-    if (validationResult.status === 'error') {
-        console.error('Validation Failed!', validationResult);
+    if (!validationResult.ok) {
+        console.error('Validation Error Details:', validationResult);
+    } else {
+        console.info('Normalized:', JSON.stringify(validationResult.normalized));
     }
 
     console.groupEnd();
