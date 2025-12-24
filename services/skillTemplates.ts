@@ -61,6 +61,7 @@ export interface SkillTemplate {
   description: string;
   category: "Compliance" | "Resilience" | "Maintenance" | "Carbon" | "Siting" | "Recommendations";
   outputType: SkillOutputType;
+  allowedOutputTypes?: SkillOutputType[];
 
   // Policy/evidence controls:
   evidenceRequired?: boolean; // if true and missing evidence => Insufficient Data
@@ -84,6 +85,10 @@ export interface SkillTemplate {
   }) => string;
 
   validate: (raw: string, params: Record<string, any>) => SkillValidationResult;
+}
+
+export function getSkillTemplate(id: string): SkillTemplate | undefined {
+  return SKILL_TEMPLATES[id as SkillTemplateId];
 }
 
 export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
@@ -329,3 +334,5 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     validate: (raw) => validateText(raw)
   }
 };
+
+export const SKILL_TEMPLATE_MAP = new Map(Object.values(SKILL_TEMPLATES).map(t => [t.id, t]));

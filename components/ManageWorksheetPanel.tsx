@@ -8,6 +8,7 @@ import {
 } from './icons';
 import ColumnSettingsModal from './ColumnSettingsModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import { SKILL_TEMPLATES, SkillTemplate } from '../services/skillTemplates';
 
 const ManageWorksheetPanel: React.FC<{
     matrix?: Matrix;
@@ -81,7 +82,8 @@ const ManageWorksheetPanel: React.FC<{
             templateId: template.id,
             params: defaultParams,
             attachedContextIds: [], // User can add later in modal
-            outputType: template.outputType
+            outputType: template.outputType,
+            promptTemplate: '' // Legacy requirement
         };
 
         const newCol: MatrixColumn = {

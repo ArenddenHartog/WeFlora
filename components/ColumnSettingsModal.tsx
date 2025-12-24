@@ -10,7 +10,7 @@ import {
     ChevronDownIcon,
     ChevronUpIcon
 } from './icons';
-import { SKILL_TEMPLATES, SkillTemplateId, SkillTemplate } from '../services/skillTemplates';
+import { SKILL_TEMPLATES, SkillTemplateId, SkillTemplate, getSkillTemplate } from '../services/skillTemplates';
 
 interface ColumnSettingsModalProps {
     column: MatrixColumn;
@@ -118,12 +118,12 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
     };
 
     const handleTemplateChange = (templateId: string) => {
-        if (!templateId) {
+        if (!templateId || templateId === 'custom') {
             setSkillConfig(prev => ({ ...prev, templateId: undefined, name: 'Custom Skill' }));
             return;
         }
 
-        const template = SKILL_TEMPLATES[templateId as SkillTemplateId];
+        const template = getSkillTemplate(templateId);
         if (template) {
             // Initialize params with defaults
             const defaultParams: Record<string, any> = {};
@@ -133,10 +133,11 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
 
             setSkillConfig(prev => ({ 
                 ...prev, 
-                templateId: templateId as SkillTemplateId, 
+                templateId: template.id as SkillTemplateId, 
                 name: template.name,
                 outputType: template.outputType,
-                params: defaultParams
+                params: defaultParams,
+                promptTemplate: '' // Clear custom prompt template when switching to skill
             }));
             
             // Set column title to template name
@@ -155,9 +156,6 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
     };
 
     const handleFormatChange = (newFormat: string) => {
-        // If template is locked, ignore format change requests from UI (though UI should disable it)
-        if (skillConfig.templateId) return;
-
         setSkillConfig(prev => ({ ...prev, outputType: newFormat as any }));
     };
 
@@ -273,11 +271,11 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                     <div>
                                         <label className="block text-xs font-bold text-weflora-dark mb-1">Skill Template</label>
                                         <select 
-                                            value={skillConfig.templateId || ''} 
+                                            value={skillConfig.templateId || 'custom'} 
                                             onChange={(e) => handleTemplateChange(e.target.value)}
                                             className="w-full bg-white border border-weflora-teal/30 rounded-lg px-3 py-2 text-sm text-slate-900 focus:border-weflora-teal outline-none"
                                         >
-                                            <option value="">-- Custom Skill --</option>
+                                            <option value="custom">-- Custom Skill --</option>
                                             {Object.values(SKILL_TEMPLATES).map(t => (
                                                 <option key={t.id} value={t.id}>{t.name}</option>
                                             ))}
@@ -447,16 +445,23 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                         <select 
                                             value={skillConfig.outputType} 
                                             onChange={(e) => handleFormatChange(e.target.value)}
-                                            disabled={!!skillConfig.templateId}
-                                            className={`w-full border border-weflora-teal/30 rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:border-weflora-teal outline-none bg-white ${skillConfig.templateId ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                            className="w-full border border-weflora-teal/30 rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:border-weflora-teal outline-none bg-white"
                                         >
-                                            {FORMAT_OPTIONS.map(opt => (
-                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                            {FORMAT_OPTIONS.filter(opt => {
+                                                if (!selectedTemplate) return true;
+                                                const allowed = selectedTemplate.allowedOutputTypes || [selectedTemplate.outputType];
+                                                // Always include the current default output type of the template even if not explicit in allowed list (safety)
+                                                if (!allowed.includes(selectedTemplate.outputType)) allowed.push(selectedTemplate.outputType);
+                                                return allowed.includes(opt.value as any);
+                                            }).map(opt => (
+                                                <option key={opt.value} value={opt.value}>
+                                                    {opt.label}
+                                                    {selectedTemplate && selectedTemplate.outputType === opt.value ? ' (default)' : ''}
+                                                </option>
                                             ))}
                                         </select>
                                         <p className="text-[10px] text-slate-500 mt-1">
                                             {activeFormat?.description}
-                                            {skillConfig.templateId && <span className="ml-1 text-weflora-teal">(Locked by Template)</span>}
                                         </p>
                                     </div>
 
