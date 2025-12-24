@@ -138,6 +138,9 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                 outputType: template.outputType,
                 params: defaultParams
             }));
+            
+            // Set column title to template name
+            setEditedCol(prev => ({ ...prev, title: template.name }));
         }
     };
 
@@ -457,69 +460,6 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                         </p>
                                     </div>
 
-                                    {/* 2. Visual Rules Engine */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-weflora-dark mb-2">Visual Rules (Conditional Formatting)</label>
-                                        <div className="space-y-2 mb-3">
-                                            {skillConfig.conditionalFormatting?.map((rule, idx) => (
-                                                <div key={rule.id} className="flex items-center gap-2 text-xs bg-weflora-mint/20 p-2 rounded border border-weflora-teal/20">
-                                                    <span className="text-weflora-teal font-mono text-[10px] w-4">{idx + 1}.</span>
-                                                    <span className="text-slate-600">If</span>
-                                                    <span className="font-bold text-slate-800 capitalize">{rule.condition.replace('_', ' ')}</span>
-                                                    <span className="bg-white px-1.5 py-0.5 rounded border border-weflora-teal/30 text-slate-800 font-mono max-w-[80px] truncate" title={rule.value}>"{rule.value}"</span>
-                                                    <span className="text-slate-600">then</span>
-                                                    <div className={`w-4 h-4 rounded-full ${COLORS.find(c => c.value === rule.style)?.bg}`}></div>
-                                                    <button
-                                                        onClick={() => handleRemoveRule(rule.id)}
-                                                        className="ml-auto h-8 w-8 flex items-center justify-center cursor-pointer text-slate-400 hover:text-weflora-red hover:bg-weflora-red/10 rounded"
-                                                        title="Delete rule"
-                                                    >
-                                                        <XIcon className="h-3.5 w-3.5" />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                            {(!skillConfig.conditionalFormatting || skillConfig.conditionalFormatting.length === 0) && (
-                                                <div className="text-[10px] text-slate-400 italic p-2 border border-dashed border-slate-200 rounded text-center">
-                                                    No rules defined. Default AI coloring will be used.
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Rule Builder Form */}
-                                        <div className="flex items-center gap-2 p-2 bg-white border border-weflora-teal/30 rounded-lg shadow-sm">
-                                            <select 
-                                                value={newRuleCondition}
-                                                onChange={(e) => setNewRuleCondition(e.target.value as any)}
-                                                className="text-xs border border-slate-200 rounded px-1 py-1.5 bg-white text-slate-900 outline-none w-24"
-                                            >
-                                                {CONDITIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                                            </select>
-                                            <input 
-                                                type="text" 
-                                                placeholder="Value..." 
-                                                value={newRuleValue}
-                                                onChange={(e) => setNewRuleValue(e.target.value)}
-                                                className="flex-1 text-xs border border-slate-200 bg-white text-slate-900 rounded px-2 py-1.5 outline-none"
-                                            />
-                                            <div className="flex gap-1">
-                                                {COLORS.map(c => (
-                                                    <button 
-                                                        key={c.value}
-                                                        onClick={() => setNewRuleStyle(c.value as any)}
-                                                        className={`w-5 h-5 rounded-full ${c.bg} ${newRuleStyle === c.value ? 'ring-2 ring-weflora-teal ring-offset-1' : 'opacity-60 hover:opacity-100'}`}
-                                                        title={c.value}
-                                                    />
-                                                ))}
-                                            </div>
-                                            <button 
-                                                onClick={handleAddRule}
-                                                disabled={!newRuleValue.trim()}
-                                                className="p-1.5 bg-weflora-teal text-white rounded hover:bg-weflora-dark disabled:opacity-50"
-                                            >
-                                                <PlusIcon className="h-3.5 w-3.5" />
-                                            </button>
-                                        </div>
-                                    </div>
                                 </div>
                             )}
                         </div>

@@ -8,7 +8,7 @@ import {
     GripVerticalIcon, MaximizeIcon, DownloadIcon, BookmarkIcon, HistoryIcon, ArrowUpIcon, EyeOffIcon, SearchIcon, MagicWandIcon, UploadIcon,
     LightningBoltIcon, InfoIcon, StarFilledIcon, CheckIcon, AlertTriangleIcon, PencilIcon, SettingsIcon, SlidersIcon,
     CopyIcon, FileTextIcon, AdjustmentsHorizontalIcon, LayoutGridIcon, LeafIcon,
-    PlayIcon
+    PlayIcon, TrashIcon, KeyIcon
 } from './icons';
 import BaseModal from './BaseModal';
 import { aiService } from '../services/aiService';
@@ -94,52 +94,66 @@ const parseCellContent = (text: string) => {
     };
 };
 
-// --- ColumnHeader: Enhanced with Run Button ---
+// --- ColumnHeader: Enhanced with Run Button & Smart Menu ---
 const ColumnHeader: React.FC<any> = ({ column, onUpdate, onDelete, onRunColumnAI, onEditSettings }) => {
-    const buttonRef = useRef(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [menuPos, setMenuPos] = useState<{top: number, left: number} | null>(null);
-    const runBtnRef = useRef<HTMLButtonElement>(null);
+    const optionsBtnRef = useRef<HTMLButtonElement>(null);
 
-    const handleRunClick = (e: React.MouseEvent) => {
+    const handleOptionsClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (runBtnRef.current) {
-            const rect = runBtnRef.current.getBoundingClientRect();
-            setMenuPos({ top: rect.bottom + 5, left: rect.left });
+        if (optionsBtnRef.current) {
+            const rect = optionsBtnRef.current.getBoundingClientRect();
+            setMenuPos({ top: rect.bottom + 5, left: rect.left - 100 }); 
             setIsMenuOpen(!isMenuOpen);
         }
     };
 
     const isAI = isAIDerivedColumn(column);
 
+    const handleMenuAction = (action: string) => {
+        setIsMenuOpen(false);
+        switch(action) {
+            case 'run_all': onRunColumnAI(column.id, 'all'); break;
+            case 'run_pending': onRunColumnAI(column.id, 'fill_empty'); break;
+            case 'settings': onEditSettings(column.id); break;
+            case 'hide': onUpdate({...column, visible: false}); break;
+            case 'set_key': onUpdate({...column, isPrimaryKey: !column.isPrimaryKey}); break;
+            case 'delete': onDelete(column.id); break;
+        }
+    };
+
     return (
         <div className={`flex-shrink-0 border-r border-b text-left relative group select-none flex items-center justify-between px-3 py-2 h-10 transition-colors ${
             isAI
-                ? 'bg-weflora-teal/10 border-weflora-teal/20 hover:bg-weflora-teal/20 ring-inset ring-1 ring-weflora-teal/20'
+                ? 'bg-weflora-teal/20 border-weflora-teal/30 hover:bg-weflora-teal/30 ring-inset ring-1 ring-weflora-teal/30'
                 : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
         }`} style={{ width: column.width }}>
-            <div className="flex items-center gap-2 truncate font-bold text-sm text-slate-700 overflow-hidden">
+            <div className="flex items-center gap-2 truncate font-bold text-sm text-slate-700 overflow-hidden flex-1">
                 {column.title}
-                {isAI && <SparklesIcon className="h-3 w-3 text-weflora-teal flex-shrink-0" />}
+                {column.isPrimaryKey && <LeafIcon className="h-3 w-3 text-weflora-teal" />}
             </div>
             
-            <div className="flex items-center opacity-0 group-hover:opacity-100 transition-all">
+            <div className="flex items-center">
                 {isAI && (
                     <button 
-                        ref={runBtnRef}
-                        onClick={handleRunClick}
-                        className="p-1 rounded hover:bg-weflora-mint/30 text-weflora-teal mr-1"
-                        title="Run Options"
+                        onClick={(e) => { e.stopPropagation(); onRunColumnAI(column.id, 'fill_empty'); }}
+                        className="p-1 rounded hover:bg-weflora-mint/50 text-weflora-teal mr-1 flex items-center justify-center transition-colors"
+                        title="Run FloraGPT (Fill Empty)"
                     >
                         <PlayIcon className="h-3.5 w-3.5" />
                     </button>
                 )}
-                <button ref={buttonRef} onClick={() => { onEditSettings(column.id); }} className="p-1 rounded hover:bg-slate-200 text-slate-400">
+                
+                <button 
+                    ref={optionsBtnRef} 
+                    onClick={handleOptionsClick} 
+                    className={`p-1 rounded hover:bg-black/5 text-slate-400 ${isAI ? 'hover:text-weflora-teal' : 'hover:text-slate-600'} ${!isMenuOpen ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'} transition-all`}
+                >
                     <MoreHorizontalIcon className="h-4 w-4" />
                 </button>
             </div>
 
-            {/* Run Options Menu */}
             {isMenuOpen && menuPos && createPortal(
                 <>
                     <div className="fixed inset-0 z-[9998]" onClick={() => setIsMenuOpen(false)} />
@@ -147,31 +161,31 @@ const ColumnHeader: React.FC<any> = ({ column, onUpdate, onDelete, onRunColumnAI
                         className="fixed bg-white border border-slate-200 shadow-xl rounded-lg z-[9999] flex flex-col w-48 overflow-hidden animate-fadeIn"
                         style={{ top: menuPos.top, left: menuPos.left }}
                     >
-                        <button 
-                            onClick={() => { onRunColumnAI(column.id, 'fill_empty'); setIsMenuOpen(false); }}
-                            className="flex items-center gap-2 w-full text-left px-4 py-2 text-xs hover:bg-slate-50 text-slate-700"
-                        >
-                            <SparklesIcon className="h-3 w-3 text-weflora-teal" />
-                            Run Pending Only
+                        {isAI && (
+                            <>
+                                <button onClick={() => handleMenuAction('run_pending')} className="flex items-center gap-2 w-full text-left px-4 py-2 text-xs hover:bg-slate-50 text-slate-700">
+                                    <PlayIcon className="h-3 w-3 text-weflora-teal" /> Run FloraGPT
+                                </button>
+                                <div className="border-t border-slate-100 my-1"></div>
+                            </>
+                        )}
+                        
+                        <button onClick={() => handleMenuAction('settings')} className="flex items-center gap-2 w-full text-left px-4 py-2 text-xs hover:bg-slate-50 text-slate-700">
+                            <SettingsIcon className="h-3 w-3 text-slate-400" /> {isAI ? 'Configure Skill' : 'Column Settings'}
                         </button>
-                        <button 
-                            onClick={() => { onRunColumnAI(column.id, 'retry_failed'); setIsMenuOpen(false); }}
-                            className="flex items-center gap-2 w-full text-left px-4 py-2 text-xs hover:bg-slate-50 text-slate-700"
-                        >
-                            <RefreshIcon className="h-3 w-3 text-amber-500" />
-                            Retry Failed
+                        
+                        <button onClick={() => handleMenuAction('set_key')} className="flex items-center gap-2 w-full text-left px-4 py-2 text-xs hover:bg-slate-50 text-slate-700">
+                            <KeyIcon className="h-3 w-3 text-slate-400" /> {column.isPrimaryKey ? 'Unset Key' : 'Set as Key'}
                         </button>
-                        <button 
-                            onClick={() => { 
-                                if (window.confirm("This will overwrite all existing values in this column. Continue?")) {
-                                    onRunColumnAI(column.id, 'all'); 
-                                }
-                                setIsMenuOpen(false); 
-                            }}
-                            className="flex items-center gap-2 w-full text-left px-4 py-2 text-xs hover:bg-slate-50 text-slate-700 border-t border-slate-100"
-                        >
-                            <PlayIcon className="h-3 w-3 text-slate-400" />
-                            Run All (Overwrite)
+
+                        <button onClick={() => handleMenuAction('hide')} className="flex items-center gap-2 w-full text-left px-4 py-2 text-xs hover:bg-slate-50 text-slate-700">
+                            <EyeOffIcon className="h-3 w-3 text-slate-400" /> Hide Column
+                        </button>
+
+                        <div className="border-t border-slate-100 my-1"></div>
+
+                        <button onClick={() => handleMenuAction('delete')} className="flex items-center gap-2 w-full text-left px-4 py-2 text-xs hover:bg-weflora-red/10 text-weflora-red">
+                            <TrashIcon className="h-3 w-3" /> Delete Column
                         </button>
                     </div>
                 </>,
@@ -317,7 +331,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
         }
     }, []);
 
-    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => { setScrollTop(e.currentTarget.scrollTop); if(headerRef.current) headerRef.current.scrollLeft = e.currentTarget.scrollLeft; };
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => { setScrollTop(e.currentTarget.scrollTop); };
     
     const handleAddColumnClick = (e: React.MouseEvent) => { 
         e.stopPropagation(); 
@@ -457,7 +471,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                 // Params
                 const params: Record<string, any> = {};
                 template.parameters.forEach(p => {
-                    params[p.id] = skillConfig.params?.[p.id] !== undefined ? skillConfig.params[p.id] : p.defaultValue;
+                    params[p.key] = skillConfig.params?.[p.key] !== undefined ? skillConfig.params[p.key] : p.defaultValue;
                 });
 
                 const compiledPrompt = template.promptBuilder(rowContext, params, fileNames);
@@ -608,15 +622,18 @@ const MatrixView: React.FC<MatrixViewProps> = ({
         stopBatchRef.current = false;
     };
 
+    // ... rest of logic
+    const HEADER_HEIGHT = 40;
     const visibleColumns = activeMatrix?.columns.filter(c => c.visible !== false) || [];
     const totalRows = activeMatrix?.rows.length || 0;
-    const totalHeight = totalRows * ROW_HEIGHT + ROW_HEIGHT; 
+    const totalHeight = totalRows * ROW_HEIGHT; 
     const totalWidth = 40 + visibleColumns.reduce((acc, col) => acc + (col.width || 200), 0) + 128;
-    let startIndex = Math.floor(scrollTop / ROW_HEIGHT);
-    let endIndex = Math.min(totalRows, Math.floor((scrollTop + containerHeight) / ROW_HEIGHT) + OVERSCAN);
+    let startIndex = Math.floor(Math.max(0, scrollTop - HEADER_HEIGHT) / ROW_HEIGHT);
+    let endIndex = Math.min(totalRows, startIndex + Math.ceil(containerHeight / ROW_HEIGHT) + OVERSCAN);
     if (startIndex < 0) startIndex = 0;
     const visibleRows = activeMatrix?.rows.slice(startIndex, endIndex) || [];
     const offsetY = startIndex * ROW_HEIGHT;
+
 
     if (!activeMatrix) return <div>No Matrix</div>;
 
@@ -652,19 +669,19 @@ const MatrixView: React.FC<MatrixViewProps> = ({
             )}
 
             {/* Grid */}
-            <div className="flex-1 overflow-hidden relative flex flex-col min-h-0">
-                {/* Header */}
-                <div ref={headerRef} className="flex bg-slate-50 border-b border-slate-200 z-20 overflow-x-hidden" style={{ minWidth: totalWidth }}>
-                    <div className="w-10 border-r border-slate-200 p-2 text-center text-xs font-bold text-slate-400">#</div>
-                    {visibleColumns.map(col => (
-                        <ColumnHeader key={col.id} column={col} onUpdate={(c:any)=>onUpdateMatrix({...activeMatrix, columns: activeMatrix.columns.map(o=>o.id===c.id?c:o)})} onDelete={(id:string)=>onDeleteMatrix && onDeleteMatrix(id)} onRunColumnAI={handleRunColumnAI} onEditSettings={(id:string)=>setEditingColumnSettings(activeMatrix.columns.find(c=>c.id===id)||null)} />
-                    ))}
-                    <button ref={addColumnBtnRef} onClick={handleAddColumnClick} className="w-32 border-r border-slate-200 flex items-center justify-center text-slate-400 hover:text-weflora-teal"><PlusIcon className="h-4 w-4"/> Add</button>
-                </div>
+            <div ref={containerRef} className="flex-1 overflow-auto bg-white custom-scrollbar outline-none relative min-h-0" onScroll={handleScroll}>
+                <div style={{ minWidth: `${totalWidth}px`, height: '100%', position: 'relative' }}>
+                    {/* Sticky Header */}
+                    <div className="sticky top-0 z-40 flex bg-slate-50 border-b border-slate-200 shadow-sm" style={{ height: HEADER_HEIGHT }}>
+                        <div className="w-10 border-r border-slate-200 p-2 text-center text-xs font-bold text-slate-400 bg-slate-50 flex items-center justify-center">#</div>
+                        {visibleColumns.map(col => (
+                            <ColumnHeader key={col.id} column={col} onUpdate={(c:any)=>onUpdateMatrix({...activeMatrix, columns: activeMatrix.columns.map(o=>o.id===c.id?c:o)})} onDelete={(id:string)=>onDeleteMatrix && onDeleteMatrix(id)} onRunColumnAI={handleRunColumnAI} onEditSettings={(id:string)=>setEditingColumnSettings(activeMatrix.columns.find(c=>c.id===id)||null)} />
+                        ))}
+                        <button ref={addColumnBtnRef} onClick={handleAddColumnClick} className="w-32 border-r border-slate-200 flex items-center justify-center text-slate-400 hover:text-weflora-teal bg-slate-50"><PlusIcon className="h-4 w-4"/> Add</button>
+                    </div>
 
-                {/* Rows */}
-                <div ref={containerRef} className="flex-1 overflow-auto bg-white custom-scrollbar outline-none relative min-h-0" onScroll={handleScroll}>
-                    <div style={{ height: totalHeight, position: 'relative', minWidth: `${totalWidth}px` }}>
+                    {/* Rows */}
+                    <div style={{ height: totalHeight, position: 'relative' }}>
                         {visibleRows.map((row, i) => {
                             const actualIndex = startIndex + i;
                             const top = offsetY + (i * ROW_HEIGHT);
@@ -688,13 +705,14 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                                                 className={`border-r border-slate-100 relative p-0 transition-colors 
                                                     ${isEditing ? 'z-10 ring-2 ring-weflora-teal' : ''} 
                                                     ${isAIDerived && !isEditing 
-                                                        ? (isError ? 'bg-red-50 hover:bg-red-100 hover:ring-1 hover:ring-red-200' : 'bg-weflora-teal/10 hover:bg-weflora-teal/20 hover:ring-1 hover:ring-weflora-teal/20')
+                                                        ? (isError ? 'bg-red-50 hover:bg-red-100 hover:ring-1 hover:ring-red-200' : 'bg-weflora-teal/5 hover:bg-weflora-teal/10 hover:ring-1 hover:ring-weflora-teal/10')
                                                         : ''
                                                     }
                                                 `}
                                                 style={{ width: col.width }}
                                                 onClick={() => !isProcessing && setEditingCell({ rowId: row.id, colId: col.id })}
-                                                onDoubleClick={() => {
+                                                onDoubleClick={(e) => {
+                                                    e.stopPropagation();
                                                     if (!isAIDerived) return;
                                                     if (!cell) return;
                                                     if (!(cell.citations?.length || cell.status === 'error' || cell.reasoning)) return;

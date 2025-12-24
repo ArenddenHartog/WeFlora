@@ -673,3 +673,10 @@ export const PlayIcon: React.FC<IconProps> = ({ className }) => (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
     </svg>
 );
+
+export const KeyIcon: React.FC<IconProps> = ({ className }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="m21 2-2 2m-7.6 7.6a6.5 6.5 0 1 1-9.19-9.19 6.5 6.5 0 0 1 9.19 9.19Z"></path>
+        <path d="m21 2-9.6 9.6"></path><path d="m17 7 5 5"></path>
+    </svg>
+);
