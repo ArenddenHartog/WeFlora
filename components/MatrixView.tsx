@@ -97,8 +97,11 @@ const parseCellContent = (text: string) => {
 // --- ColumnHeader: Enhanced with Run Button & Smart Menu ---
 const ColumnHeader: React.FC<any> = ({ column, onUpdate, onDelete, onRunColumnAI, onEditSettings }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isRunMenuOpen, setIsRunMenuOpen] = useState(false);
     const [menuPos, setMenuPos] = useState<{top: number, left: number} | null>(null);
+    const [runMenuPos, setRunMenuPos] = useState<{top: number, left: number} | null>(null);
     const optionsBtnRef = useRef<HTMLButtonElement>(null);
+    const runBtnRef = useRef<HTMLButtonElement>(null);
 
     const handleOptionsClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -106,6 +109,17 @@ const ColumnHeader: React.FC<any> = ({ column, onUpdate, onDelete, onRunColumnAI
             const rect = optionsBtnRef.current.getBoundingClientRect();
             setMenuPos({ top: rect.bottom + 5, left: rect.left - 100 }); 
             setIsMenuOpen(!isMenuOpen);
+            setIsRunMenuOpen(false);
+        }
+    };
+
+    const handleRunClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (runBtnRef.current) {
+            const rect = runBtnRef.current.getBoundingClientRect();
+            setRunMenuPos({ top: rect.bottom + 5, left: rect.left });
+            setIsRunMenuOpen(!isRunMenuOpen);
+            setIsMenuOpen(false);
         }
     };
 
@@ -113,15 +127,31 @@ const ColumnHeader: React.FC<any> = ({ column, onUpdate, onDelete, onRunColumnAI
 
     const handleMenuAction = (action: string) => {
         setIsMenuOpen(false);
+        setIsRunMenuOpen(false);
         switch(action) {
-            case 'run_all': onRunColumnAI(column.id, 'all'); break;
+            case 'run_all': if (window.confirm("This will overwrite all existing values in this column. Continue?")) onRunColumnAI(column.id, 'all'); break;
             case 'run_pending': onRunColumnAI(column.id, 'fill_empty'); break;
+            case 'retry_failed': onRunColumnAI(column.id, 'retry_failed'); break;
             case 'settings': onEditSettings(column.id); break;
             case 'hide': onUpdate({...column, visible: false}); break;
             case 'set_key': onUpdate({...column, isPrimaryKey: !column.isPrimaryKey}); break;
             case 'delete': onDelete(column.id); break;
         }
     };
+
+    const RunMenuOptions = () => (
+        <>
+            <button onClick={() => handleMenuAction('run_pending')} className="flex items-center gap-2 w-full text-left px-4 py-2 text-xs hover:bg-slate-50 text-slate-700">
+                <SparklesIcon className="h-3 w-3 text-weflora-teal" /> Run Pending Only
+            </button>
+            <button onClick={() => handleMenuAction('retry_failed')} className="flex items-center gap-2 w-full text-left px-4 py-2 text-xs hover:bg-slate-50 text-slate-700">
+                <RefreshIcon className="h-3 w-3 text-amber-500" /> Retry Failed
+            </button>
+            <button onClick={() => handleMenuAction('run_all')} className="flex items-center gap-2 w-full text-left px-4 py-2 text-xs hover:bg-slate-50 text-slate-700 border-t border-slate-100">
+                <PlayIcon className="h-3 w-3 text-slate-400" /> Run All (Overwrite)
+            </button>
+        </>
+    );
 
     return (
         <div className={`flex-shrink-0 border-r border-b text-left relative group select-none flex items-center justify-between px-3 py-2 h-10 transition-colors ${
@@ -137,9 +167,10 @@ const ColumnHeader: React.FC<any> = ({ column, onUpdate, onDelete, onRunColumnAI
             <div className="flex items-center">
                 {isAI && (
                     <button 
-                        onClick={(e) => { e.stopPropagation(); onRunColumnAI(column.id, 'fill_empty'); }}
+                        ref={runBtnRef}
+                        onClick={handleRunClick}
                         className="p-1 rounded hover:bg-weflora-mint/50 text-weflora-teal mr-1 flex items-center justify-center transition-colors"
-                        title="Run FloraGPT (Fill Empty)"
+                        title="Run Options"
                     >
                         <PlayIcon className="h-3.5 w-3.5" />
                     </button>
@@ -154,6 +185,21 @@ const ColumnHeader: React.FC<any> = ({ column, onUpdate, onDelete, onRunColumnAI
                 </button>
             </div>
 
+            {/* Run Context Menu */}
+            {isRunMenuOpen && runMenuPos && createPortal(
+                <>
+                    <div className="fixed inset-0 z-[9998]" onClick={() => setIsRunMenuOpen(false)} />
+                    <div 
+                        className="fixed bg-white border border-slate-200 shadow-xl rounded-lg z-[9999] flex flex-col w-48 overflow-hidden animate-fadeIn"
+                        style={{ top: runMenuPos.top, left: runMenuPos.left }}
+                    >
+                        <RunMenuOptions />
+                    </div>
+                </>,
+                document.body
+            )}
+
+            {/* Options Context Menu */}
             {isMenuOpen && menuPos && createPortal(
                 <>
                     <div className="fixed inset-0 z-[9998]" onClick={() => setIsMenuOpen(false)} />
@@ -163,9 +209,8 @@ const ColumnHeader: React.FC<any> = ({ column, onUpdate, onDelete, onRunColumnAI
                     >
                         {isAI && (
                             <>
-                                <button onClick={() => handleMenuAction('run_pending')} className="flex items-center gap-2 w-full text-left px-4 py-2 text-xs hover:bg-slate-50 text-slate-700">
-                                    <PlayIcon className="h-3 w-3 text-weflora-teal" /> Run FloraGPT
-                                </button>
+                                <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50">Run FloraGPT</div>
+                                <RunMenuOptions />
                                 <div className="border-t border-slate-100 my-1"></div>
                             </>
                         )}
@@ -532,7 +577,6 @@ const MatrixView: React.FC<MatrixViewProps> = ({
         return { ok: false, error: "Configuration Error" };
     };
 
-    // Single Cell Run (Interactive)
     const handleRunAICell = async (rowId: string, colId: string) => {
         const startMatrix = activeMatrixRef.current;
         if (!startMatrix) return;
@@ -548,12 +592,39 @@ const MatrixView: React.FC<MatrixViewProps> = ({
         
         const result = await executeCellAI(promptTemplate, row.entityName || '', row, col.skillConfig);
         
+        // Check if stopped/cancelled (status changed from loading)
+        const currentMatrix = activeMatrixRef.current;
+        const currentCell = currentMatrix?.rows.find(r => r.id === rowId)?.cells[colId];
+        if (currentCell?.status !== 'loading') return;
+
         if (result.ok) {
             updateRowImmediate(rowId, colId, 'success', result.data);
         } else {
             updateRowImmediate(rowId, colId, 'error', { reasoning: result.error });
         }
     };
+
+    const handleStopAICell = (rowId: string, colId: string) => {
+        // Reset to idle effectively cancels the loading UI and the subsequent update check will fail
+        updateRowImmediate(rowId, colId, 'idle');
+    };
+
+    const handleAddRow = () => {
+        const matrix = activeMatrixRef.current;
+        if (!matrix) return;
+        
+        const newRow: MatrixRow = {
+            id: `row-${Date.now()}`,
+            cells: {}
+        };
+        // Initialize cells
+        matrix.columns.forEach(c => {
+            newRow.cells[c.id] = { columnId: c.id, value: '' };
+        });
+        
+        onUpdateMatrix({ ...matrix, rows: [...matrix.rows, newRow] });
+    };
+
 
     // Batch Run (Hardened)
     const handleRunColumnAI = async (colId: string, mode: 'all' | 'fill_empty' | 'retry_failed' = 'fill_empty') => {
@@ -626,7 +697,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
     const HEADER_HEIGHT = 40;
     const visibleColumns = activeMatrix?.columns.filter(c => c.visible !== false) || [];
     const totalRows = activeMatrix?.rows.length || 0;
-    const totalHeight = totalRows * ROW_HEIGHT; 
+    const totalHeight = totalRows * ROW_HEIGHT + ROW_HEIGHT; // +1 for Add Row button space
     const totalWidth = 40 + visibleColumns.reduce((acc, col) => acc + (col.width || 200), 0) + 128;
     let startIndex = Math.floor(Math.max(0, scrollTop - HEADER_HEIGHT) / ROW_HEIGHT);
     let endIndex = Math.min(totalRows, startIndex + Math.ceil(containerHeight / ROW_HEIGHT) + OVERSCAN);
@@ -677,7 +748,9 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                         {visibleColumns.map(col => (
                             <ColumnHeader key={col.id} column={col} onUpdate={(c:any)=>onUpdateMatrix({...activeMatrix, columns: activeMatrix.columns.map(o=>o.id===c.id?c:o)})} onDelete={(id:string)=>onDeleteMatrix && onDeleteMatrix(id)} onRunColumnAI={handleRunColumnAI} onEditSettings={(id:string)=>setEditingColumnSettings(activeMatrix.columns.find(c=>c.id===id)||null)} />
                         ))}
-                        <button ref={addColumnBtnRef} onClick={handleAddColumnClick} className="w-32 border-r border-slate-200 flex items-center justify-center text-slate-400 hover:text-weflora-teal bg-slate-50"><PlusIcon className="h-4 w-4"/> Add</button>
+                        <button ref={addColumnBtnRef} onClick={handleAddColumnClick} className="w-32 border-r border-slate-200 flex items-center justify-center text-slate-400 hover:text-weflora-teal bg-slate-50">
+                            <PlusIcon className="h-4 w-4"/>
+                        </button>
                     </div>
 
                     {/* Rows */}
@@ -730,7 +803,15 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                                                     });
                                                 }}
                                             >
-                                                {isProcessing && <div className="absolute inset-0 bg-white/50 z-20 flex items-center justify-center"><RefreshIcon className="h-4 w-4 animate-spin text-weflora-teal" /></div>}
+                                                {isProcessing && (
+                                                    <div 
+                                                        onClick={(e) => { e.stopPropagation(); handleStopAICell(row.id, col.id); }}
+                                                        className="absolute inset-0 bg-white/50 z-20 flex items-center justify-center cursor-pointer group/spinner"
+                                                        title="Click to stop"
+                                                    >
+                                                        <RefreshIcon className="h-4 w-4 animate-spin text-weflora-teal group-hover/spinner:text-weflora-red" />
+                                                    </div>
+                                                )}
                                                 {isEditing ? (
                                                     <MatrixInput 
                                                         value={cell?.value ?? ''} 
@@ -744,7 +825,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                                                 ) : (
                                                     <div className="w-full h-full flex items-center">
                                                         {col.type === 'ai' && !cell?.value && !isProcessing ? (
-                                                            <button onClick={() => handleRunAICell(row.id, col.id)} className="mx-2 px-2 py-0.5 bg-weflora-mint/20 text-weflora-dark rounded text-[10px] font-bold flex items-center gap-1"><SparklesIcon className="h-3 w-3"/> Run AI</button>
+                                                            <button onClick={() => handleRunAICell(row.id, col.id)} className="mx-2 px-2 py-0.5 bg-weflora-mint/20 text-weflora-dark rounded text-[10px] font-bold flex items-center gap-1"><SparklesIcon className="h-3 w-3"/> Run FloraGPT</button>
                                                         ) : (
                                                             <RichCellRenderer 
                                                                 value={cell?.value ?? ''} 
@@ -765,6 +846,24 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                                 </div>
                             );
                         })}
+                        
+                        {/* Add Row Button */}
+                        <div 
+                            style={{ top: totalRows * ROW_HEIGHT, height: ROW_HEIGHT, width: '100%' }}
+                            className="absolute left-0 flex border-b border-dashed border-slate-200 hover:bg-slate-50 transition-colors"
+                        >
+                            <div className="w-10 border-r border-slate-200 flex items-center justify-center text-xs text-slate-300 font-mono">
+                                +
+                            </div>
+                            <div className="flex-1 flex items-center px-4">
+                                <button 
+                                    onClick={handleAddRow}
+                                    className="flex items-center gap-2 text-sm text-slate-400 hover:text-weflora-teal font-medium"
+                                >
+                                    <PlusIcon className="h-4 w-4" /> Add Row
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -779,14 +878,14 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                         onClick={() => handleInitiateAddColumn('text')} 
                         className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 text-slate-700 transition-colors"
                     >
-                        <LayoutGridIcon className="h-4 w-4 text-slate-400" />
+                        <PlusIcon className="h-4 w-4 text-slate-400" />
                         Create Column
                     </button>
                     <button 
                         onClick={() => handleInitiateAddColumn('ai')} 
                         className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm hover:bg-weflora-mint/10 text-slate-700 hover:text-weflora-dark transition-colors border-t border-slate-100"
                     >
-                        <SparklesIcon className="h-4 w-4 text-weflora-teal" />
+                        <PlusIcon className="h-4 w-4 text-weflora-teal" />
                         Select Skill
                     </button>
                 </div>, 
