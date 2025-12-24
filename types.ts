@@ -1,5 +1,5 @@
-
 import React from 'react';
+import { SkillTemplateId, SkillOutputType } from './services/skillTemplates';
 
 export interface User {
   name: string;
@@ -250,7 +250,9 @@ export interface SkillConfiguration {
     description?: string;   // e.g. "Checks species against 2024 City Policy"
     
     // The "Brain"
-    promptTemplate: string; // e.g. "Analyze {Row} against the attached PDF..."
+    promptTemplate: string; // [LEGACY] e.g. "Analyze {Row} against the attached PDF..."
+    templateId?: SkillTemplateId; // NEW: References a locked template
+    params?: Record<string, any>; // NEW: Parameters for the locked template
     
     // The "Context" (The Anthropic Skill Feature)
     attachedContextIds: string[]; // IDs of ProjectFiles or KnowledgeItems specific to this column
@@ -284,6 +286,20 @@ export interface MatrixCell {
     status?: 'idle' | 'loading' | 'success' | 'error'; // For AI processing
     citations?: Citation[]; // Verification for AI cells
     colSpan?: number; // For merging cells horizontally
+    
+    // NEW: Skill Output Fields
+    displayValue?: string;
+    reasoning?: string;
+    outputType?: SkillOutputType;
+    normalized?: any;
+    provenance?: {
+       skillTemplateId?: string;
+       skillRunId?: string;
+       model?: string;
+       ranAt?: string;
+       contextFileIds?: string[];
+       promptHash?: string;
+    };
 }
 
 export interface MatrixRow {
