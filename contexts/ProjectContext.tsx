@@ -3,8 +3,10 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from './AuthContext';
 import { useUI } from './UIContext';
+import { FEATURES } from '../src/config/features';
 import type { PinnedProject, ProjectFile, Matrix, Report, Task, TeamComment, ProjectData } from '../types';
 import { FolderIcon, FileSheetIcon, FilePdfIcon, FileCodeIcon } from '../components/icons';
+import { dbIdOrUndefined, isUuid } from '../utils/ids';
 
 const emptyProjectData: ProjectData = {
     analytics: { costs: [], water: [], diversity: [] },
@@ -29,6 +31,7 @@ const ALLOWED_MIME_TYPES = [
 interface ProjectContextType {
     projects: PinnedProject[];
     setProjects: React.Dispatch<React.SetStateAction<PinnedProject[]>>;
+    createProject: (project: PinnedProject) => Promise<{ id: string } | null>;
     updateProject: (project: PinnedProject) => Promise<void>;
     deleteProject: (projectId: string) => Promise<void>;
     files: { [projectId: string]: ProjectFile[] };
@@ -37,13 +40,13 @@ interface ProjectContextType {
     // Explicit Data Actions
     matrices: Matrix[];
     setMatrices: React.Dispatch<React.SetStateAction<Matrix[]>>; // Kept for loading/reset
-    createMatrix: (matrix: Matrix) => Promise<void>;
+    createMatrix: (matrix: Matrix) => Promise<{ id: string; projectId?: string; parentId?: string } | null>;
     updateMatrix: (matrix: Matrix) => Promise<void>;
     deleteMatrix: (matrixId: string) => Promise<void>;
 
     reports: Report[];
     setReports: React.Dispatch<React.SetStateAction<Report[]>>; // Kept for loading/reset
-    createReport: (report: Report) => Promise<void>;
+    createReport: (report: Report) => Promise<{ id: string; projectId?: string; parentId?: string } | null>;
     updateReport: (report: Report) => Promise<void>;
     deleteReport: (reportId: string) => Promise<void>;
 
@@ -100,9 +103,9 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                     name: p.name,
                     status: p.status,
                     date: p.date,
-                    workspaceId: p.workspace_id || 'ws-1', 
+                    workspaceId: 'ws-default',
                     icon: FolderIcon,
-                    members: p.members || [] 
+                    members: [] 
                 })));
             }
 
@@ -162,29 +165,37 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 setFiles(groupedFiles);
             }
 
-            // 5. Tasks & Comments
-            const { data: taskData } = await supabase.from('tasks').select('*').eq('user_id', userId);
-            if (taskData) {
-                setTasks(taskData.map((t: any) => ({
-                    id: t.id,
-                    title: t.title,
-                    status: t.status,
-                    priority: t.priority,
-                    dueDate: t.due_date,
-                    assigneeId: t.assignee_id,
-                    projectId: t.project_id
-                })));
+            // 5. Tasks & Comments (feature-gated)
+            if (FEATURES.tasks) {
+                const { data: taskData } = await supabase.from('tasks').select('*').eq('user_id', userId);
+                if (taskData) {
+                    setTasks(taskData.map((t: any) => ({
+                        id: t.id,
+                        title: t.title,
+                        status: t.status,
+                        priority: t.priority,
+                        dueDate: t.due_date,
+                        assigneeId: t.assignee_id,
+                        projectId: t.project_id
+                    })));
+                }
+            } else {
+                setTasks([]);
             }
 
-            const { data: commData } = await supabase.from('comments').select('*').eq('user_id', userId);
-            if (commData) {
-                setComments(commData.map((c: any) => ({
-                    id: c.id,
-                    text: c.text,
-                    memberId: c.member_id,
-                    projectId: c.project_id,
-                    timestamp: new Date(c.created_at).toLocaleString()
-                })));
+            if (FEATURES.comments) {
+                const { data: commData } = await supabase.from('comments').select('*').eq('user_id', userId);
+                if (commData) {
+                    setComments(commData.map((c: any) => ({
+                        id: c.id,
+                        text: c.text,
+                        memberId: c.member_id,
+                        projectId: c.project_id,
+                        timestamp: new Date(c.created_at).toLocaleString()
+                    })));
+                }
+            } else {
+                setComments([]);
             }
         };
 
@@ -193,34 +204,59 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // --- Projects CRUD ---
     const handleSetProjects: React.Dispatch<React.SetStateAction<PinnedProject[]>> = (action) => {
-        setProjects(prev => {
-            const newVal = typeof action === 'function' ? action(prev) : action;
-            // Legacy handling for direct setProjects calls from MainContent
-            // Ideally we would migrate this too, but focusing on Matrices/Reports first
-            const added = newVal.filter(p => !prev.find(old => old.id === p.id));
-            added.forEach(async (p) => {
-                const userId = (await supabase.auth.getUser()).data.user?.id;
-                if (!userId) return;
-                await supabase.from('projects').insert({
-                    id: p.id.includes('new') ? undefined : p.id,
-                    name: p.name,
-                    status: p.status,
-                    date: p.date,
-                    user_id: userId,
-                    members: p.members,
-                    workspace_id: p.workspaceId
-                });
+        setProjects(action as any);
+    };
+
+    const createProject = async (project: PinnedProject): Promise<{ id: string } | null> => {
+        const userId = (await supabase.auth.getUser()).data.user?.id;
+        if (!userId) return null;
+
+        const tempId = project.id;
+        setProjects(prev => [project, ...prev]);
+
+        const shouldDbGenerateId = tempId.startsWith('proj-') || tempId.startsWith('new-') || tempId.includes('new');
+
+        const { data, error } = await supabase.from('projects').insert({
+            id: shouldDbGenerateId ? undefined : tempId,
+            name: project.name,
+            status: project.status,
+            date: project.date,
+            user_id: userId
+        }).select('*').single();
+
+        if (error || !data) {
+            console.info('[createProject:error]', {
+                code: (error as any)?.code,
+                message: (error as any)?.message,
+                details: (error as any)?.details,
+                hint: (error as any)?.hint
             });
-            return newVal;
-        });
+            showNotification('Failed to create project.', 'error');
+            setProjects(prev => prev.filter(p => p.id !== tempId));
+            return null;
+        }
+
+        const members = project.members ?? [];
+        const mappedProject: PinnedProject = {
+            id: (data as any).id,
+            name: (data as any).name,
+            status: (data as any).status,
+            date: (data as any).date,
+            workspaceId: project.workspaceId,
+            icon: FolderIcon,
+            members
+        };
+
+        setProjects(prev => prev.map(p => p.id === tempId ? mappedProject : p));
+        console.info('[createProject] inserted', { tempId, dbId: mappedProject.id });
+        return { id: mappedProject.id };
     };
 
     const updateProject = async (project: PinnedProject) => {
         setProjects(prev => prev.map(p => p.id === project.id ? project : p));
         await supabase.from('projects').update({
             name: project.name,
-            status: project.status,
-            members: project.members
+            status: project.status
         }).eq('id', project.id);
     };
 
@@ -246,29 +282,106 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // --- Explicit Matrix Actions ---
 
-    const createMatrix = async (matrix: Matrix) => {
+    const createMatrix = async (matrix: Matrix): Promise<{ id: string; projectId?: string; parentId?: string } | null> => {
         const userId = (await supabase.auth.getUser()).data.user?.id;
-        if (!userId) return;
+        if (!userId) return null;
+
+        if (matrix.projectId && !isUuid(matrix.projectId)) {
+            console.error('[createMatrix:error]', {
+                id: matrix.id,
+                projectId: matrix.projectId,
+                parentId: matrix.parentId,
+                isUuid: {
+                    id: Boolean(matrix.id && isUuid(matrix.id)),
+                    projectId: Boolean(matrix.projectId && isUuid(matrix.projectId)),
+                    parentId: Boolean(matrix.parentId && isUuid(matrix.parentId))
+                }
+            });
+            showNotification("Cannot save: project not yet persisted.", 'error');
+            return null;
+        }
+
+        const title = (matrix.title || '').trim() || 'Worksheet';
+        const columnsIsArray = Array.isArray((matrix as any).columns);
+        const rowsIsArray = Array.isArray((matrix as any).rows);
+        const columns = columnsIsArray ? matrix.columns : [{
+            id: 'c1',
+            title: 'Item',
+            type: 'text',
+            width: 200,
+            isPrimaryKey: true
+        }];
+        const rows = rowsIsArray ? matrix.rows : [];
 
         // Optimistic Update
-        setMatrices(prev => [...prev, matrix]);
+        const optimisticMatrix: Matrix = {
+            ...matrix,
+            title,
+            columns,
+            rows
+        };
+        setMatrices(prev => [...prev, optimisticMatrix]);
 
-        const { error } = await supabase.from('matrices').insert({
-            id: matrix.id.includes('new') || matrix.id.includes('mtx-') ? undefined : matrix.id, // Let DB gen if temp ID
-            project_id: matrix.projectId,
-            title: matrix.title,
-            description: matrix.description,
-            columns: matrix.columns,
-            rows: matrix.rows,
-            parent_id: matrix.parentId,
+        const tempId = optimisticMatrix.id;
+        if (tempId && !isUuid(tempId)) {
+            console.info('[id:temp]', { tempId });
+        }
+
+        const insertPayload = {
+            // IDs are UUID in DB; UI may use temp IDs; DB must generate UUID.
+            id: dbIdOrUndefined(tempId),
+            project_id: dbIdOrUndefined(optimisticMatrix.projectId),
+            title: optimisticMatrix.title,
+            description: optimisticMatrix.description,
+            columns: optimisticMatrix.columns,
+            rows: optimisticMatrix.rows,
+            parent_id: dbIdOrUndefined(optimisticMatrix.parentId),
             user_id: userId
-        });
+        };
+
+        const { data, error } = await supabase.from('matrices').insert(insertPayload).select('*').single();
 
         if (error) {
-            console.error("Failed to create matrix", error);
+            console.info('[createMatrix:error]', {
+                message: error.message,
+                code: (error as any).code,
+                details: (error as any).details,
+                hint: (error as any).hint,
+                payload: {
+                    projectId: optimisticMatrix.projectId,
+                    title: optimisticMatrix.title,
+                    parentId: optimisticMatrix.parentId,
+                    columnsCount: Array.isArray(optimisticMatrix.columns) ? optimisticMatrix.columns.length : 0,
+                    rowsCount: Array.isArray(optimisticMatrix.rows) ? optimisticMatrix.rows.length : 0,
+                    columnsIsArray: Array.isArray(optimisticMatrix.columns),
+                    rowsIsArray: Array.isArray(optimisticMatrix.rows),
+                    isUuid: {
+                        id: Boolean(tempId && isUuid(tempId)),
+                        projectId: Boolean(optimisticMatrix.projectId && isUuid(optimisticMatrix.projectId)),
+                        parentId: Boolean(optimisticMatrix.parentId && isUuid(optimisticMatrix.parentId))
+                    }
+                }
+            });
             showNotification("Failed to save worksheet.", 'error');
-            setMatrices(prev => prev.filter(m => m.id !== matrix.id)); // Rollback
+            setMatrices(prev => prev.filter(m => m.id !== tempId)); // Rollback
+            return null;
         }
+
+        const mappedMatrix: Matrix = {
+            id: (data as any).id,
+            projectId: (data as any).project_id ?? optimisticMatrix.projectId,
+            parentId: (data as any).parent_id ?? optimisticMatrix.parentId,
+            title: (data as any).title,
+            description: (data as any).description ?? optimisticMatrix.description,
+            columns: (data as any).columns ?? optimisticMatrix.columns,
+            rows: (data as any).rows ?? optimisticMatrix.rows,
+            tabTitle: optimisticMatrix.tabTitle,
+            order: (data as any).order ?? optimisticMatrix.order,
+            updatedAt: (data as any).updated_at ?? new Date().toISOString()
+        };
+
+        setMatrices(prev => prev.map(m => m.id === tempId ? mappedMatrix : m));
+        return { id: mappedMatrix.id, projectId: mappedMatrix.projectId, parentId: mappedMatrix.parentId };
     };
 
     const updateMatrix = async (matrix: Matrix) => {
@@ -312,27 +425,64 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // --- Explicit Report Actions ---
 
-    const createReport = async (report: Report) => {
+    const createReport = async (report: Report): Promise<{ id: string; projectId?: string; parentId?: string } | null> => {
         const userId = (await supabase.auth.getUser()).data.user?.id;
-        if (!userId) return;
+        if (!userId) return null;
+
+        if (report.projectId && !isUuid(report.projectId)) {
+            console.error('[createReport:error]', {
+                id: report.id,
+                projectId: report.projectId,
+                parentId: report.parentId,
+                isUuid: {
+                    id: Boolean(report.id && isUuid(report.id)),
+                    projectId: Boolean(report.projectId && isUuid(report.projectId)),
+                    parentId: Boolean(report.parentId && isUuid(report.parentId))
+                }
+            });
+            showNotification("Cannot save: project not yet persisted.", 'error');
+            return null;
+        }
 
         setReports(prev => [...prev, report]);
 
-        const { error } = await supabase.from('reports').insert({
-            id: report.id.includes('rep-') || report.id.includes('new') ? undefined : report.id,
-            project_id: report.projectId,
+        const tempId = report.id;
+        if (tempId && !isUuid(tempId)) {
+            console.info('[id:temp]', { tempId });
+        }
+
+        const { data, error } = await supabase.from('reports').insert({
+            // IDs are UUID in DB; UI may use temp IDs; DB must generate UUID.
+            id: dbIdOrUndefined(tempId),
+            project_id: dbIdOrUndefined(report.projectId),
             title: report.title,
             content: report.content,
             tags: report.tags,
-            parent_id: report.parentId,
+            parent_id: dbIdOrUndefined(report.parentId),
             user_id: userId
-        });
+        }).select('*').single();
 
         if (error) {
             console.error("Failed to create report", error);
             showNotification("Failed to save report.", 'error');
-            setReports(prev => prev.filter(r => r.id !== report.id));
+            setReports(prev => prev.filter(r => r.id !== tempId));
+            return null;
         }
+
+        const mappedReport: Report = {
+            id: (data as any).id,
+            projectId: (data as any).project_id ?? report.projectId,
+            parentId: (data as any).parent_id ?? report.parentId,
+            title: (data as any).title,
+            content: (data as any).content,
+            tags: (data as any).tags ?? report.tags,
+            tabTitle: report.tabTitle,
+            order: (data as any).order ?? report.order,
+            lastModified: (data as any).updated_at ?? (data as any).last_modified ?? new Date().toISOString()
+        };
+
+        setReports(prev => prev.map(r => r.id === tempId ? mappedReport : r));
+        return { id: mappedReport.id, projectId: mappedReport.projectId, parentId: mappedReport.parentId };
     };
 
     const updateReport = async (report: Report) => {
@@ -372,29 +522,6 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const handleSetTasks: React.Dispatch<React.SetStateAction<Task[]>> = (action) => {
         setTasks(prev => {
             const newVal = typeof action === 'function' ? action(prev) : action;
-            newVal.forEach(async (t) => {
-                const exists = prev.find(old => old.id === t.id);
-                const userId = (await supabase.auth.getUser()).data.user?.id;
-                if (!userId) return;
-
-                if (!exists) {
-                    await supabase.from('tasks').insert({
-                        title: t.title,
-                        status: t.status,
-                        priority: t.priority,
-                        due_date: t.dueDate,
-                        assignee_id: t.assigneeId,
-                        project_id: t.projectId,
-                        user_id: userId
-                    });
-                } else if (JSON.stringify(exists) !== JSON.stringify(t)) {
-                    await supabase.from('tasks').update({
-                        status: t.status,
-                        priority: t.priority,
-                        title: t.title
-                    }).eq('id', t.id);
-                }
-            });
             return newVal;
         });
     };
@@ -402,17 +529,6 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const handleSetComments: React.Dispatch<React.SetStateAction<TeamComment[]>> = (action) => {
         setComments(prev => {
             const newVal = typeof action === 'function' ? action(prev) : action;
-            const added = newVal.filter(c => !prev.find(old => old.id === c.id));
-            added.forEach(async c => {
-                const userId = (await supabase.auth.getUser()).data.user?.id;
-                if (!userId) return;
-                await supabase.from('comments').insert({
-                    text: c.text,
-                    member_id: c.memberId,
-                    project_id: c.projectId,
-                    user_id: userId
-                });
-            });
             return newVal;
         });
     };
@@ -521,6 +637,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     return (
         <ProjectContext.Provider value={{
             projects, setProjects: handleSetProjects,
+            createProject,
             updateProject, deleteProject,
             files, setFiles, 
             

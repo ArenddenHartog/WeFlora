@@ -58,34 +58,35 @@ const PromptTemplatesView: React.FC<PromptTemplatesViewProps> = ({ items, onOpen
     return (
         <div className="h-full overflow-y-auto bg-white p-4 md:p-8">
             <header className="mb-8">
-                <div className="flex items-center justify-between mb-6">
-                     <div className="flex items-center gap-4">
-                        <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
-                            <MenuIcon className="h-6 w-6" />
-                        </button>
-                        <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
-                            <ChatBubbleIcon className="h-6 w-6" />
-                        </div>
-                        <h1 className="text-2xl font-bold text-slate-800">Prompts Hub</h1>
-                     </div>
-                     <button 
-                        onClick={() => setIsCreateModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium shadow-sm transition-colors"
-                     >
-                        <PlusIcon className="h-4 w-4" />
-                        <span className="hidden sm:inline">Create Prompt</span>
-                     </button>
+                <div className="flex items-center gap-4 mb-6">
+                    <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
+                        <MenuIcon className="h-6 w-6" />
+                    </button>
+                    <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
+                        <ChatBubbleIcon className="h-6 w-6" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-slate-800">Prompts Hub</h1>
                 </div>
 
-                <div className="relative w-full md:w-96">
-                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Search prompts..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-weflora-teal focus:border-weflora-teal outline-none text-slate-900"
-                    />
+                <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
+                    <div className="relative w-full md:w-96">
+                        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Search prompts..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-weflora-teal focus:border-weflora-teal outline-none text-slate-900"
+                        />
+                    </div>
+                    <button 
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium shadow-sm transition-colors"
+                    >
+                        <PlusIcon className="h-4 w-4" />
+                        <span className="hidden sm:inline">Create Prompt</span>
+                        <span className="sm:hidden">New</span>
+                    </button>
                 </div>
             </header>
 
@@ -102,7 +103,7 @@ const PromptTemplatesView: React.FC<PromptTemplatesViewProps> = ({ items, onOpen
                                 </span>
                             </div>
                             
-                            <h3 className="text-lg font-bold text-slate-800 mb-1 group-hover:text-weflora-teal-dark transition-colors">{item.title}</h3>
+                            <h3 className="text-lg font-bold text-slate-800 mb-1 group-hover:text-weflora-dark transition-colors">{item.title}</h3>
                             <p className="text-sm text-slate-500 line-clamp-2 mb-4">{item.description}</p>
                             
                             {/* Preview Area */}
@@ -190,11 +191,11 @@ const PromptTemplatesView: React.FC<PromptTemplatesViewProps> = ({ items, onOpen
                             </div>
 
                             {viewingTemplate.systemInstruction && (
-                                <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
-                                    <div className="flex items-center gap-2 mb-2 text-xs font-bold text-purple-600 uppercase tracking-wider">
+                                <div className="p-4 bg-weflora-teal/10 rounded-xl border border-weflora-teal/20">
+                                    <div className="flex items-center gap-2 mb-2 text-xs font-bold text-weflora-dark uppercase tracking-wider">
                                         <EyeOffIcon className="h-4 w-4" /> System Instruction (Hidden)
                                     </div>
-                                    <pre className="text-sm text-purple-800 whitespace-pre-wrap font-mono bg-white/50 p-3 rounded-lg border border-purple-100">
+                                    <pre className="text-sm text-weflora-dark whitespace-pre-wrap font-mono bg-white/50 p-3 rounded-lg border border-weflora-teal/20">
                                         {viewingTemplate.systemInstruction}
                                     </pre>
                                 </div>
@@ -229,7 +230,7 @@ const PromptTemplatesView: React.FC<PromptTemplatesViewProps> = ({ items, onOpen
                         </button>
                         <button 
                             onClick={handleCreate}
-                            className="px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm font-medium hover:bg-weflora-teal-dark shadow-sm transition-colors"
+                            className="px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm font-medium hover:bg-weflora-dark shadow-sm transition-colors"
                         >
                             Create Template
                         </button>
@@ -290,18 +291,18 @@ const PromptTemplatesView: React.FC<PromptTemplatesViewProps> = ({ items, onOpen
                             />
                         </div>
 
-                        <div className="bg-purple-50 p-4 rounded-xl border border-purple-200">
+                        <div className="bg-weflora-teal/10 p-4 rounded-xl border border-weflora-teal/20">
                             <div className="flex items-center gap-2 mb-2">
-                                <EyeOffIcon className="h-4 w-4 text-purple-600" />
-                                <label className="block text-xs font-bold text-purple-700 uppercase">System Instruction (Invisible)</label>
+                                <EyeOffIcon className="h-4 w-4 text-weflora-dark" />
+                                <label className="block text-xs font-bold text-weflora-dark uppercase">System Instruction (Invisible)</label>
                             </div>
-                            <p className="text-[10px] text-purple-600/70 mb-2">Technical rules passed silently to FloraGPT. Define output formats here.</p>
+                            <p className="text-[10px] text-weflora-dark/70 mb-2">Technical rules passed silently to FloraGPT. Define output formats here.</p>
                             <textarea
                                 value={newSystemInstruction}
                                 onChange={(e) => setNewSystemInstruction(e.target.value)}
                                 rows={6}
                                 placeholder="Output format: Return JSON with keys..."
-                                className="w-full px-3 py-2 bg-white border border-purple-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none font-mono text-slate-900"
+                                className="w-full px-3 py-2 bg-white border border-weflora-teal/20 rounded-lg text-sm outline-none focus:ring-2 focus:ring-weflora-teal/30 focus:border-weflora-teal resize-none font-mono text-slate-900"
                             />
                         </div>
                     </div>

@@ -24,37 +24,37 @@ const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTempl
     const tabs: ('All' | TemplateType)[] = ['All', 'Prompt', 'Project', 'Workflow'];
 
     const getIcon = (type: TemplateType) => {
-        if (type === 'Prompt') return <ChatBubbleIcon className="h-5 w-5 text-purple-600" />;
-        if (type === 'Project') return <FolderIcon className="h-5 w-5 text-blue-600" />;
-        return <LayoutGridIcon className="h-5 w-5 text-orange-600" />;
+        if (type === 'Prompt') return <ChatBubbleIcon className="h-5 w-5 text-weflora-dark" />;
+        if (type === 'Project') return <FolderIcon className="h-5 w-5 text-weflora-teal" />;
+        return <LayoutGridIcon className="h-5 w-5 text-weflora-teal" />;
     };
 
     const getColor = (type: TemplateType) => {
-        if (type === 'Prompt') return 'bg-purple-50 border-purple-100 text-purple-700';
-        if (type === 'Project') return 'bg-blue-50 border-blue-100 text-blue-700';
-        return 'bg-orange-50 border-orange-100 text-orange-700';
+        if (type === 'Prompt') return 'bg-weflora-teal/10 border-weflora-teal/20 text-weflora-dark';
+        if (type === 'Project') return 'bg-weflora-mint/20 border-weflora-teal/20 text-weflora-dark';
+        return 'bg-weflora-mint/10 border-weflora-teal/20 text-weflora-dark';
     };
 
     return (
         <div className="h-full overflow-y-auto bg-white p-4 md:p-8">
             <header className="mb-8">
                 <div className="flex items-center justify-between mb-6">
-                     <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4">
                         <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
                             <MenuIcon className="h-6 w-6" />
                         </button>
-                        <div className="h-10 w-10 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
+                        <div className="h-10 w-10 bg-weflora-teal/20 rounded-xl flex items-center justify-center text-weflora-dark">
                             <MagicWandIcon className="h-6 w-6" />
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold text-slate-800">Library</h1>
                             <p className="text-slate-500 text-sm">Receipts, prompts, and reusable workflows.</p>
                         </div>
-                     </div>
-                     <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 font-medium shadow-sm">
+                    </div>
+                    <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 font-medium shadow-sm">
                         <PlusIcon className="h-4 w-4" />
                         <span className="hidden sm:inline">Create Template</span>
-                     </button>
+                    </button>
                 </div>
 
                 {/* Navigation & Search */}
@@ -66,7 +66,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTempl
                                 onClick={() => setActiveTab(tab)}
                                 className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
                                     activeTab === tab 
-                                    ? 'border-weflora-teal text-weflora-teal-dark' 
+                                    ? 'border-weflora-teal text-weflora-dark' 
                                     : 'border-transparent text-slate-500 hover:text-slate-800'
                                 }`}
                             >
@@ -100,7 +100,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTempl
                                 </span>
                             </div>
                             
-                            <h3 className="text-lg font-bold text-slate-800 mb-1 group-hover:text-weflora-teal-dark transition-colors">{item.title}</h3>
+                            <h3 className="text-lg font-bold text-slate-800 mb-1 group-hover:text-weflora-dark transition-colors">{item.title}</h3>
                             <p className="text-sm text-slate-500 line-clamp-2 mb-4">{item.description}</p>
                             
                             <div className="flex flex-wrap gap-2">

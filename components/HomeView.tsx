@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import type { PinnedProject, RecentItem, PromptTemplate, KnowledgeItem, ChatMessage, Thread, ProjectFile, Report, Matrix, ContextItem } from '../types';
 import ChatInput from './ChatInput';
 import { 
@@ -7,7 +7,7 @@ import {
     SparklesIcon, LogoIcon, RefreshIcon, CopyIcon, CheckIcon, BookmarkIcon,
     ArrowUpIcon, TrendingUpIcon, ChevronRightIcon
 } from './icons'; 
-import { MessageRenderer } from './MessageRenderer';
+import { MessageRenderer, EvidenceChip } from './MessageRenderer';
 
 interface HomeViewProps {
     pinnedProjects: PinnedProject[];
@@ -38,7 +38,7 @@ const HomeView: React.FC<HomeViewProps> = ({
     
     // Find active thread
     const activeThread = threads.find(t => t.id === activeThreadId);
-    const messages = activeThread?.messages || [];
+    const messages = useMemo(() => activeThread?.messages || [], [activeThread?.messages]);
     const chatScrollRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll logic for thread view
@@ -59,7 +59,6 @@ const HomeView: React.FC<HomeViewProps> = ({
                         <MenuIcon className="h-6 w-6" />
                     </button>
                 </div>
-
                 <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center">
                     <header className="mb-8 md:mb-10 text-center relative w-full max-w-3xl mt-4 md:mt-8">
                         <div className="flex flex-col items-center gap-4 mb-6">
@@ -112,13 +111,13 @@ const HomeView: React.FC<HomeViewProps> = ({
     // --- ACTIVE THREAD STATE: RESEARCH INTERFACE ---
     return (
         <div className="h-full flex flex-col bg-white relative">
-            {/* Header - No sticky, just flex-none */}
+            {/* Thread Context Header */}
             <header className="flex-none h-14 border-b border-slate-100 flex items-center justify-between px-4 bg-white/80 backdrop-blur-md z-30">
                 <div className="flex items-center gap-4">
                     <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
                         <MenuIcon className="h-6 w-6" />
                     </button>
-                    
+
                     {onBack && (
                         <button 
                             onClick={onBack}
@@ -137,8 +136,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                         <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full hidden sm:inline-block">Research Session</span>
                     </div>
                 </div>
-                
-                {/* Actions */}
+
                 <div className="flex items-center gap-2">
                     {onNewChat && (
                         <button 
@@ -167,7 +165,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                     {/* Only show "Start Research" if NOT generating and NO messages */}
                     {messages.length === 0 && !isGenerating && (
                         <div className="text-center py-20 text-slate-400">
-                            <SparklesIcon className="h-12 w-12 mx-auto mb-4 text-purple-200" />
+                            <SparklesIcon className="h-12 w-12 mx-auto mb-4 text-weflora-teal/20" />
                             <p>Start your research...</p>
                         </div>
                     )}
@@ -190,6 +188,11 @@ const HomeView: React.FC<HomeViewProps> = ({
                                     <div className={`prose prose-sm max-w-none text-slate-700 leading-relaxed ${
                                         msg.sender === 'user' ? 'bg-slate-50 p-4 rounded-2xl rounded-tr-none text-left inline-block' : ''
                                     }`}>
+                                        {msg.sender === 'ai' && (
+                                            <div className="flex justify-end mb-2">
+                                                <EvidenceChip citations={msg.citations} label="Assistant answer" />
+                                            </div>
+                                        )}
                                         <MessageRenderer text={msg.text} />
                                     </div>
 

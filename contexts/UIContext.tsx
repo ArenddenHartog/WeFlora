@@ -14,6 +14,19 @@ interface DestinationModalState {
     message: ChatMessage | null;
 }
 
+export type EvidenceProvenance = {
+    label: string;
+    sources?: string[];
+    generatedAt?: string;
+    // Extended fields for Skills DSL
+    reasoning?: string;
+    displayValue?: string;
+    outputType?: string;
+    templateId?: string;
+    model?: string;
+    promptHash?: string;
+};
+
 interface UIContextType {
     // Sidebar State
     isSidebarOpen: boolean;
@@ -36,6 +49,10 @@ interface UIContextType {
     navigateToProject: (id: string) => void;
     navigateToHome: () => void;
 
+    // Sessions Navigation Intent
+    sessionOpenOrigin: 'sessions' | 'other' | null;
+    setSessionOpenOrigin: (origin: 'sessions' | 'other' | null) => void;
+
     // Destination Modal State
     destinationModal: DestinationModalState;
     openDestinationModal: (type: 'report' | 'worksheet', message: ChatMessage) => void;
@@ -45,6 +62,17 @@ interface UIContextType {
     previewItem: ProjectFile | KnowledgeItem | null;
     openFilePreview: (item: ProjectFile | KnowledgeItem) => void;
     closeFilePreview: () => void;
+
+    // Evidence Panel (Global, right-side)
+    activeEvidence: EvidenceProvenance | null;
+    openEvidencePanel: (provenance: EvidenceProvenance) => void;
+    closeEvidencePanel: () => void;
+
+    // Assistant Panel (Global, right-side)
+    isAssistantOpen: boolean;
+    assistantDraftKey: string;
+    openAssistantPanel: (draft?: string) => void;
+    closeAssistantPanel: () => void;
 }
 
 const UIContext = createContext<UIContextType | undefined>(undefined);
@@ -56,6 +84,7 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
     const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
     const [notification, setNotification] = useState<NotificationState | null>(null);
+    const [sessionOpenOrigin, setSessionOpenOrigin] = useState<'sessions' | 'other' | null>(null);
 
     const [destinationModal, setDestinationModal] = useState<DestinationModalState>({
         isOpen: false,
@@ -64,6 +93,9 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     });
 
     const [previewItem, setPreviewItem] = useState<ProjectFile | KnowledgeItem | null>(null);
+    const [activeEvidence, setActiveEvidence] = useState<EvidenceProvenance | null>(null);
+    const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+    const assistantDraftKey = 'weflora-global-assistant-draft';
 
     const toggleSidebarCollapse = () => setIsSidebarCollapsed(prev => !prev);
 
@@ -104,6 +136,26 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
         setPreviewItem(null);
     };
 
+    const openEvidencePanel = (provenance: EvidenceProvenance) => {
+        setActiveEvidence(provenance);
+    };
+
+    const closeEvidencePanel = () => {
+        setActiveEvidence(null);
+    };
+
+    const openAssistantPanel = (draft?: string) => {
+        setIsAssistantOpen(true);
+        if (typeof draft === 'string') {
+            localStorage.setItem(assistantDraftKey, draft);
+            window.dispatchEvent(new CustomEvent('weflora:draft', { detail: { draftKey: assistantDraftKey, value: draft } }));
+        }
+    };
+
+    const closeAssistantPanel = () => {
+        setIsAssistantOpen(false);
+    };
+
     return (
         <UIContext.Provider value={{
             isSidebarOpen, setIsSidebarOpen,
@@ -112,8 +164,11 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
             selectedChatId, setSelectedChatId,
             notification, showNotification, closeNotification,
             navigateToProject, navigateToHome,
+            sessionOpenOrigin, setSessionOpenOrigin,
             destinationModal, openDestinationModal, closeDestinationModal,
-            previewItem, openFilePreview, closeFilePreview
+            previewItem, openFilePreview, closeFilePreview,
+            activeEvidence, openEvidencePanel, closeEvidencePanel,
+            isAssistantOpen, assistantDraftKey, openAssistantPanel, closeAssistantPanel
         }}>
             {children}
         </UIContext.Provider>

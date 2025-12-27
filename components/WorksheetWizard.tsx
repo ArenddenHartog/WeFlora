@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Matrix, MatrixColumn, MatrixRow, MatrixColumnType, DiscoveredStructure, WorksheetTemplate, Species, ProjectFile } from '../types';
 import { 
     TelescopeIcon, LayoutGridIcon, MagicWandIcon, TableIcon, UploadIcon, 
@@ -46,7 +46,7 @@ const WizardStepper = ({ step }: { step: number }) => {
 
 const WorksheetWizard: React.FC<{
     onClose: () => void;
-    onCreate: (matrix: Matrix) => void;
+    onCreate: (matrix: Matrix) => Promise<{ id: string; projectId?: string; parentId?: string } | null>;
     onDiscover: (files: File[]) => Promise<DiscoveredStructure[]>;
     onAnalyze: (files: File[], context?: string, columns?: MatrixColumn[]) => Promise<{ columns: MatrixColumn[], rows: any[] }>;
     onFileSave?: (file: ProjectFile) => void; // New prop for saving files
@@ -75,13 +75,7 @@ const WorksheetWizard: React.FC<{
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
-        if (initialFile && step === 0) {
-            startScanning(initialFile);
-        }
-    }, [initialFile]);
-
-    const startScanning = async (file: File) => {
+    const startScanning = useCallback(async (file: File) => {
         setUploadedFile(file);
         setSheetTitle(file.name.split('.')[0]);
         setStep(2);
@@ -119,7 +113,13 @@ const WorksheetWizard: React.FC<{
         } finally {
             setIsScanning(false);
         }
-    };
+    }, [onDiscover, onFileSave]);
+
+    useEffect(() => {
+        if (initialFile && step === 0) {
+            startScanning(initialFile);
+        }
+    }, [initialFile, startScanning, step]);
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
@@ -186,7 +186,7 @@ const WorksheetWizard: React.FC<{
         }
     };
 
-    const handleFinalCreate = () => {
+    const handleFinalCreate = async () => {
         if (!extractionResult) return;
         const newMatrix: Matrix = {
             id: `mtx-${Date.now()}`,
@@ -194,11 +194,19 @@ const WorksheetWizard: React.FC<{
             columns: extractionResult.columns,
             rows: extractionResult.rows
         };
-        onCreate(newMatrix);
+        const created = await onCreate(newMatrix);
+        if (!created) return;
+        console.info('[create-flow] worksheet wizard', {
+            kind: 'worksheet',
+            withinProject: Boolean(created.projectId),
+            projectId: created.projectId,
+            matrixId: created.id,
+            tabId: Boolean(created.projectId) ? created.id : undefined
+        });
         onClose();
     };
 
-    const handleCreateSpeciesSheet = () => {
+    const handleCreateSpeciesSheet = async () => {
         const standardColumns: MatrixColumn[] = [
             { id: 'sc-1', title: 'Scientific Name', type: 'text', width: 220, isPrimaryKey: true },
             { id: 'sc-2', title: 'Common Name', type: 'text', width: 180 },
@@ -231,7 +239,15 @@ const WorksheetWizard: React.FC<{
             columns: standardColumns,
             rows: rows
         };
-        onCreate(newMatrix);
+        const created = await onCreate(newMatrix);
+        if (!created) return;
+        console.info('[create-flow] worksheet wizard', {
+            kind: 'worksheet',
+            withinProject: Boolean(created.projectId),
+            projectId: created.projectId,
+            matrixId: created.id,
+            tabId: Boolean(created.projectId) ? created.id : undefined
+        });
         onClose();
     };
 
@@ -252,7 +268,7 @@ const WorksheetWizard: React.FC<{
                 <div className="font-bold text-slate-900 mb-1">Use Template</div>
                 <div className="text-xs text-slate-500 px-4">Start with a pre-defined structure.</div>
             </button>
-            <button onClick={() => { const newMatrix: Matrix = { id: `mtx-${Date.now()}`, title: 'Untitled Worksheet', columns: [{id:'c1', title:'Column 1', type:'text', width: 200}], rows: [] }; onCreate(newMatrix); onClose(); }} className="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-weflora-teal hover:shadow-md transition-all text-center group h-40">
+            <button onClick={async () => { const newMatrix: Matrix = { id: `mtx-${Date.now()}`, title: 'Untitled Worksheet', columns: [{id:'c1', title:'Column 1', type:'text', width: 200}], rows: [] }; const created = await onCreate(newMatrix); if (!created) return; console.info('[create-flow] worksheet wizard', { kind: 'worksheet', withinProject: Boolean(created.projectId), projectId: created.projectId, matrixId: created.id, tabId: Boolean(created.projectId) ? created.id : undefined }); onClose(); }} className="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-weflora-teal hover:shadow-md transition-all text-center group h-40">
                 <div className="h-12 w-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 mb-3 group-hover:scale-110 transition-transform"><TableIcon className="h-6 w-6" /></div>
                 <div className="font-bold text-slate-900 mb-1">Empty Sheet</div>
                 <div className="text-xs text-slate-500 px-4">Start from scratch with a blank grid.</div>
@@ -294,7 +310,7 @@ const WorksheetWizard: React.FC<{
                     <div className="flex-1 flex flex-col min-h-0">
                         <div className="flex justify-between items-center mb-3">
                             <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Refine Schema</h4>
-                            <div className="flex gap-2"><button onClick={() => addSchemaColumn('text')} className="text-[10px] px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold rounded transition-colors">+ Text</button><button onClick={() => addSchemaColumn('ai')} className="text-[10px] px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold rounded transition-colors flex items-center gap-1"><SparklesIcon className="h-3 w-3"/> + AI</button></div>
+                            <div className="flex gap-2"><button onClick={() => addSchemaColumn('text')} className="text-[10px] px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold rounded transition-colors">+ Text</button><button onClick={() => addSchemaColumn('ai')} className="text-[10px] px-2 py-1 bg-weflora-teal/10 hover:bg-weflora-teal/20 text-weflora-dark font-bold rounded transition-colors flex items-center gap-1"><SparklesIcon className="h-3 w-3"/> + AI</button></div>
                         </div>
                         <div className="bg-slate-50 rounded-xl flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                             {schemaColumns.map((col, idx) => (
@@ -302,9 +318,15 @@ const WorksheetWizard: React.FC<{
                                      <div className="pt-3"><input type="radio" name="primaryKey" checked={!!col.isPrimaryKey} onChange={() => setPrimaryKey(col.id)} className="accent-weflora-teal cursor-pointer w-4 h-4" title="Set as Entity Name (Primary Key)" /></div>
                                      <div className="flex-1 space-y-2">
                                          <div className="flex gap-2"><input type="text" value={col.title} onChange={(e) => updateSchemaColumn(col.id, { title: e.target.value })} className="flex-1 text-sm font-bold text-slate-900 border-b border-transparent focus:border-slate-300 outline-none pb-1 bg-transparent placeholder-slate-300" placeholder="Column Name" /><select value={col.type} onChange={(e) => updateSchemaColumn(col.id, { type: e.target.value as MatrixColumnType })} className="text-xs bg-slate-100 rounded px-2 py-1 border-none outline-none text-slate-900 font-medium cursor-pointer hover:bg-slate-200"><option value="text">Text</option><option value="number">Number</option><option value="date">Date</option><option value="select">Select</option><option value="ai">FloraGPT Gen</option></select></div>
-                                         {col.type === 'ai' && <input type="text" value={col.aiPrompt || ''} onChange={(e) => updateSchemaColumn(col.id, { aiPrompt: e.target.value })} className="w-full text-xs bg-purple-50 text-purple-900 border-0 rounded px-3 py-2 outline-none placeholder:text-purple-300" placeholder="AI Prompt: e.g. Analyze {Entity Name}..." />}
+                                         {col.type === 'ai' && <input type="text" value={col.aiPrompt || ''} onChange={(e) => updateSchemaColumn(col.id, { aiPrompt: e.target.value })} className="w-full text-xs bg-weflora-teal/10 text-weflora-dark border-0 rounded px-3 py-2 outline-none placeholder:text-weflora-teal/40" placeholder="AI Prompt: e.g. Analyze {Entity Name}..." />}
                                      </div>
-                                     <button onClick={() => removeSchemaColumn(col.id)} className="text-slate-300 hover:text-red-500 pt-2 transition-colors"><XIcon className="h-4 w-4" /></button>
+                                     <button
+                                         onClick={() => removeSchemaColumn(col.id)}
+                                         className="h-8 w-8 flex items-center justify-center cursor-pointer text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors"
+                                         title="Delete column"
+                                     >
+                                         <XIcon className="h-4 w-4" />
+                                     </button>
                                 </div>
                             ))}
                             {schemaColumns.length === 0 && <div className="text-center py-10 text-slate-400 text-sm">No columns defined.</div>}
@@ -351,7 +373,7 @@ const WorksheetWizard: React.FC<{
                     {filteredTemplates.length === 0 && <div className="text-center py-10 text-slate-400"><MagicWandIcon className="h-8 w-8 mx-auto mb-2 opacity-30" /><p className="text-sm">No templates found.</p></div>}
                     {filteredTemplates.map(template => (
                          <button key={template.id} onClick={() => { const newMatrix: Matrix = { id: `mtx-${Date.now()}`, title: template.title, description: template.description, columns: template.columns, rows: template.rows || [] }; onCreate(newMatrix); onClose(); }} className="w-full flex flex-col items-start p-4 bg-white border border-slate-100 rounded-xl hover:border-weflora-teal hover:shadow-md transition-all text-left group">
-                            <div className="flex items-center justify-between w-full mb-1"><span className="font-bold text-slate-900 text-sm group-hover:text-weflora-teal-dark transition-colors">{template.title}</span><span className="text-[10px] bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full">{template.usageCount} uses</span></div>
+                            <div className="flex items-center justify-between w-full mb-1"><span className="font-bold text-slate-900 text-sm group-hover:text-weflora-dark transition-colors">{template.title}</span><span className="text-[10px] bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full">{template.usageCount} uses</span></div>
                             <p className="text-xs text-slate-500 line-clamp-2 mb-2">{template.description}</p>
                             <div className="flex flex-wrap gap-1">{template.tags.slice(0, 3).map(tag => <span key={tag} className="text-[10px] px-1.5 py-0.5 bg-slate-50 text-slate-500 rounded">#{tag}</span>)}</div>
                         </button>
@@ -370,7 +392,7 @@ const WorksheetWizard: React.FC<{
                         {filteredSpecies.map(species => {
                             const isSelected = selectedSpeciesIds.has(species.id);
                             return (
-                                <button key={species.id} onClick={() => { const next = new Set(selectedSpeciesIds); if (next.has(species.id)) next.delete(species.id); else next.add(species.id); setSelectedSpeciesIds(next); }} className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all text-left group ${isSelected ? 'bg-weflora-mint/10 border-weflora-teal text-weflora-teal-dark' : 'bg-white border-transparent hover:border-slate-200 hover:shadow-sm text-slate-700'}`}>
+                                <button key={species.id} onClick={() => { const next = new Set(selectedSpeciesIds); if (next.has(species.id)) next.delete(species.id); else next.add(species.id); setSelectedSpeciesIds(next); }} className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all text-left group ${isSelected ? 'bg-weflora-mint/10 border-weflora-teal text-weflora-dark' : 'bg-white border-transparent hover:border-slate-200 hover:shadow-sm text-slate-700'}`}>
                                     <div><div className="font-bold text-sm text-slate-900">{species.scientificName}</div><div className="text-xs opacity-70 text-slate-600">{species.commonName}</div></div>
                                     <div className={`h-5 w-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'bg-weflora-teal border-weflora-teal text-white' : 'border-slate-300 bg-white group-hover:border-weflora-teal'}`}>{isSelected && <CheckIcon className="h-3 w-3" />}</div>
                                 </button>
@@ -379,7 +401,7 @@ const WorksheetWizard: React.FC<{
                     </div>
                 </div>
                 <div className="w-7/12 bg-white flex flex-col">
-                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white"><h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Selected Items</h4><span className="text-xs font-bold bg-weflora-mint/20 text-weflora-teal-dark px-2 py-0.5 rounded-full">{selectedSpeciesIds.size}</span></div>
+                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white"><h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Selected Items</h4><span className="text-xs font-bold bg-weflora-mint/20 text-weflora-dark px-2 py-0.5 rounded-full">{selectedSpeciesIds.size}</span></div>
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
                         {Array.from(selectedSpeciesIds).map(id => {
                             const sp = speciesList.find(s => s.id === id);
@@ -387,7 +409,7 @@ const WorksheetWizard: React.FC<{
                             return (
                                 <div key={id} className="flex items-center justify-between text-sm bg-slate-50 p-3 rounded-lg border border-slate-100 animate-fadeIn">
                                     <div className="flex items-center gap-3"><div className="h-8 w-8 bg-white rounded flex items-center justify-center border border-slate-200 text-weflora-teal font-bold text-xs">{sp.scientificName.charAt(0)}</div><div><div className="font-medium text-slate-900">{sp.scientificName}</div><div className="text-xs text-slate-500">{sp.commonName}</div></div></div>
-                                    <button onClick={() => { const next = new Set(selectedSpeciesIds); next.delete(id); setSelectedSpeciesIds(next); }} className="text-slate-400 hover:text-red-500 p-2 hover:bg-white rounded transition-colors"><XIcon className="h-4 w-4" /></button>
+                                    <button onClick={() => { const next = new Set(selectedSpeciesIds); next.delete(id); setSelectedSpeciesIds(next); }} className="text-slate-400 hover:text-weflora-red p-2 hover:bg-white rounded transition-colors"><XIcon className="h-4 w-4" /></button>
                                 </div>
                             );
                         })}
@@ -402,8 +424,8 @@ const WorksheetWizard: React.FC<{
         <>
             {step > 0 && step !== 3 ? <button onClick={() => setStep(s => (s === 5 || s === 6 ? 0 : Math.max(0, s - 1)) as any)} className="mr-auto px-6 py-3 text-slate-500 hover:text-slate-800 text-sm font-bold transition-colors">Back</button> : <div className="mr-auto" />}
             {step === 2 && <button onClick={handleExtract} disabled={schemaColumns.length === 0} className="px-8 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-black disabled:opacity-50 shadow-lg transition-all flex items-center gap-2"><SparklesIcon className="h-4 w-4" />Extract Data</button>}
-            {step === 4 && <button onClick={handleFinalCreate} className="px-8 py-3 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-teal-dark shadow-lg shadow-weflora-mint/50 transition-all">Create Worksheet</button>}
-            {step === 6 && <button onClick={handleCreateSpeciesSheet} disabled={selectedSpeciesIds.size === 0} className="px-8 py-3 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-teal-dark shadow-lg shadow-weflora-mint/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed">Create Worksheet ({selectedSpeciesIds.size})</button>}
+            {step === 4 && <button onClick={handleFinalCreate} className="px-8 py-3 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-dark shadow-lg shadow-weflora-mint/50 transition-all">Create Worksheet</button>}
+            {step === 6 && <button onClick={handleCreateSpeciesSheet} disabled={selectedSpeciesIds.size === 0} className="px-8 py-3 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-dark shadow-lg shadow-weflora-mint/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed">Create Worksheet ({selectedSpeciesIds.size})</button>}
         </>
     );
 

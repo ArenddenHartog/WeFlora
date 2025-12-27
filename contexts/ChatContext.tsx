@@ -105,7 +105,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setMessages([]);
             }
         }
-    }, [activeThreadId, threads]); // Removed isGenerating from deps to avoid circular logic
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeThreadId, threads]); // Intentionally exclude isGenerating to avoid circular logic.
 
     const createThread = useCallback(async (initialMessage: string, contextSnapshot: ContextItem[] = []): Promise<string> => {
         if (!user) return '';

@@ -36,9 +36,9 @@ const FilePreview: React.FC<FilePreviewProps> = ({ item, onClose, onAskAI, verif
 
     const getIcon = (className = "h-10 w-10") => {
         const name = isKnowledgeItem(item) ? item.title : item.name;
-        if (name.endsWith('.pdf')) return <FilePdfIcon className={`${className} text-red-500`} />;
-        if (name.endsWith('.xlsx')) return <FileSheetIcon className={`${className} text-green-500`} />;
-        if (name.endsWith('.docx')) return <BookIcon className={`${className} text-blue-500`} />;
+        if (name.endsWith('.pdf')) return <FilePdfIcon className={`${className} text-weflora-red`} />;
+        if (name.endsWith('.xlsx')) return <FileSheetIcon className={`${className} text-weflora-success`} />;
+        if (name.endsWith('.docx')) return <BookIcon className={`${className} text-weflora-teal`} />;
         return <FileCodeIcon className={`${className} text-slate-500`} />;
     };
 
@@ -120,13 +120,13 @@ const FilePreview: React.FC<FilePreviewProps> = ({ item, onClose, onAskAI, verif
                         </button>
                         <button 
                             onClick={() => onAskAI(item)}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 shadow-sm transition-colors"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-weflora-teal text-white rounded-lg text-sm font-medium hover:bg-weflora-dark shadow-sm transition-colors"
                         >
                             <SparklesIcon className="h-4 w-4" /> 
                             <span className="hidden sm:inline">Ask FloraGPT</span>
                         </button>
                         <div className="h-6 w-px bg-slate-200 mx-2"></div>
-                        <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-red-500 transition-colors">
+                        <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-weflora-red transition-colors">
                             <XIcon className="h-5 w-5" />
                         </button>
                     </div>
@@ -138,8 +138,8 @@ const FilePreview: React.FC<FilePreviewProps> = ({ item, onClose, onAskAI, verif
                     </div>
 
                     <aside className="w-80 bg-white border-l border-slate-200 overflow-y-auto shrink-0 flex flex-col">
-                        <div className="p-5 border-b border-slate-100 bg-purple-50/30">
-                            <div className="flex items-center gap-2 mb-3 text-purple-700 font-bold text-sm">
+                        <div className="p-5 border-b border-slate-100 bg-weflora-teal/10">
+                            <div className="flex items-center gap-2 mb-3 text-weflora-dark font-bold text-sm">
                                 <SparklesIcon className="h-4 w-4" /> FloraGPT Insights
                             </div>
                             <p className="text-xs text-slate-600 leading-relaxed">
@@ -171,10 +171,11 @@ const FilePreview: React.FC<FilePreviewProps> = ({ item, onClose, onAskAI, verif
                                         </div>
                                         <div className="pl-5">
                                             <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                                                item.category === 'Internal' ? 'bg-blue-100 text-blue-700' :
-                                                item.category === 'Policy' ? 'bg-purple-100 text-purple-700' :
-                                                item.category === 'Research' ? 'bg-green-100 text-green-700' :
-                                                'bg-orange-100 text-orange-700'
+                                                // NOTE: Conservative mapping: treat "Internal" as a neutral/brand surface label (no separate info-blue token yet).
+                                                item.category === 'Internal' ? 'bg-weflora-mint/20 text-weflora-dark' :
+                                                item.category === 'Policy' ? 'bg-weflora-teal/20 text-weflora-dark' :
+                                                item.category === 'Research' ? 'bg-weflora-success/20 text-weflora-success' :
+                                                'bg-weflora-amber/10 text-weflora-amber'
                                             }`}>
                                                 {item.category}
                                             </span>

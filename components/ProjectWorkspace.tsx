@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import type { 
     PinnedProject, Matrix, Report, Task, TeamComment, 
     WorksheetDocument, ReportDocument, Member, MatrixRow
@@ -8,7 +8,7 @@ import type {
 import { 
     DatabaseIcon, FileTextIcon,
     SparklesIcon, SlidersIcon, FolderIcon, ChevronRightIcon,
-    UploadIcon, PencilIcon, TableIcon, TrashIcon, HomeIcon
+    UploadIcon, PencilIcon, TableIcon, XIcon, HomeIcon
 } from './icons';
 import ProjectTeamView from './ProjectTeamView';
 import ChatView from './ChatView';
@@ -22,24 +22,14 @@ import ReportWizard from './ReportWizard';
 import WritingAssistantPanel from './WritingAssistantPanel'; 
 import SpeciesIntelligencePanel from './SpeciesIntelligencePanel';
 import ProjectOverview from './ProjectOverview';
+import ProjectHeader from './ProjectHeader';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { useChat } from '../contexts/ChatContext';
 import { useUI } from '../contexts/UIContext';
 import { useProject } from '../contexts/ProjectContext';
 import { useData } from '../contexts/DataContext';
 import { aiService } from '../services/aiService';
-
-const ProjectNavTab: React.FC<{ label: string, active: boolean, onClick: () => void }> = ({ label, active, onClick }) => (
-    <button
-        onClick={onClick}
-        className={`px-3 py-1.5 rounded-md text-sm font-bold transition-all capitalize ${
-            active 
-            ? 'bg-weflora-mint/20 text-weflora-teal-dark' 
-            : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-        }`}
-    >
-        {label}
-    </button>
-);
+import { navigateToCreatedEntity } from '../utils/navigation';
 
 const EmptyState = ({ 
     icon: Icon, 
@@ -58,7 +48,7 @@ const EmptyState = ({
         <p className="text-sm text-slate-500 max-w-xs text-center mb-6">{description}</p>
         <button 
             onClick={onAction}
-            className="px-6 py-2.5 bg-weflora-teal text-white rounded-xl hover:bg-weflora-teal-dark font-bold transition-colors shadow-sm text-sm"
+            className="px-6 py-2.5 bg-weflora-teal text-white rounded-xl hover:bg-weflora-dark font-bold transition-colors shadow-sm text-sm"
         >
             {actionLabel}
         </button>
@@ -69,6 +59,7 @@ const EmptyState = ({
 const ProjectWorkspace: React.FC = () => {
     // Navigation & Params
     const navigate = useNavigate();
+    const location = useLocation();
     const params = useParams();
     const projectId = params.projectId;
     
@@ -81,7 +72,7 @@ const ProjectWorkspace: React.FC = () => {
     } = useProject();
     
     const { species, worksheetTemplates, reportTemplates } = useData();
-    const { setActiveThreadId, chats, messages, isGenerating, sendMessage } = useChat();
+    const { setActiveThreadId, chats, messages, isGenerating, sendMessage, entityThreads, sendEntityMessage } = useChat();
     const { showNotification, selectedChatId, openDestinationModal, openFilePreview } = useUI(); // Added openFilePreview
     
     // --- Data Filtering ---
@@ -108,6 +99,40 @@ const ProjectWorkspace: React.FC = () => {
     // Removed local previewFile state
     const [inspectedEntity, setInspectedEntity] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [pendingDeleteFileId, setPendingDeleteFileId] = useState<string | null>(null);
+
+    // Focus state for "new tab created" redirects (passed via navigate state)
+    const [focusedWorksheetTabId, setFocusedWorksheetTabId] = useState<string | undefined>(undefined);
+    const [focusedReportTabId, setFocusedReportTabId] = useState<string | undefined>(undefined);
+
+    // Contextual assistant scope (right-side panel)
+    const [assistantScope, setAssistantScope] = useState<'project' | 'worksheet' | 'report'>('project');
+    const [activeWorksheetMatrixId, setActiveWorksheetMatrixId] = useState<string | null>(null);
+    const [activeReportId, setActiveReportId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const navState = location.state as any;
+        if (typeof navState?.focusWorksheetTabId === 'string') {
+            setFocusedWorksheetTabId(navState.focusWorksheetTabId);
+        }
+        if (typeof navState?.focusReportTabId === 'string') {
+            setFocusedReportTabId(navState.focusReportTabId);
+        }
+    }, [location.state]);
+
+    useEffect(() => {
+        if (!activeWorksheetMatrixId && matrices.length > 0) setActiveWorksheetMatrixId(matrices[0].id);
+        if (activeWorksheetMatrixId && !matrices.some(m => m.id === activeWorksheetMatrixId)) {
+            setActiveWorksheetMatrixId(matrices[0]?.id || null);
+        }
+    }, [matrices, activeWorksheetMatrixId]);
+
+    useEffect(() => {
+        if (!activeReportId && reports.length > 0) setActiveReportId(reports[0].id);
+        if (activeReportId && !reports.some(r => r.id === activeReportId)) {
+            setActiveReportId(reports[0]?.id || null);
+        }
+    }, [reports, activeReportId]);
 
     // Sync tab navigation
     const handleTabChange = (tab: string) => {
@@ -115,14 +140,14 @@ const ProjectWorkspace: React.FC = () => {
         navigate(`/project/${projectId}/${tab}`);
     };
 
-    if (!project || !projectId) return <div className="p-8 text-center text-slate-400">Project not found.</div>;
-
     // --- Handlers ---
 
-    const toggleChat = () => {
+    const toggleAssistant = (scope: 'project' | 'worksheet' | 'report') => {
+        setAssistantScope(scope);
         setRightPanel(current => {
-            if (current === 'chat') return 'none';
-            setActiveThreadId(null);
+            const isSame = current === 'chat' && assistantScope === scope;
+            if (isSame) return 'none';
+            if (scope === 'project') setActiveThreadId(null);
             return 'chat';
         });
     };
@@ -144,9 +169,7 @@ const ProjectWorkspace: React.FC = () => {
 
     const handleDeleteFile = (e: React.MouseEvent, fileId: string) => {
         e.stopPropagation();
-        if (window.confirm("Delete this file? This cannot be undone.")) {
-            deleteProjectFile(fileId, projectId);
-        }
+        setPendingDeleteFileId(fileId);
     };
 
     const handleAddSpeciesToWorksheet = (data: any) => {
@@ -187,22 +210,28 @@ const ProjectWorkspace: React.FC = () => {
 
     // Virtual Documents
     const projectWorksheetDoc: WorksheetDocument = useMemo(() => ({
-        id: project.id,
-        projectId: project.id,
-        title: project.name, 
-        createdAt: project.date,
+        id: project?.id || (projectId || ''),
+        projectId: project?.id || (projectId || ''),
+        title: project?.name || 'Project', 
+        createdAt: project?.date || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        tabs: matrices
-    }), [project, matrices]);
+        tabs: project
+            ? [...matrices].sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER))
+            : []
+    }), [project, projectId, matrices]);
 
-    const handleUpdateWorksheetDoc = (doc: WorksheetDocument) => {
+    const handleUpdateWorksheetDoc = async (doc: WorksheetDocument) => {
         const currentIds = new Set(matrices.map(m => m.id));
         const newIds = new Set(doc.tabs.map(t => t.id));
         
-        doc.tabs.forEach(tab => {
-            if (currentIds.has(tab.id)) updateMatrix(tab);
-            else createMatrix({ ...tab, projectId: project.id });
-        });
+        for (const tab of doc.tabs) {
+            if (currentIds.has(tab.id)) {
+                updateMatrix(tab);
+            } else {
+                const created = await createMatrix({ ...tab, projectId: project.id });
+                if (created?.id) setFocusedWorksheetTabId(created.id);
+            }
+        }
 
         matrices.forEach(m => {
             if (!newIds.has(m.id)) deleteMatrix(m.id);
@@ -210,44 +239,148 @@ const ProjectWorkspace: React.FC = () => {
     };
 
     const projectReportDoc: ReportDocument = useMemo(() => ({
-        id: project.id,
-        projectId: project.id,
+        id: project?.id || (projectId || ''),
+        projectId: project?.id || (projectId || ''),
         title: 'Project Reports',
-        createdAt: project.date,
+        createdAt: project?.date || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        tabs: reports
-    }), [project, reports]);
+        tabs: project
+            ? [...reports].sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER))
+            : []
+    }), [project, projectId, reports]);
 
-    const handleUpdateReportDoc = (doc: ReportDocument) => {
+    if (!project || !projectId) return <div className="p-8 text-center text-slate-400">Project not found.</div>;
+
+    const handleUpdateReportDoc = async (doc: ReportDocument) => {
         const currentIds = new Set(reports.map(r => r.id));
         const newIds = new Set(doc.tabs.map(t => t.id));
 
-        doc.tabs.forEach(tab => {
-            if (currentIds.has(tab.id)) updateReport(tab);
-            else createReport({ ...tab, projectId: project.id });
-        });
+        for (const tab of doc.tabs) {
+            if (currentIds.has(tab.id)) {
+                updateReport(tab);
+            } else {
+                const created = await createReport({ ...tab, projectId: project.id });
+                if (created?.id) setFocusedReportTabId(created.id);
+            }
+        }
 
         reports.forEach(r => {
             if (!newIds.has(r.id)) deleteReport(r.id);
         });
     };
 
-    const handleCreateWorksheetFromWizard = (matrix: Matrix) => {
-        createMatrix({ ...matrix, projectId: project.id });
+    const handleCreateWorksheetFromWizard = async (matrix: Matrix) => {
+        const created = await createMatrix({ ...matrix, projectId: project.id });
+        if (!created) return null;
+        console.info('[create-flow] build worksheet (project)', {
+            kind: 'worksheet',
+            withinProject: true,
+            projectId: project.id,
+            matrixId: created.id,
+            tabId: created.id
+        });
+        navigateToCreatedEntity({
+            navigate,
+            kind: 'worksheet',
+            withinProject: true,
+            projectId: project.id,
+            matrixId: created.id,
+            focusTabId: created.id
+        });
         setIsWorksheetWizardOpen(false);
+        return created;
     };
 
-    const handleCreateReportFromWizard = (report: Report) => {
-        createReport({ ...report, projectId: project.id });
+    const handleCreateReportFromWizard = async (report: Report) => {
+        const created = await createReport({ ...report, projectId: project.id });
+        if (!created) return null;
+        console.info('[create-flow] draft report (project)', {
+            kind: 'report',
+            withinProject: true,
+            projectId: project.id,
+            reportId: created.id,
+            tabId: created.id
+        });
+        navigateToCreatedEntity({
+            navigate,
+            kind: 'report',
+            withinProject: true,
+            projectId: project.id,
+            reportId: created.id,
+            focusTabId: created.id
+        });
         setIsReportWizardOpen(false);
+        return created;
     };
 
     const renderRightPanelContent = () => {
         if (rightPanel === 'chat') {
+            if (assistantScope === 'worksheet') {
+                const matrix = matrices.find(m => m.id === activeWorksheetMatrixId) || matrices[0];
+                if (!matrix) return <div className="p-6 text-center text-slate-400">Open a worksheet to use the assistant.</div>;
+
+                const contextData = `
+Active Worksheet: "${matrix.title}"
+Columns: ${matrix.columns.map(c => c.title).join(', ')}
+Rows Count: ${matrix.rows.length}
+Data Preview (First 5 rows):
+${matrix.rows.slice(0, 5).map(r => matrix.columns.map(c => `${c.title}: ${r.cells[c.id]?.value}`).join(' | ')).join('\n')}
+                `.trim();
+
+                const msgs = entityThreads[matrix.id] || [];
+                return (
+                    <div className="h-full flex flex-col bg-white">
+                        <ChatView 
+                            chat={{ id: `proj-ws-chat-${matrix.id}`, title: 'Worksheet Assistant', description: `About: ${matrix.title}`, icon: SparklesIcon, time: 'Now' }} 
+                            messages={msgs} 
+                            onBack={() => setRightPanel('none')}
+                            onSendMessage={(text, files) => sendEntityMessage(matrix.id, text, contextData, files)}
+                            isGenerating={isGenerating}
+                            onRegenerateMessage={() => {}}
+                            onOpenMenu={() => {}}
+                            variant="panel"
+                            contextProjectId={project.id}
+                            onContinueInReport={(msg) => openDestinationModal('report', msg)}
+                            onContinueInWorksheet={(msg) => openDestinationModal('worksheet', msg)}
+                        />
+                    </div>
+                );
+            }
+
+            if (assistantScope === 'report') {
+                const report = reports.find(r => r.id === activeReportId) || reports[0];
+                if (!report) return <div className="p-6 text-center text-slate-400">Open a report to use the assistant.</div>;
+
+                const contextData = `
+Active Report: "${report.title}"
+Content:
+${report.content.substring(0, 3000)}${report.content.length > 3000 ? '...(truncated)' : ''}
+                `.trim();
+
+                const msgs = entityThreads[report.id] || [];
+                return (
+                    <div className="h-full flex flex-col bg-white">
+                        <ChatView 
+                            chat={{ id: `proj-rep-chat-${report.id}`, title: 'Report Assistant', description: `About: ${report.title}`, icon: SparklesIcon, time: 'Now' }} 
+                            messages={msgs} 
+                            onBack={() => setRightPanel('none')}
+                            onSendMessage={(text, files) => sendEntityMessage(report.id, text, contextData, files)}
+                            isGenerating={isGenerating}
+                            onRegenerateMessage={() => {}}
+                            onOpenMenu={() => {}}
+                            variant="panel"
+                            contextProjectId={project.id}
+                            onContinueInReport={(msg) => openDestinationModal('report', msg)}
+                            onContinueInWorksheet={(msg) => openDestinationModal('worksheet', msg)}
+                        />
+                    </div>
+                );
+            }
+
             return (
                 <div className="h-full flex flex-col bg-white">
                     <ChatView 
-                        chat={selectedChat || { id: 'proj-chat', title: 'Ask FloraGPT', description: 'Ask about this project', icon: SparklesIcon, time: 'Now' }} 
+                        chat={selectedChat || { id: 'proj-chat', title: 'Project Assistant', description: 'Ask about this project', icon: SparklesIcon, time: 'Now' }} 
                         messages={messages} 
                         onBack={() => setRightPanel('none')}
                         onSendMessage={sendMessage}
@@ -263,15 +396,59 @@ const ProjectWorkspace: React.FC = () => {
             );
         }
         if (rightPanel === 'manage') {
+            const settingsHeader =
+                activeTab === 'worksheets'
+                    ? 'Worksheet Settings'
+                    : activeTab === 'reports'
+                        ? 'Report Settings'
+                        : 'Project Settings';
+
             if (activeTab === 'worksheets') {
-                const matrixToManage = matrices.length > 0 ? matrices[0] : undefined; 
-                return <ManageWorksheetPanel matrix={matrixToManage} onUpdate={updateMatrix} onClose={() => setRightPanel('none')} onUpload={(fs) => fs.forEach(f => uploadProjectFile(f, projectId))} />;
+                const matrixToManage = 
+                    (activeWorksheetMatrixId && matrices.find(m => m.id === activeWorksheetMatrixId))
+                    ?? (matrices.length > 0 ? matrices[0] : undefined);
+                
+                if (matrixToManage) {
+                    return (
+                        <ManageWorksheetPanel
+                            matrix={matrixToManage}
+                            onUpdate={updateMatrix}
+                            onClose={() => setRightPanel('none')}
+                            onUpload={(fs) => fs.forEach(f => uploadProjectFile(f, projectId))}
+                        />
+                    );
+                }
             }
             if (activeTab === 'reports') {
                 const report = reports.length > 0 ? reports[0] : undefined;
                 if (report) return <ManageReportPanel report={report} onUpdate={updateReport} onClose={() => setRightPanel('none')} />;
             }
-            return <div className="p-6 text-center text-slate-400">Select a worksheet or report to view settings.</div>;
+
+            const placeholder =
+                activeTab === 'reports'
+                    ? 'Select a report to view settings.'
+                    : activeTab === 'worksheets'
+                        ? 'Select a worksheet to view settings.'
+                        : 'Select a worksheet or report to view settings.';
+
+            return (
+                <div className="h-full flex flex-col bg-white">
+                    <div className="flex-none h-14 border-b border-slate-200 bg-white flex items-center justify-between px-4 z-40">
+                        <div className="font-semibold text-slate-900">{settingsHeader}</div>
+                        <button
+                            onClick={() => setRightPanel('none')}
+                            className="h-9 w-9 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+                            title="Close"
+                            type="button"
+                        >
+                            <XIcon className="h-4 w-4" />
+                        </button>
+                    </div>
+                    <div className="flex-1 p-6 text-center text-slate-400 flex items-center justify-center">
+                        <div className="max-w-xs">{placeholder}</div>
+                    </div>
+                </div>
+            );
         }
         if (rightPanel === 'writing_assistant') {
             const activeReport = reports.length > 0 ? reports[0] : undefined;
@@ -323,7 +500,7 @@ const ProjectWorkspace: React.FC = () => {
                             <h2 className="text-lg font-bold text-slate-800">Project Files</h2>
                             <button 
                                 onClick={() => fileInputRef.current?.click()}
-                                className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium transition-colors shadow-sm"
+                                className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium transition-colors shadow-sm"
                             >
                                 <UploadIcon className="h-4 w-4" />
                                 <span>Upload Files</span>
@@ -350,10 +527,10 @@ const ProjectWorkspace: React.FC = () => {
                                         <div className="text-xs text-slate-400">{file.size} • {file.date}</div>
                                         <button 
                                             onClick={(e) => handleDeleteFile(e, file.id)}
-                                            className="absolute top-2 right-2 p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                            className="absolute top-2 right-2 h-8 w-8 flex items-center justify-center cursor-pointer text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded transition-colors opacity-0 group-hover:opacity-100"
                                             title="Delete File"
                                         >
-                                            <TrashIcon className="h-3.5 w-3.5" />
+                                            <XIcon className="h-3.5 w-3.5" />
                                         </button>
                                     </div>
                                 ))}
@@ -378,11 +555,13 @@ const ProjectWorkspace: React.FC = () => {
                 return (
                     <WorksheetContainer 
                         document={projectWorksheetDoc}
+                        initialActiveTabId={focusedWorksheetTabId}
                         onUpdateDocument={handleUpdateWorksheetDoc}
                         onRunAICell={aiService.runAICell}
                         onAnalyze={aiService.analyzeDocuments}
                         speciesList={species}
                         onOpenManage={() => setRightPanel('manage')}
+                        onActiveMatrixIdChange={(id) => setActiveWorksheetMatrixId(id)}
                         onClose={() => {}}
                         projectFiles={files}
                         onUpload={(fs) => fs.forEach(f => uploadProjectFile(f, projectId))}
@@ -392,6 +571,7 @@ const ProjectWorkspace: React.FC = () => {
                             setInspectedEntity(entity);
                             setRightPanel('entity');
                         }}
+                        onActiveTabChange={setActiveWorksheetMatrixId}
                     />
                 );
             case 'reports':
@@ -411,10 +591,12 @@ const ProjectWorkspace: React.FC = () => {
                 return (
                     <ReportContainer 
                         document={projectReportDoc}
+                        initialActiveTabId={focusedReportTabId}
                         onUpdateDocument={handleUpdateReportDoc}
                         onClose={() => {}}
                         availableMatrices={allMatrices} 
                         onToggleAssistant={() => togglePanel('writing_assistant')} 
+                        onActiveReportIdChange={(id) => setActiveReportId(id)}
                     />
                 );
             case 'team':
@@ -437,86 +619,22 @@ const ProjectWorkspace: React.FC = () => {
 
     return (
         <>
-            <div className="flex flex-col h-full bg-white relative">
-                <header className="flex-none h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30 gap-4">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => navigate('/projects')} className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium pr-2">
-                            <ChevronRightIcon className="h-4 w-4 rotate-180" />
-                            Back
-                        </button>
-                        <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 bg-weflora-mint/20 rounded-lg flex items-center justify-center text-weflora-teal">
-                                <FolderIcon className="h-5 w-5" />
-                            </div>
-                            <span className="text-lg font-bold text-slate-900 truncate max-w-[200px]">{project.name}</span>
-                        </div>
-                        <div className="h-6 w-px bg-slate-200 mx-1"></div>
-                        <div className="flex items-center gap-1">
-                            {['overview', 'worksheets', 'reports', 'team'].map((tab) => (
-                                <ProjectNavTab 
-                                    key={tab} 
-                                    label={tab} 
-                                    active={activeTab === tab} 
-                                    onClick={() => handleTabChange(tab)} 
-                                />
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <button 
-                            onClick={() => handleTabChange('files')}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
-                                activeTab === 'files'
-                                ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark'
-                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                            }`}
-                        >
-                            <DatabaseIcon className={`h-4 w-4 ${activeTab === 'files' ? 'text-weflora-teal-dark' : 'text-weflora-teal'}`} />
-                            <span>Project Files</span>
-                        </button>
-
-                        {activeTab === 'worksheets' && matrices.length > 0 && (
-                            <button 
-                                onClick={toggleManage}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
-                                    rightPanel === 'manage'
-                                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark' 
-                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                                }`}
-                            >
-                                <SlidersIcon className="h-4 w-4 text-weflora-teal" />
-                                <span className="hidden sm:inline">Worksheet Setting</span>
-                            </button>
-                        )}
-                        
-                        {activeTab === 'reports' && reports.length > 0 && (
-                            <button 
-                                onClick={toggleManage}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
-                                    rightPanel === 'manage'
-                                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark' 
-                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                                }`}
-                            >
-                                <PencilIcon className="h-4 w-4 text-weflora-teal" />
-                                <span className="hidden sm:inline">Report Setting</span>
-                            </button>
-                        )}
-
-                        <button 
-                            onClick={toggleChat}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap ${
-                                rightPanel === 'chat'
-                                ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark'
-                                : 'bg-white border-slate-200 text-slate-600 hover:bg-weflora-mint/10 hover:text-weflora-teal hover:border-weflora-teal'
-                            }`}
-                        >
-                            <SparklesIcon className={`h-4 w-4 ${rightPanel === 'chat' ? 'text-weflora-teal' : 'text-weflora-teal'}`} />
-                            <span>Ask FloraGPT</span>
-                        </button>
-                    </div>
-                </header>
+            <div className="flex flex-col h-full bg-weflora-mint relative">
+                <ProjectHeader
+                    projectName={project.name || project.id}
+                    activeTab={activeTab === 'overview' || activeTab === 'worksheets' || activeTab === 'reports' || activeTab === 'team' ? activeTab : undefined}
+                    onBackToProjects={() => navigate('/projects')}
+                    onNavigateTab={(tab) => handleTabChange(tab)}
+                    onOpenProjectFiles={() => handleTabChange('files')}
+                    onOpenProjectSettings={() => setRightPanel(current => current === 'manage' ? 'none' : 'manage')}
+                    settingsOpen={rightPanel === 'manage'}
+                    onQuickAsk={() => toggleAssistant(
+                        activeTab === 'worksheets' ? 'worksheet'
+                        : activeTab === 'reports' ? 'report'
+                        : 'project'
+                    )}
+                    quickAskActive={rightPanel === 'chat'}
+                />
 
                 <div className="flex-1 overflow-hidden bg-white relative">
                     {renderContent()}
@@ -526,6 +644,21 @@ const ProjectWorkspace: React.FC = () => {
                     {renderRightPanelContent()}
                 </ResizablePanel>
             </div>
+
+            <ConfirmDeleteModal
+                isOpen={Boolean(pendingDeleteFileId)}
+                title="Delete project file?"
+                description={`This will permanently delete "${
+                    pendingDeleteFileId ? (files.find(f => f.id === pendingDeleteFileId)?.name || 'this file') : 'this file'
+                }" from the project. This cannot be undone.`}
+                confirmLabel="Delete file"
+                onCancel={() => setPendingDeleteFileId(null)}
+                onConfirm={() => {
+                    if (!pendingDeleteFileId) return;
+                    deleteProjectFile(pendingDeleteFileId, projectId);
+                    setPendingDeleteFileId(null);
+                }}
+            />
 
             {isWorksheetWizardOpen && (
                 <WorksheetWizard 

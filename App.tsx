@@ -4,13 +4,17 @@ import { BrowserRouter, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import FilePreview from './components/FilePreview';
+import GlobalTopBar from './components/GlobalTopBar';
+import EvidencePanel from './components/EvidencePanel';
+import { ResizablePanel } from './components/ResizablePanel';
+import ChatView from './components/ChatView';
 import { DataProvider, useData } from './contexts/DataContext';
 import { ProjectProvider, useProject } from './contexts/ProjectContext';
 import { ChatProvider, useChat } from './contexts/ChatContext';
 import { UIProvider, useUI } from './contexts/UIContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AuthView from './components/AuthView';
-import { XIcon, CheckCircleIcon, AlertTriangleIcon } from './components/icons';
+import { XIcon, AlertTriangleIcon, CheckCircleIcon, SparklesIcon } from './components/icons';
 import type { ProjectFile, KnowledgeItem } from './types';
 
 // -- Global Toast Component --
@@ -21,10 +25,10 @@ const GlobalToast = () => {
     return (
         <div className={`fixed bottom-6 right-6 z-[100] flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border animate-slideUp ${
             notification.type === 'error' 
-                ? 'bg-red-50 border-red-100 text-red-800' 
+                ? 'bg-weflora-red/10 border-weflora-red/20 text-weflora-red' 
                 : 'bg-slate-800 text-white border-slate-700'
         }`}>
-            {notification.type === 'error' ? <AlertTriangleIcon className="h-5 w-5" /> : <CheckCircleIcon className="h-5 w-5 text-green-400" />}
+            {notification.type === 'error' ? <AlertTriangleIcon className="h-5 w-5" /> : <CheckCircleIcon className="h-5 w-5 text-weflora-success" />}
             <span className="text-sm font-medium">{notification.message}</span>
             <button onClick={closeNotification} className="ml-2 opacity-70 hover:opacity-100">
                 <XIcon className="h-4 w-4" />
@@ -36,6 +40,7 @@ const GlobalToast = () => {
 const AppContent: React.FC = () => {
     const { user, loading } = useAuth();
     const navigate = useNavigate();
+    const [assistantPanelWidth, setAssistantPanelWidth] = useState(420);
     
     // Hooks must be inside the component
     const uiContext = useUI();
@@ -50,7 +55,8 @@ const AppContent: React.FC = () => {
     const { 
         isSidebarOpen, setIsSidebarOpen, isSidebarCollapsed, toggleSidebarCollapse,
         selectedProjectId, setSelectedProjectId,
-        previewItem, closeFilePreview, openFilePreview
+        previewItem, closeFilePreview, openFilePreview,
+        isAssistantOpen, assistantDraftKey, closeAssistantPanel
     } = uiContext;
 
     const {
@@ -59,17 +65,21 @@ const AppContent: React.FC = () => {
     } = dataContext;
 
     const {
-        projects, setProjects
+        projects, createProject
     } = projectContext;
 
     const { 
-        sendMessage: handleSendMessage 
+        sendMessage: handleSendMessage,
+        messages,
+        isGenerating
     } = chatContext;
 
-    const handleCreateProject = (newProject: any) => {
-        setProjects([newProject, ...projects]);
-        setSelectedProjectId(newProject.id);
-        navigate(`/project/${newProject.id}`);
+    const handleCreateProject = async (newProject: any) => {
+        const created = await createProject(newProject);
+        if (!created) return;
+        console.info('[project-created]', { source: 'sidebar', id: created.id });
+        setSelectedProjectId(created.id);
+        navigate(`/project/${created.id}`);
     };
 
     // Wrapper to handle viewMode fallback for global queries
@@ -87,7 +97,7 @@ const AppContent: React.FC = () => {
     };
 
     return (
-        <div className="flex h-[100dvh] w-full bg-white overflow-hidden font-sans text-slate-900">
+        <div className="flex h-[100dvh] w-full bg-weflora-mintLight overflow-hidden font-sans text-slate-900">
             <GlobalToast />
             
             {/* Global File Preview Modal (Controlled by UI Context) */}
@@ -122,14 +132,42 @@ const AppContent: React.FC = () => {
                 toggleCollapse={toggleSidebarCollapse}
             />
 
-            {/* Main Layout Area - Header logic is now delegated to MainContent routes */}
+            {/* Main Layout Area */}
             <div className="flex-1 flex flex-col h-full min-w-0 relative">
+                <GlobalTopBar />
                 <main className="flex-1 overflow-hidden relative">
                     <MainContent 
                         onNavigate={(path) => navigate(path === 'home' ? '/' : `/${path}`)}
                         onSelectProject={(id) => { setSelectedProjectId(id); navigate(`/project/${id}`); }}
                         onOpenMenu={() => setIsSidebarOpen(true)}
                     />
+                    <EvidencePanel />
+                    <ResizablePanel
+                        isOpen={isAssistantOpen}
+                        onClose={closeAssistantPanel}
+                        width={assistantPanelWidth}
+                        setWidth={setAssistantPanelWidth}
+                        minWidth={320}
+                        maxWidth={800}
+                    >
+                        <div className="h-full bg-white flex flex-col">
+                            <ChatView
+                                chat={{ id: 'global-assistant', title: 'Ask FloraGPT', description: 'Global assistant', icon: SparklesIcon, time: 'Now' }}
+                                messages={messages}
+                                onBack={() => closeAssistantPanel()}
+                                onSendMessage={(text, files, instructions, model, contextItems) => {
+                                    // New research semantics: opening the panel clears active thread; sending creates a new one.
+                                    handleSendMessage(text, files, instructions, model, contextItems, 'home', false, false);
+                                }}
+                                isGenerating={isGenerating}
+                                onRegenerateMessage={() => {}}
+                                onOpenMenu={() => {}}
+                                variant="panel"
+                                draftKey={assistantDraftKey}
+                                contextProjectId={selectedProjectId || undefined}
+                            />
+                        </div>
+                    </ResizablePanel>
                 </main>
             </div>
         </div>

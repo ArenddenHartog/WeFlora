@@ -1,25 +1,35 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import type { ReportDocument, Report, Matrix } from '../types';
 import ReportEditorView from './ReportEditorView';
 import { 
     FileTextIcon, PlusIcon, PencilIcon, CheckIcon, XIcon, 
     ArrowUpIcon, HistoryIcon, DownloadIcon, BookmarkIcon, CheckCircleIcon, RefreshIcon,
-    FilePdfIcon, FileCodeIcon, BookIcon
+    FilePdfIcon, FileCodeIcon, BookIcon, SparklesIcon
 } from './icons';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
+import EvidenceGlow from './EvidenceGlow';
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface ReportContainerProps {
     document: ReportDocument;
+    initialActiveTabId?: string;
     onUpdateDocument: (doc: ReportDocument) => void;
     onClose?: () => void;
     availableMatrices?: Matrix[]; 
     onToggleAssistant?: () => void; // New Prop
+    onOpenAssistantChat?: () => void; // icon-only entry point (entity chat)
+    assistantChatActive?: boolean;
+    onActiveReportIdChange?: (reportId: string) => void;
+    hideHeader?: boolean;
 }
 
 const ReportContainer: React.FC<ReportContainerProps> = ({ 
-    document: reportDoc, onUpdateDocument, onClose, availableMatrices, onToggleAssistant 
+    document: reportDoc, initialActiveTabId, onUpdateDocument, onClose, availableMatrices, onToggleAssistant, onOpenAssistantChat, assistantChatActive, onActiveReportIdChange, hideHeader
 }) => {
-    const [activeTabId, setActiveTabId] = useState<string>(reportDoc.tabs[0]?.id || '');
+    const [activeTabId, setActiveTabId] = useState<string>(initialActiveTabId || reportDoc.tabs[0]?.id || '');
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [titleInput, setTitleInput] = useState(reportDoc.title);
     
@@ -32,12 +42,23 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
     // Download State
     const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
     const downloadMenuRef = useRef<HTMLDivElement>(null);
+    const [pendingDeleteTabId, setPendingDeleteTabId] = useState<string | null>(null);
+    const [assistantArmedAt, setAssistantArmedAt] = useState<string | null>(null);
+    const [assistantMarks, setAssistantMarks] = useState<Record<string, string>>({});
+    const lastContentRef = useRef<Record<string, string>>({});
 
     useEffect(() => {
         if (!reportDoc.tabs.find(t => t.id === activeTabId) && reportDoc.tabs.length > 0) {
             setActiveTabId(reportDoc.tabs[0].id);
         }
     }, [reportDoc.tabs, activeTabId]);
+
+    useEffect(() => {
+        if (!initialActiveTabId) return;
+        if (reportDoc.tabs.some(t => t.id === initialActiveTabId)) {
+            setActiveTabId(initialActiveTabId);
+        }
+    }, [initialActiveTabId, reportDoc.tabs]);
 
     // Close download menu on outside click
     useEffect(() => {
@@ -51,6 +72,14 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
     }, [isDownloadMenuOpen]);
 
     const activeReport = reportDoc.tabs.find(t => t.id === activeTabId);
+    useEffect(() => {
+        if (activeReport?.id) onActiveReportIdChange?.(activeReport.id);
+    }, [activeReport?.id, onActiveReportIdChange]);
+    useEffect(() => {
+        if (activeReport) {
+            lastContentRef.current[activeReport.id] = activeReport.content;
+        }
+    }, [activeReport]);
 
     // --- Handlers ---
 
@@ -82,6 +111,13 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
     };
 
     const handleReportUpdate = (updatedReport: Report) => {
+        // Heuristic: if the assistant panel was opened and content changed, mark as AI-generated.
+        const prev = lastContentRef.current[updatedReport.id] ?? '';
+        if (assistantArmedAt && updatedReport.content !== prev) {
+            setAssistantMarks(prevMarks => ({ ...prevMarks, [updatedReport.id]: assistantArmedAt }));
+            setAssistantArmedAt(null);
+        }
+        lastContentRef.current[updatedReport.id] = updatedReport.content;
         const newTabs = reportDoc.tabs.map(t => t.id === updatedReport.id ? updatedReport : t);
         onUpdateDocument({ ...reportDoc, tabs: newTabs });
     };
@@ -92,17 +128,7 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
             alert("A document must have at least one section.");
             return;
         }
-        
-        setTimeout(() => {
-            if (window.confirm("Delete this section?")) {
-                const newTabs = reportDoc.tabs.filter(t => t.id !== tabId);
-                // Preemptively switch if we are deleting the active tab
-                if (activeTabId === tabId) {
-                    setActiveTabId(newTabs[0].id);
-                }
-                onUpdateDocument({ ...reportDoc, tabs: newTabs });
-            }
-        }, 0);
+        setPendingDeleteTabId(tabId);
     };
 
     // Tab Renaming
@@ -132,6 +158,78 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
     const handleTabKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') saveTabName();
         if (e.key === 'Escape') setEditingTabId(null);
+    };
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+    );
+
+    const rootTab = useMemo(() => reportDoc.tabs.find(t => t.id === reportDoc.id) || null, [reportDoc.id, reportDoc.tabs]);
+    const reorderableTabs = useMemo(() => {
+        if (!rootTab) return reportDoc.tabs;
+        return reportDoc.tabs.filter(t => t.id !== reportDoc.id);
+    }, [rootTab, reportDoc.id, reportDoc.tabs]);
+
+    const handleTabsReorder = (activeId: string, overId: string) => {
+        const tabsToMove = reorderableTabs;
+        const oldIndex = tabsToMove.findIndex(t => t.id === activeId);
+        const newIndex = tabsToMove.findIndex(t => t.id === overId);
+        if (oldIndex < 0 || newIndex < 0) return;
+
+        const moved = arrayMove(tabsToMove, oldIndex, newIndex);
+        const nextTabs = rootTab ? [rootTab, ...moved] : moved;
+        // TODO(SCHEMA_CONTRACT.md): persist section order to DB once reports.order is supported server-side.
+        const withOrder = nextTabs.map((t, idx) => ({ ...t, order: idx }));
+        onUpdateDocument({ ...reportDoc, tabs: withOrder });
+    };
+
+    const SortableTab: React.FC<{ tab: Report }> = ({ tab }) => {
+        const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id });
+        const style = { transform: CSS.Transform.toString(transform), transition } as React.CSSProperties;
+
+        return (
+            <div
+                ref={setNodeRef}
+                style={style}
+                {...attributes}
+                {...listeners}
+                onClick={() => setActiveTabId(tab.id)}
+                onDoubleClick={() => startRenamingTab(tab)}
+                className={`
+                    group flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-t-md cursor-pointer select-none min-w-[100px] max-w-[200px] border-b-2 transition-colors relative flex-shrink-0
+                    ${isDragging ? 'opacity-80 ring-2 ring-weflora-teal/30 bg-weflora-teal/10' : ''}
+                    ${activeTabId === tab.id 
+                        ? 'bg-white text-weflora-teal border-weflora-teal shadow-sm' 
+                        : 'bg-transparent text-slate-500 border-transparent hover:bg-slate-100 hover:text-slate-700'
+                    }
+                `}
+                title="Drag to reorder"
+            >
+                {editingTabId === tab.id ? (
+                    <input
+                        type="text"
+                        value={tabNameInput}
+                        onChange={(e) => setTabNameInput(e.target.value)}
+                        onBlur={saveTabName}
+                        onKeyDown={handleTabKeyDown}
+                        className="w-full bg-white border border-weflora-teal rounded px-1 outline-none text-xs font-bold"
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()} 
+                    />
+                ) : (
+                    <span className="truncate flex-1">{tab.title}</span>
+                )}
+
+                {!editingTabId && (
+                    <button 
+                        onClick={(e) => handleDeleteTab(e, tab.id)}
+                        className={`h-8 w-8 flex items-center justify-center cursor-pointer rounded hover:bg-weflora-red/20 hover:text-weflora-red opacity-0 group-hover:opacity-100 transition-opacity ${activeTabId === tab.id ? 'text-slate-300' : 'text-slate-400'}`}
+                    >
+                        <XIcon className="h-3 w-3" />
+                    </button>
+                )}
+            </div>
+        );
     };
 
     const handleSave = () => {
@@ -186,6 +284,7 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
         <div className="flex flex-col h-full bg-white relative">
             
             {/* 1. Document Header */}
+            {!hideHeader && (
             <header className="flex-none h-14 border-b border-slate-200 bg-white flex items-center justify-between px-4 z-40 print:hidden">
                 <div className="flex items-center gap-3">
                     <div className="h-8 w-8 bg-weflora-mint/20 rounded-lg flex items-center justify-center text-weflora-teal">
@@ -203,7 +302,7 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
                                 className="px-2 py-1 border border-weflora-teal rounded text-lg font-bold text-slate-900 outline-none focus:ring-2 focus:ring-weflora-mint/50 bg-white"
                                 autoFocus
                             />
-                            <button onClick={handleTitleSave} className="p-1 text-green-600 hover:bg-green-50 rounded"><CheckIcon className="h-4 w-4" /></button>
+                            <button onClick={handleTitleSave} className="p-1 text-weflora-success hover:bg-weflora-success/10 rounded"><CheckIcon className="h-4 w-4" /></button>
                         </div>
                     ) : (
                         <div className="group flex items-center gap-2 cursor-pointer" onClick={() => setIsEditingTitle(true)}>
@@ -234,13 +333,13 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
                             {isDownloadMenuOpen && (
                                 <div className="absolute top-full right-0 mt-2 w-40 bg-white rounded-lg shadow-xl border border-slate-200 z-[100] animate-fadeIn overflow-hidden">
                                     <button onClick={() => handleDownload('md')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                                        <FileCodeIcon className="h-4 w-4 text-blue-600" /> Markdown
+                                        <FileCodeIcon className="h-4 w-4 text-weflora-teal" /> Markdown
                                     </button>
                                     <button onClick={() => handleDownload('docx')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                                        <BookIcon className="h-4 w-4 text-blue-600" /> Word
+                                        <BookIcon className="h-4 w-4 text-weflora-teal" /> Word
                                     </button>
                                     <button onClick={() => handleDownload('pdf')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                                        <FilePdfIcon className="h-4 w-4 text-red-600" /> PDF (Print)
+                                        <FilePdfIcon className="h-4 w-4 text-weflora-red" /> PDF (Print)
                                     </button>
                                 </div>
                             )}
@@ -252,22 +351,57 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
                     <button onClick={handleSave} className={`flex items-center justify-center p-2 rounded-lg transition-colors ${isSaving ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10'}`}>
                         {isSaving ? (<RefreshIcon className="h-5 w-5 animate-spin" />) : (<CheckCircleIcon className="h-5 w-5" />)}
                     </button>
+                    {onOpenAssistantChat && (
+                        <button
+                            onClick={onOpenAssistantChat}
+                            className={`ml-1 p-2 rounded-lg transition-colors ${
+                                assistantChatActive ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10'
+                            }`}
+                            title="Assistant"
+                        >
+                            <SparklesIcon className="h-5 w-5" />
+                        </button>
+                    )}
                     <button onClick={onClose} className="ml-2 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                         <XIcon className="h-5 w-5" />
                     </button>
                 </div>
             </header>
+            )}
 
             {/* 2. Content Area (ReportEditorView - Toolbar Hidden) */}
             <div className="flex-1 overflow-hidden relative">
-                <ReportEditorView 
-                    report={activeReport}
-                    onUpdate={handleReportUpdate}
-                    onClose={() => {}} 
-                    hideToolbar={true}
-                    availableMatrices={availableMatrices}
-                    onToggleAssistant={onToggleAssistant} // Passed down
-                />
+                {assistantMarks[activeReport.id] ? (
+                    <EvidenceGlow
+                        status="generated"
+                        provenance={{ label: 'Assistant-inserted content', generatedAt: assistantMarks[activeReport.id] }}
+                        className="h-full"
+                    >
+                        <ReportEditorView 
+                            report={activeReport}
+                            onUpdate={handleReportUpdate}
+                            onClose={() => {}} 
+                            hideToolbar={true}
+                            availableMatrices={availableMatrices}
+                            onToggleAssistant={() => {
+                                setAssistantArmedAt(new Date().toLocaleString());
+                                onToggleAssistant?.();
+                            }}
+                        />
+                    </EvidenceGlow>
+                ) : (
+                    <ReportEditorView 
+                        report={activeReport}
+                        onUpdate={handleReportUpdate}
+                        onClose={() => {}} 
+                        hideToolbar={true}
+                        availableMatrices={availableMatrices}
+                        onToggleAssistant={() => {
+                            setAssistantArmedAt(new Date().toLocaleString());
+                            onToggleAssistant?.();
+                        }}
+                    />
+                )}
             </div>
 
             {/* 3. Bottom Tab Bar (Renamable) */}
@@ -281,45 +415,69 @@ const ReportContainer: React.FC<ReportContainerProps> = ({
                     <PlusIcon className="h-4 w-4" />
                 </button>
 
-                {reportDoc.tabs.map(tab => (
-                    <div 
-                        key={tab.id}
-                        onClick={() => setActiveTabId(tab.id)}
-                        onDoubleClick={() => startRenamingTab(tab)}
-                        className={`
-                            group flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-t-md cursor-pointer select-none min-w-[100px] max-w-[200px] border-b-2 transition-colors relative flex-shrink-0
-                            ${activeTabId === tab.id 
-                                ? 'bg-white text-weflora-teal border-weflora-teal shadow-sm' 
-                                : 'bg-transparent text-slate-500 border-transparent hover:bg-slate-100 hover:text-slate-700'
-                            }
-                        `}
-                    >
-                        {editingTabId === tab.id ? (
-                            <input
-                                type="text"
-                                value={tabNameInput}
-                                onChange={(e) => setTabNameInput(e.target.value)}
-                                onBlur={saveTabName}
-                                onKeyDown={handleTabKeyDown}
-                                className="w-full bg-white border border-weflora-teal rounded px-1 outline-none text-xs font-bold"
-                                autoFocus
-                                onClick={(e) => e.stopPropagation()} 
-                            />
-                        ) : (
-                            <span className="truncate flex-1">{tab.title}</span>
-                        )}
-                        
-                        {!editingTabId && (
-                            <button 
-                                onClick={(e) => handleDeleteTab(e, tab.id)}
-                                className={`p-0.5 rounded hover:bg-red-100 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ${activeTabId === tab.id ? 'text-slate-300' : 'text-slate-400'}`}
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={({ active, over }) => {
+                        if (!over) return;
+                        if (active.id === over.id) return;
+                        handleTabsReorder(String(active.id), String(over.id));
+                    }}
+                >
+                    <SortableContext items={reorderableTabs.map(t => t.id)} strategy={horizontalListSortingStrategy}>
+                        {rootTab && (
+                            <div
+                                key={rootTab.id}
+                                onClick={() => setActiveTabId(rootTab.id)}
+                                onDoubleClick={() => startRenamingTab(rootTab)}
+                                className={`
+                                    group flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-t-md cursor-pointer select-none min-w-[100px] max-w-[200px] border-b-2 transition-colors relative flex-shrink-0
+                                    ${activeTabId === rootTab.id 
+                                        ? 'bg-white text-weflora-teal border-weflora-teal shadow-sm' 
+                                        : 'bg-transparent text-slate-500 border-transparent hover:bg-slate-100 hover:text-slate-700'
+                                    }
+                                `}
                             >
-                                <XIcon className="h-3 w-3" />
-                            </button>
+                                {editingTabId === rootTab.id ? (
+                                    <input
+                                        type="text"
+                                        value={tabNameInput}
+                                        onChange={(e) => setTabNameInput(e.target.value)}
+                                        onBlur={saveTabName}
+                                        onKeyDown={handleTabKeyDown}
+                                        className="w-full bg-white border border-weflora-teal rounded px-1 outline-none text-xs font-bold"
+                                        autoFocus
+                                        onClick={(e) => e.stopPropagation()} 
+                                    />
+                                ) : (
+                                    <span className="truncate flex-1">{rootTab.title}</span>
+                                )}
+                            </div>
                         )}
-                    </div>
-                ))}
+
+                        {reorderableTabs.map(tab => (
+                            <SortableTab key={tab.id} tab={tab} />
+                        ))}
+                    </SortableContext>
+                </DndContext>
             </div>
+
+            <ConfirmDeleteModal
+                isOpen={Boolean(pendingDeleteTabId)}
+                title="Delete section?"
+                description={`This will permanently delete "${
+                    pendingDeleteTabId ? (reportDoc.tabs.find(t => t.id === pendingDeleteTabId)?.tabTitle || reportDoc.tabs.find(t => t.id === pendingDeleteTabId)?.title || 'this section') : 'this section'
+                }" from this report. This cannot be undone.`}
+                confirmLabel="Delete section"
+                onCancel={() => setPendingDeleteTabId(null)}
+                onConfirm={() => {
+                    if (!pendingDeleteTabId) return;
+                    const newTabs = reportDoc.tabs.filter(t => t.id !== pendingDeleteTabId);
+                    if (activeTabId === pendingDeleteTabId && newTabs.length > 0) setActiveTabId(newTabs[0].id);
+                    onUpdateDocument({ ...reportDoc, tabs: newTabs });
+                    setPendingDeleteTabId(null);
+                }}
+            />
         </div>
     );
 };

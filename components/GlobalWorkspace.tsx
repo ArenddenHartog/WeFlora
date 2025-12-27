@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { 
     ViewMode, PinnedProject, Matrix, Report, 
     ContextItem, Chat
@@ -19,6 +20,7 @@ import { useProject } from '../contexts/ProjectContext';
 import { useChat } from '../contexts/ChatContext';
 import { useUI } from '../contexts/UIContext';
 import { aiService } from '../services/aiService';
+import { navigateToCreatedEntity } from '../utils/navigation';
 
 interface GlobalWorkspaceProps {
     view: ViewMode;
@@ -32,9 +34,10 @@ interface GlobalWorkspaceProps {
 const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
     view, onNavigate, onSelectProject, onOpenMenu, onOpenDestinationModal
 }) => {
+    const navigate = useNavigate();
     // Hooks
     const { 
-        projects: pinnedProjects, setProjects: setPinnedProjects, 
+        projects: pinnedProjects, createProject,
         files: allFiles, matrices: allMatrices, reports: allReports,
         createMatrix, deleteMatrix, createReport, deleteReport, 
         updateMatrix, updateReport, uploadProjectFile, deleteProjectFile
@@ -52,7 +55,7 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
         sendMessage, setActiveThreadId
     } = useChat();
 
-    const { selectedChatId } = useUI();
+    const { selectedChatId, sessionOpenOrigin, setSessionOpenOrigin } = useUI();
 
     // Derived Data
     const standaloneMatrices = useMemo(() => allMatrices.filter(m => !m.projectId), [allMatrices]);
@@ -69,12 +72,12 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
     const [newProjStatus, setNewProjStatus] = useState<'Active' | 'Archived'>('Active');
     const [newProjDate, setNewProjDate] = useState(new Date().toISOString().split('T')[0]);
 
-    const handleCreateProjectSubmit = (e?: React.FormEvent) => {
+    const handleCreateProjectSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         if (!newProjName.trim()) return;
 
         const newProject: PinnedProject = {
-            id: `proj-${Date.now()}`,
+            id: `new-${Date.now()}`,
             name: newProjName,
             icon: FolderIcon,
             status: newProjStatus,
@@ -82,23 +85,53 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
             workspaceId: currentWorkspace.id, 
             members: []
         };
-        setPinnedProjects(prev => [newProject, ...prev]); // Optimistic
+        const created = await createProject(newProject);
+        if (!created) return;
+        console.info('[project-created]', { source: 'home', id: created.id });
         setIsCreateProjectOpen(false);
         setNewProjName('');
         setNewProjStatus('Active');
         setNewProjDate(new Date().toISOString().split('T')[0]);
     };
 
-    const handleCreateWorksheet = (matrix: Matrix) => {
-        createMatrix({ ...matrix, projectId: undefined }); // Standalone
+    const handleCreateWorksheet = async (matrix: Matrix) => {
+        const created = await createMatrix({ ...matrix, projectId: undefined }); // Standalone
+        if (!created) return null;
+        console.info('[create-flow] build worksheet (home)', {
+            kind: 'worksheet',
+            withinProject: Boolean(created.projectId),
+            projectId: created.projectId,
+            matrixId: created.id,
+            tabId: Boolean(created.projectId) ? created.id : undefined
+        });
+        navigateToCreatedEntity({
+            navigate,
+            kind: 'worksheet',
+            withinProject: false,
+            matrixId: created.id
+        });
         setIsCreateWorksheetOpen(false);
-        // Navigation handled by routing in MainContent usually, but here we might need to navigate
-        // Since we don't have navigate hook here (it's in MainContent logic), we rely on list view updates
+        return created;
     };
 
-    const handleCreateReport = (report: Report) => {
-        createReport({ ...report, projectId: undefined });
+    const handleCreateReport = async (report: Report) => {
+        const created = await createReport({ ...report, projectId: undefined });
+        if (!created) return null;
+        console.info('[create-flow] draft report (home)', {
+            kind: 'report',
+            withinProject: Boolean(created.projectId),
+            projectId: created.projectId,
+            reportId: created.id,
+            tabId: Boolean(created.projectId) ? created.id : undefined
+        });
+        navigateToCreatedEntity({
+            navigate,
+            kind: 'report',
+            withinProject: false,
+            reportId: created.id
+        });
         setIsCreateReportOpen(false);
+        return created;
     };
 
     switch (view) {
@@ -122,7 +155,11 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
                         onCopyContentToReport={(msg) => onOpenDestinationModal('report', msg)}
                         onCopyContentToWorksheet={(msg) => onOpenDestinationModal('worksheet', msg)}
                         isGenerating={isGenerating}
-                        onBack={() => onNavigate('research_history')}
+                        onBack={sessionOpenOrigin === 'sessions' ? () => {
+                            setSessionOpenOrigin(null);
+                            setActiveThreadId(null);
+                            navigate('/sessions');
+                        } : undefined}
                     />
                     {isCreateWorksheetOpen && (
                         <WorksheetWizard 
@@ -142,7 +179,7 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
                             templates={reportTemplates} 
                         />
                     )}
-                    <BaseModal isOpen={isCreateProjectOpen} onClose={() => setIsCreateProjectOpen(false)} title="Create New Project" size="md" footer={<><button onClick={() => setIsCreateProjectOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg font-medium text-sm transition-colors">Cancel</button><button onClick={handleCreateProjectSubmit} className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium text-sm shadow-sm transition-colors">Create Project</button></>}>
+                    <BaseModal isOpen={isCreateProjectOpen} onClose={() => setIsCreateProjectOpen(false)} title="Create New Project" size="md" footer={<><button onClick={() => setIsCreateProjectOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg font-medium text-sm transition-colors">Cancel</button><button onClick={handleCreateProjectSubmit} className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium text-sm shadow-sm transition-colors">Create Project</button></>}>
                         <form onSubmit={handleCreateProjectSubmit} className="space-y-4">
                             <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Project Name</label><input autoFocus type="text" required value={newProjName} onChange={(e) => setNewProjName(e.target.value)} placeholder="e.g., AMS-West Site Analysis" className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-weflora-teal focus:border-weflora-teal outline-none text-slate-900" /></div>
                             <div className="grid grid-cols-2 gap-4">
@@ -154,7 +191,18 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
                 </>
             );
         case 'projects':
-            return <ProjectsView projects={pinnedProjects} onSelectProject={onSelectProject} onOpenMenu={onOpenMenu} onCreateProject={(p) => setPinnedProjects(prev => [p, ...prev])} />;
+            return (
+                <ProjectsView
+                    projects={pinnedProjects}
+                    onSelectProject={onSelectProject}
+                    onOpenMenu={onOpenMenu}
+                    onCreateProject={async (p) => {
+                        const created = await createProject({ ...p, workspaceId: currentWorkspace.id });
+                        if (created) console.info('[project-created]', { source: 'projects-hub', id: created.id });
+                        return created;
+                    }}
+                />
+            );
         case 'chat':
             if (selectedChat) return <div className="h-full flex flex-col bg-white"><ChatView chat={selectedChat} messages={messages} onBack={() => onNavigate('home')} onSendMessage={sendMessage} isGenerating={isGenerating} onOpenMenu={onOpenMenu} onRegenerateMessage={() => {}} onContinueInReport={(msg) => onOpenDestinationModal('report', msg)} onContinueInWorksheet={(msg) => onOpenDestinationModal('worksheet', msg)} /></div>;
             return <div className="p-10 text-center text-slate-400">Chat not found</div>;

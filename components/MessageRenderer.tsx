@@ -1,29 +1,31 @@
 
-import React, { useState } from 'react';
-import { SparklesIcon, ChevronUpIcon, ChevronDownIcon } from './icons';
+import React, { useMemo, useState } from 'react';
+import { SparklesIcon, ChevronUpIcon, ChevronDownIcon, ShieldCheckIcon } from './icons';
 import { parseMarkdownTable } from '../utils/markdown';
+import type { Citation } from '../types';
+import { useUI } from '../contexts/UIContext';
 
 const ReasoningBlock = ({ text }: { text: string }) => {
     const [isOpen, setIsOpen] = useState(true);
     if (!text) return null;
     return (
-        <div className="border border-purple-200 bg-purple-50 rounded-lg mb-3 overflow-hidden">
+        <div className="border border-weflora-teal/20 bg-weflora-teal/10 rounded-lg mb-3 overflow-hidden">
             {/* Header: Click bubbles to parent (Edit) except for the toggle button */}
-            <div className="w-full flex items-center justify-between p-2 text-xs font-bold text-purple-700 hover:bg-purple-100 transition-colors select-none">
+            <div className="w-full flex items-center justify-between p-2 text-xs font-bold text-weflora-dark hover:bg-weflora-teal/20 transition-colors select-none">
                 <div className="flex items-center gap-2 cursor-pointer flex-1">
                     <SparklesIcon className="h-3 w-3" />
                     AI Reasoning & Context
                 </div>
                 <button 
                     onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
-                    className="p-1 hover:bg-purple-200 rounded text-purple-600 focus:outline-none"
+                    className="p-1 hover:bg-weflora-teal/20 rounded text-weflora-dark focus:outline-none"
                     title={isOpen ? "Collapse" : "Expand"}
                 >
                     {isOpen ? <ChevronUpIcon className="h-3 w-3" /> : <ChevronDownIcon className="h-3 w-3" />}
                 </button>
             </div>
             {isOpen && (
-                <div className="p-3 text-xs text-purple-900 border-t border-purple-100 whitespace-pre-wrap leading-relaxed cursor-text">
+                <div className="p-3 text-xs text-weflora-dark border-t border-weflora-teal/20 whitespace-pre-wrap leading-relaxed cursor-text">
                     {text}
                 </div>
             )}
@@ -42,6 +44,7 @@ const renderInlineStyles = (text: string) => {
 };
 
 export const MessageRenderer = ({ text }: { text: string }) => {
+    // Optional evidence chip support (call sites opt-in)
     let content = text;
     let reasoning = null;
 
@@ -129,5 +132,39 @@ export const MessageRenderer = ({ text }: { text: string }) => {
                 })}
             </div>
         </div>
+    );
+};
+
+type EvidenceChipProps = {
+    citations?: Citation[];
+    label?: string;
+};
+
+export const EvidenceChip: React.FC<EvidenceChipProps> = ({ citations, label }) => {
+    const { openEvidencePanel } = useUI();
+    const hasCitations = Boolean(citations && citations.length > 0);
+    const sources = useMemo(() => {
+        if (!citations) return [];
+        return Array.from(new Set(citations.map(c => c.source))).filter(Boolean);
+    }, [citations]);
+
+    return (
+        <button
+            onClick={() => openEvidencePanel({
+                label: label || (hasCitations ? 'Verified assistant answer' : 'Generated assistant answer'),
+                sources: sources.length > 0 ? sources : undefined,
+                generatedAt: new Date().toLocaleString(),
+            })}
+            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold border transition-colors ${
+                hasCitations
+                    ? 'bg-weflora-success/10 border-weflora-success/20 text-weflora-dark hover:bg-weflora-success/20'
+                    : 'bg-weflora-teal/10 border-weflora-teal/20 text-weflora-dark hover:bg-weflora-teal/20'
+            }`}
+            title="View evidence"
+            type="button"
+        >
+            {hasCitations ? <ShieldCheckIcon className="h-3 w-3" /> : <SparklesIcon className="h-3 w-3" />}
+            Evidence
+        </button>
     );
 };

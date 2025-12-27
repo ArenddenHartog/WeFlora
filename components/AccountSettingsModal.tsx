@@ -11,7 +11,7 @@ interface AccountSettingsModalProps {
 }
 
 const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOpen, onClose }) => {
-    const { user, signOut } = useAuth();
+    const { user } = useAuth();
     const { showNotification } = useUI();
     const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'org'>('profile');
     const [loading, setLoading] = useState(false);
@@ -126,7 +126,7 @@ const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOpen, onC
                             </div>
 
                             <div className="pt-4">
-                                <button type="submit" disabled={loading} className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium text-sm transition-colors disabled:opacity-50 shadow-sm">
+                                <button type="submit" disabled={loading} className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium text-sm transition-colors disabled:opacity-50 shadow-sm">
                                     {loading ? 'Saving...' : 'Save Changes'}
                                 </button>
                             </div>
@@ -160,7 +160,7 @@ const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOpen, onC
                             </div>
 
                             <div className="pt-4">
-                                <button type="submit" disabled={loading} className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium text-sm transition-colors disabled:opacity-50 shadow-sm">
+                                <button type="submit" disabled={loading} className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium text-sm transition-colors disabled:opacity-50 shadow-sm">
                                     {loading ? 'Updating...' : 'Update Password'}
                                 </button>
                             </div>
@@ -182,14 +182,6 @@ const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOpen, onC
                     )}
                 </div>
 
-                <div className="mt-6 pt-6 border-t border-slate-200">
-                    <button 
-                        onClick={signOut}
-                        className="w-full px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium text-sm transition-colors border border-red-200"
-                    >
-                        Sign Out
-                    </button>
-                </div>
             </div>
         </BaseModal>
     );

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Chat, ChatMessage, ContextItem } from '../types';
 import ChatInput from './ChatInput';
-import { MessageRenderer } from './MessageRenderer';
+import { MessageRenderer, EvidenceChip } from './MessageRenderer';
 import CitationsSidebar from './CitationsSidebar';
 import { 
     MenuIcon, ArrowUpIcon, RefreshIcon, CopyIcon, 
@@ -23,12 +23,13 @@ interface ChatViewProps {
     onContinueInReport?: (message: ChatMessage) => void;
     onContinueInWorksheet?: (message: ChatMessage) => void;
     contextProjectId?: string; // New prop for scoping
+    draftKey?: string;
 }
 
 const ChatView: React.FC<ChatViewProps> = ({ 
     chat, messages, onBack, onSendMessage, isGenerating, 
     onRegenerateMessage, onOpenMenu, variant = 'full',
-    onContinueInReport, onContinueInWorksheet, contextProjectId
+    onContinueInReport, onContinueInWorksheet, contextProjectId, draftKey
 }) => {
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
@@ -82,7 +83,6 @@ const ChatView: React.FC<ChatViewProps> = ({
     return (
         <div className="flex h-full bg-white relative overflow-hidden">
             <div className="flex-1 flex flex-col min-w-0">
-                {/* Header */}
                 <header className="flex-none h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-white z-20">
                     <div className="flex items-center gap-3">
                         {variant === 'full' && (
@@ -139,6 +139,11 @@ const ChatView: React.FC<ChatViewProps> = ({
 
                                     <div className={`flex-1 min-w-0 max-w-[85%] ${msg.sender === 'user' ? 'text-right' : ''}`}>
                                         <div className={`prose prose-sm max-w-none text-slate-700 leading-relaxed ${msg.sender === 'user' ? 'bg-white border border-slate-200 p-3 rounded-2xl rounded-tr-none shadow-sm text-left inline-block' : ''}`}>
+                                            {msg.sender === 'ai' && (
+                                                <div className="flex justify-end mb-2">
+                                                    <EvidenceChip citations={msg.citations} label="Assistant answer" />
+                                                </div>
+                                            )}
                                             <MessageRenderer text={msg.text} />
                                         </div>
                                         
@@ -154,7 +159,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                                                 {onContinueInWorksheet && (
                                                     <button 
                                                         onClick={() => onContinueInWorksheet(msg)} 
-                                                        className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors hover:bg-weflora-mint/20 hover:text-weflora-teal-dark text-slate-400`}
+                                                        className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors hover:bg-weflora-mint/20 hover:text-weflora-dark text-slate-400`}
                                                         title="Extract Data to Worksheet"
                                                     >
                                                         <TableIcon className="h-3.5 w-3.5" />
@@ -207,6 +212,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                                 isLoading={isGenerating}
                                 highlightedFileName={highlightedFileName}
                                 contextProjectId={contextProjectId}
+                                draftKey={draftKey}
                             />
                         </div>
                     </div>

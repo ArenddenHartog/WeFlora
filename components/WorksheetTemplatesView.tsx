@@ -2,9 +2,10 @@
 import React, { useState } from 'react';
 import type { WorksheetTemplate, Matrix } from '../types';
 import { 
-    SearchIcon, MenuIcon, PlusIcon, TableIcon, LightningBoltIcon, MagicWandIcon, XIcon, FolderIcon, TrashIcon
+    SearchIcon, MenuIcon, PlusIcon, TableIcon, LightningBoltIcon, MagicWandIcon, XIcon, FolderIcon
 } from './icons';
 import BaseModal from './BaseModal';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 interface WorksheetTemplatesViewProps {
     items: WorksheetTemplate[];
@@ -24,6 +25,7 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
     const [newTitle, setNewTitle] = useState('');
     const [newDescription, setNewDescription] = useState('');
     const [newTags, setNewTags] = useState('');
+    const [pendingDeleteMatrixId, setPendingDeleteMatrixId] = useState<string | null>(null);
 
     const filteredTemplates = items.filter(item => 
         item.title.toLowerCase().includes(search.toLowerCase()) || 
@@ -38,12 +40,7 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
 
     const handleDelete = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        // Use setTimeout to avoid UI freeze
-        setTimeout(() => {
-            if (window.confirm("Are you sure you want to delete this worksheet?")) {
-                onDeleteMatrix && onDeleteMatrix(id);
-            }
-        }, 0);
+        setPendingDeleteMatrixId(id);
     };
 
     const handleCreate = (e: React.FormEvent) => {
@@ -76,7 +73,7 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
         <div className="h-full overflow-y-auto bg-white p-4 md:p-8">
             <header className="mb-8">
                 <div className="flex items-center justify-between mb-6">
-                     <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4">
                         <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
                             <MenuIcon className="h-6 w-6" />
                         </button>
@@ -85,8 +82,8 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
                             <TableIcon className="h-6 w-6" />
                         </div>
                         <h1 className="text-2xl font-bold text-slate-800">Worksheet Hub</h1>
-                     </div>
-                     <div className="flex items-center gap-2">
+                    </div>
+                    <div className="flex items-center gap-2">
                         <button 
                             onClick={() => setIsCreateModalOpen(true)}
                             className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium border border-slate-200 hover:border-slate-300 transition-colors shadow-sm"
@@ -96,12 +93,12 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
                         </button>
                         <button 
                             onClick={onOpenCreateWorksheet}
-                            className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium shadow-sm transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium shadow-sm transition-colors"
                         >
                             <PlusIcon className="h-4 w-4" />
                             <span className="hidden sm:inline">Build Worksheet</span>
                         </button>
-                     </div>
+                    </div>
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-6 items-center">
@@ -144,14 +141,11 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredSheets.map(sheet => (
                         <div key={sheet.id} onClick={() => onOpenMatrix(sheet)} className="group flex flex-col bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-weflora-teal transition-all duration-200 cursor-pointer relative">
-                            <div className="p-5 flex-grow">
+                            <div className="p-5 flex-grow pb-10">
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="h-10 w-10 rounded-lg flex items-center justify-center border bg-weflora-mint/10 border-weflora-mint text-weflora-teal">
                                         <TableIcon className="h-5 w-5" />
                                     </div>
-                                    <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded">
-                                        General Worksheet
-                                    </span>
                                 </div>
                                 <h3 className="text-lg font-bold text-slate-800 mb-1 group-hover:text-weflora-teal transition-colors pr-6">{sheet.title}</h3>
                                 <p className="text-sm text-slate-500 line-clamp-2 mb-4">{sheet.description || 'No description'}</p>
@@ -159,14 +153,18 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
                                     Last updated: {sheet.updatedAt || 'Recently'}
                                 </div>
                             </div>
+
+                            <span className="absolute bottom-4 right-4 text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded pointer-events-none">
+                                General Worksheet
+                            </span>
                             {/* Delete Button */}
                             {onDeleteMatrix && (
                                 <button 
                                     onClick={(e) => handleDelete(e, sheet.id)}
-                                    className="absolute top-4 right-4 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                    className="absolute top-4 right-4 h-8 w-8 flex items-center justify-center cursor-pointer text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                     title="Delete Worksheet"
                                 >
-                                    <TrashIcon className="h-4 w-4" />
+                                    <XIcon className="h-4 w-4" />
                                 </button>
                             )}
                         </div>
@@ -244,7 +242,7 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
                         </button>
                         <button 
                             onClick={handleCreate}
-                            className="px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm font-medium hover:bg-weflora-teal-dark shadow-sm transition-colors"
+                            className="px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm font-medium hover:bg-weflora-dark shadow-sm transition-colors"
                         >
                             Create Template
                         </button>
@@ -288,6 +286,21 @@ const WorksheetTemplatesView: React.FC<WorksheetTemplatesViewProps> = ({ items, 
                     </div>
                 </form>
             </BaseModal>
+
+            <ConfirmDeleteModal
+                isOpen={Boolean(pendingDeleteMatrixId)}
+                title="Delete worksheet?"
+                description={`This will permanently delete "${
+                    pendingDeleteMatrixId ? (standaloneMatrices.find(m => m.id === pendingDeleteMatrixId)?.title || 'this worksheet') : 'this worksheet'
+                }". This cannot be undone.`}
+                confirmLabel="Delete worksheet"
+                onCancel={() => setPendingDeleteMatrixId(null)}
+                onConfirm={() => {
+                    if (!pendingDeleteMatrixId) return;
+                    onDeleteMatrix && onDeleteMatrix(pendingDeleteMatrixId);
+                    setPendingDeleteMatrixId(null);
+                }}
+            />
         </div>
     );
 };

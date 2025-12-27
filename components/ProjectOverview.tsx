@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import type { PinnedProject, Matrix, Report, ProjectInsights, ProjectFile } from '../types';
 import { 
     RefreshIcon, SparklesIcon, ChartPieIcon, CheckCircleIcon, 
@@ -18,7 +18,7 @@ const ProjectOverview: React.FC<ProjectOverviewProps> = ({ project, matrices, re
     const [insights, setInsights] = useState<ProjectInsights | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
-    const generateInsights = async () => {
+    const generateInsights = useCallback(async () => {
         setIsLoading(true);
         try {
             const data = await aiService.generateProjectInsights(matrices, reports);
@@ -28,19 +28,19 @@ const ProjectOverview: React.FC<ProjectOverviewProps> = ({ project, matrices, re
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [matrices, reports]);
 
     useEffect(() => {
         if (!insights && (matrices.length > 0 || reports.length > 0)) {
             generateInsights();
         }
-    }, []);
+    }, [generateInsights, insights, matrices.length, reports.length]);
 
     const getIcon = (type?: string) => {
         switch (type) {
-            case 'chart': return <ChartPieIcon className="h-5 w-5 text-blue-500" />;
-            case 'alert': return <AlertTriangleIcon className="h-5 w-5 text-amber-500" />;
-            case 'check': return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
+            case 'chart': return <ChartPieIcon className="h-5 w-5 text-weflora-teal" />;
+            case 'alert': return <AlertTriangleIcon className="h-5 w-5 text-weflora-amber" />;
+            case 'check': return <CheckCircleIcon className="h-5 w-5 text-weflora-success" />;
             default: return <DatabaseIcon className="h-5 w-5 text-slate-500" />;
         }
     };
@@ -74,7 +74,7 @@ const ProjectOverview: React.FC<ProjectOverviewProps> = ({ project, matrices, re
                         <div className="bg-weflora-mint/10 border border-weflora-teal/20 rounded-xl p-4">
                             <div className="flex items-center gap-2 mb-2">
                                 <SparklesIcon className="h-4 w-4 text-weflora-teal" />
-                                <span className="text-xs font-bold text-weflora-teal-dark uppercase tracking-wider">AI Executive Summary</span>
+                                <span className="text-xs font-bold text-weflora-dark uppercase tracking-wider">AI Executive Summary</span>
                             </div>
                             <p className="text-sm text-slate-700 leading-relaxed">
                                 {isLoading ? "Analyzing project data..." : (insights?.summary || "No insights generated yet. Add worksheets or reports to get started.")}
@@ -89,7 +89,7 @@ const ProjectOverview: React.FC<ProjectOverviewProps> = ({ project, matrices, re
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         {/* Static Hardcoded Metrics as Fallback/Base */}
                         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-                            <div className="h-10 w-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
+                            <div className="h-10 w-10 bg-weflora-mint/20 rounded-lg flex items-center justify-center text-weflora-teal">
                                 <DatabaseIcon className="h-5 w-5" />
                             </div>
                             <div>
@@ -98,7 +98,7 @@ const ProjectOverview: React.FC<ProjectOverviewProps> = ({ project, matrices, re
                             </div>
                         </div>
                         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-                            <div className="h-10 w-10 bg-orange-50 rounded-lg flex items-center justify-center text-orange-600">
+                            <div className="h-10 w-10 bg-weflora-teal/10 rounded-lg flex items-center justify-center text-weflora-dark">
                                 <FolderIcon className="h-5 w-5" />
                             </div>
                             <div>
@@ -130,7 +130,7 @@ const ProjectOverview: React.FC<ProjectOverviewProps> = ({ project, matrices, re
                             <div className="divide-y divide-slate-100">
                                 {insights.actions.map((action, i) => (
                                     <div key={i} className="p-4 flex gap-4 hover:bg-slate-50 transition-colors">
-                                        <div className={`mt-0.5 ${action.type === 'missing_data' ? 'text-red-500' : 'text-blue-500'}`}>
+                                        <div className={`mt-0.5 ${action.type === 'missing_data' ? 'text-weflora-red' : 'text-weflora-teal'}`}>
                                             {action.type === 'missing_data' ? <AlertTriangleIcon className="h-5 w-5" /> : <ArrowUpIcon className="h-5 w-5" />}
                                         </div>
                                         <div>
@@ -180,7 +180,7 @@ const ProjectOverview: React.FC<ProjectOverviewProps> = ({ project, matrices, re
                             
                             return (
                                 <div key={i} className="flex gap-3 relative">
-                                    <div className={`w-5 h-5 rounded-full border-2 border-white shadow-sm flex-shrink-0 z-10 ${isMatrix ? 'bg-weflora-teal' : isReport ? 'bg-orange-400' : 'bg-blue-500'}`}></div>
+                                    <div className={`w-5 h-5 rounded-full border-2 border-white shadow-sm flex-shrink-0 z-10 ${isMatrix ? 'bg-weflora-teal' : isReport ? 'bg-weflora-amber' : 'bg-slate-400'}`}></div>
                                     <div>
                                         <div className="text-sm font-medium text-slate-800 truncate w-48">{name}</div>
                                         <div className="text-xs text-slate-400 flex items-center gap-1">

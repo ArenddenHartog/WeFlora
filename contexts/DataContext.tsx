@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from './AuthContext';
+import { FEATURES } from '../src/config/features';
 import type { 
     Workspace, RecentItem, KnowledgeItem, WorksheetTemplate, 
     PromptTemplate, ReportTemplate, Species
@@ -74,13 +75,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (!userId) return;
 
             // 1. Workspaces
-            try {
-                const { data: wsData } = await supabase.from('workspaces').select('*').eq('user_id', userId);
-                if (wsData && wsData.length > 0) {
-                    setWorkspaces(wsData);
-                    setCurrentWorkspace(wsData[0]);
-                }
-            } catch (e) { console.error("Error fetching workspaces", e); }
+            if (FEATURES.workspaces) {
+                try {
+                    const { data: wsData } = await supabase.from('workspaces').select('*').eq('user_id', userId);
+                    if (wsData && wsData.length > 0) {
+                        setWorkspaces(wsData);
+                        setCurrentWorkspace(wsData[0]);
+                    }
+                } catch (e) { console.error("Error fetching workspaces", e); }
+            }
 
             // 2. Templates (System + User)
             try {
@@ -146,18 +149,20 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             } catch (e) { console.error("Error fetching templates", e); }
 
             // 3. Species
-            try {
-                const { data: spData } = await supabase.from('species').select('*').limit(50);
-                if (spData) {
-                    setSpecies(spData.map(s => ({
-                        id: s.id,
-                        scientificName: s.scientific_name,
-                        commonName: s.common_name,
-                        family: s.family,
-                        tags: s.tags || []
-                    })));
-                }
-            } catch (e) { console.error("Error fetching species", e); }
+            if (FEATURES.species) {
+                try {
+                    const { data: spData } = await supabase.from('species').select('*').limit(50);
+                    if (spData) {
+                        setSpecies(spData.map(s => ({
+                            id: s.id,
+                            scientificName: s.scientific_name,
+                            commonName: s.common_name,
+                            family: s.family,
+                            tags: s.tags || []
+                        })));
+                    }
+                } catch (e) { console.error("Error fetching species", e); }
+            }
             
             // 4. Knowledge Items
             try {
@@ -244,6 +249,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (exists) return;
 
         const userId = (await supabase.auth.getUser()).data.user?.id;
+        if (!FEATURES.species) {
+            const local: Species = {
+                id: `sp-local-${Date.now()}`,
+                scientificName: speciesData.scientificName,
+                commonName: speciesData.commonName || '',
+                family: speciesData.family || '',
+                tags: speciesData.tags || []
+            };
+            setSpecies(prev => [...prev, local]);
+            return;
+        }
         
         const newSpecies = {
             scientific_name: speciesData.scientificName,

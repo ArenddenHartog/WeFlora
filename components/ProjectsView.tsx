@@ -1,15 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
 import type { PinnedProject, Member } from '../types';
-import { SearchIcon, PlusIcon, FolderIcon, FilterIcon, SortAscendingIcon, MoreHorizontalIcon, LockClosedIcon, MenuIcon, XIcon, ChevronDownIcon, TrashIcon } from './icons';
+import { SearchIcon, PlusIcon, FolderIcon, FilterIcon, SortAscendingIcon, XIcon, ChevronDownIcon, MenuIcon, ArchiveIcon } from './icons';
 import BaseModal from './BaseModal';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { useProject } from '../contexts/ProjectContext';
 
 interface ProjectsViewProps {
     projects: PinnedProject[];
     onSelectProject: (id: string) => void;
     onOpenMenu: () => void;
-    onCreateProject: (project: PinnedProject) => void;
+    onCreateProject: (project: PinnedProject) => Promise<{ id: string } | null>;
     onUpdateProject?: (project: PinnedProject) => void;
 }
 
@@ -18,11 +19,11 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'Archived'>('Active');
     const [sortOrder, setSortOrder] = useState<'name' | 'date'>('name');
-    const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
     
     // Expansion and Invite States
     const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
     const [inviteInputs, setInviteInputs] = useState<{[key: string]: string}>({});
+    const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState<string | null>(null);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,20 +39,11 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                 status: project.status === 'Active' ? 'Archived' : 'Active' 
             });
         }
-        setActiveMenuId(null);
     };
 
     const handleDeleteProject = (e: React.MouseEvent, projectId: string) => {
         e.stopPropagation();
-        if (window.confirm("Are you sure you want to delete this project? This will remove all files, worksheets, and reports associated with it.")) {
-            deleteProject(projectId);
-        }
-        setActiveMenuId(null);
-    };
-
-    const toggleMenu = (e: React.MouseEvent, projectId: string) => {
-        e.stopPropagation();
-        setActiveMenuId(activeMenuId === projectId ? null : projectId);
+        setPendingDeleteProjectId(projectId);
     };
 
     const toggleExpand = (e: React.MouseEvent, projectId: string) => {
@@ -93,14 +85,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
         setInviteInputs(prev => ({ ...prev, [project.id]: '' }));
     };
 
-    // Close menu when clicking outside
-    useEffect(() => {
-        const handleClickOutside = () => setActiveMenuId(null);
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
-    }, []);
-
-    const handleCreateProject = (e: React.FormEvent) => {
+    const handleCreateProject = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newProjectName.trim()) return;
 
@@ -114,7 +99,8 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
             members: [{ id: 'me', name: 'Arend den Hartog', initials: 'AH' }]
         };
         
-        onCreateProject(newProject);
+        const created = await onCreateProject(newProject);
+        if (!created) return;
         setIsModalOpen(false);
         
         // Reset form
@@ -139,7 +125,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
             <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 relative z-10">
                 <div className="flex items-center gap-4">
                     <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
-                         <MenuIcon className="h-6 w-6" />
+                        <MenuIcon className="h-6 w-6" />
                     </button>
                     <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
                         <FolderIcon className="h-6 w-6" />
@@ -148,7 +134,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                 </div>
                 <button 
                     onClick={() => setIsModalOpen(true)}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium transition-colors shadow-sm"
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium transition-colors shadow-sm"
                 >
                     <PlusIcon className="h-5 w-5" />
                     New Project
@@ -205,35 +191,29 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                         <div 
                             key={project.id}
                             onClick={() => onSelectProject(project.id)}
-                            className="group bg-white border border-slate-200 rounded-xl p-5 cursor-pointer hover:border-weflora-teal hover:shadow-md transition-all relative flex flex-col"
+                            className="group bg-white border border-slate-200 rounded-xl p-5 pb-10 cursor-pointer hover:border-weflora-teal hover:shadow-md transition-all relative flex flex-col"
                         >
                             <div className="flex justify-between items-start mb-4">
                                 <div className={`h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0 ${project.status === 'Archived' ? 'bg-slate-100 text-slate-400' : 'bg-weflora-mint/20 text-weflora-teal'}`}>
                                     <FolderIcon className="h-6 w-6" />
                                 </div>
                                 <div className="relative">
-                                    <button 
-                                        onClick={(e) => toggleMenu(e, project.id)}
-                                        className="p-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                        <MoreHorizontalIcon className="h-5 w-5" />
-                                    </button>
-                                    {activeMenuId === project.id && (
-                                        <div className="absolute right-0 mt-1 w-36 bg-white border border-slate-200 rounded-lg shadow-lg z-50">
-                                            <button
-                                                onClick={(e) => toggleProjectStatus(e, project)}
-                                                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 first:rounded-t-lg"
-                                            >
-                                                {project.status === 'Active' ? 'Archive' : 'Restore'}
-                                            </button>
-                                            <button
-                                                onClick={(e) => handleDeleteProject(e, project.id)}
-                                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 last:rounded-b-lg flex items-center gap-2"
-                                            >
-                                                <TrashIcon className="h-3.5 w-3.5" /> Delete
-                                            </button>
-                                        </div>
-                                    )}
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                            onClick={(e) => toggleProjectStatus(e, project)}
+                                            className="h-8 w-8 flex items-center justify-center cursor-pointer text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                            title={project.status === 'Active' ? 'Archive project' : 'Restore project'}
+                                        >
+                                            <ArchiveIcon className="h-4 w-4" />
+                                        </button>
+                                        <button 
+                                            onClick={(e) => handleDeleteProject(e, project.id)}
+                                            className="h-8 w-8 flex items-center justify-center cursor-pointer text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors"
+                                            title="Delete project"
+                                        >
+                                            <XIcon className="h-4 w-4" />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -247,10 +227,6 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                             </p>
 
                             <div className="flex items-center justify-between pt-4 border-t border-slate-100 text-xs font-medium text-slate-500 mt-auto">
-                                <div className="flex items-center gap-1">
-                                    <LockClosedIcon className="h-3 w-3" />
-                                    <span>{project.status}</span>
-                                </div>
                                 <div className="flex items-center gap-3">
                                     <button 
                                         onClick={(e) => toggleExpand(e, project.id)}
@@ -263,6 +239,10 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                                     <span>{project.date}</span>
                                 </div>
                             </div>
+
+                            <span className="absolute bottom-4 right-4 text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded pointer-events-none">
+                                {project.status}
+                            </span>
 
                             {/* Expanded Members Section */}
                             {isExpanded && (
@@ -288,7 +268,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                                         />
                                         <button 
                                             type="submit"
-                                            className="px-2 py-1.5 bg-weflora-teal text-white text-xs font-medium rounded-lg hover:bg-weflora-teal-dark transition-colors"
+                                            className="px-2 py-1.5 bg-weflora-teal text-white text-xs font-medium rounded-lg hover:bg-weflora-dark transition-colors"
                                         >
                                             Add
                                         </button>
@@ -323,7 +303,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                         </button>
                         <button
                             onClick={handleCreateProject}
-                            className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium text-sm shadow-sm transition-colors"
+                            className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium text-sm shadow-sm transition-colors"
                         >
                             Create Project
                         </button>
@@ -371,6 +351,21 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                     </div>
                 </form>
             </BaseModal>
+
+            <ConfirmDeleteModal
+                isOpen={Boolean(pendingDeleteProjectId)}
+                title="Delete project?"
+                description={`This will permanently delete "${
+                    pendingDeleteProjectId ? (projects.find(p => p.id === pendingDeleteProjectId)?.name || pendingDeleteProjectId) : 'this project'
+                }" and remove all associated files, worksheets, and reports. This cannot be undone.`}
+                confirmLabel="Delete project"
+                onCancel={() => setPendingDeleteProjectId(null)}
+                onConfirm={() => {
+                    if (!pendingDeleteProjectId) return;
+                    deleteProject(pendingDeleteProjectId);
+                    setPendingDeleteProjectId(null);
+                }}
+            />
         </div>
     );
 };

@@ -18,3 +18,9 @@ View your app in AI Studio: https://ai.studio/apps/drive/1eb9aVcW0xgHuqOEDYKId0h
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## UX lint (AI presence guardrails)
+
+```bash
+bash scripts/ux-lint.sh
+```

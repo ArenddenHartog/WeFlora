@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import type { 
     PinnedProject, Chat, ProjectFile, Matrix, Report, 
     ChatMessage, DiscoveredStructure, MatrixColumn
@@ -12,10 +12,11 @@ import ReportsRoute from './routes/ReportsRoute';
 import GlobalLayout from './GlobalLayout';
 import BaseModal from './BaseModal';
 import { DatabaseIcon, FolderIcon, PlusIcon, CheckIcon, SparklesIcon, RefreshIcon } from './icons';
-import { aiService } from '../services/aiService';
+import { aiService, hasMarkdownPipeTable, parseMarkdownPipeTableAsMatrix } from '../services/aiService';
 import { useProject } from '../contexts/ProjectContext';
 import { useData } from '../contexts/DataContext';
 import { useUI } from '../contexts/UIContext';
+import { navigateToCreatedEntity } from '../utils/navigation';
 
 // Props reduced to minimal handlers if any
 interface MainContentProps {
@@ -27,60 +28,66 @@ interface MainContentProps {
 const MainContent: React.FC<MainContentProps> = ({ 
     onNavigate, onSelectProject, onOpenMenu 
 }) => {
+    const navigate = useNavigate();
+    const location = useLocation();
     // Hooks for data access
-    const { projects, createMatrix, createReport, setProjects } = useProject();
+    const { projects, matrices, createProject, createMatrix, createReport, updateMatrix } = useProject();
     const { currentWorkspace } = useData();
     const { showNotification, destinationModal, openDestinationModal, closeDestinationModal } = useUI();
 
+    const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    // Only show persisted projects (UUID ids). Temp ids (e.g. proj-*) are never valid FKs.
+    const persistedProjects = projects.filter(p => isUuid(p.id));
+
     // Wrappers to handle logic for Destination Modal
-    const handleCreateMatrix = (newM: Matrix, dest?: { type: 'project' | 'standalone' | 'new_project', projectId?: string, newProjectName?: string }) => {
+    const handleCreateMatrix = async (newM: Matrix, dest?: { type: 'project' | 'standalone' | 'new_project', projectId?: string, newProjectName?: string }) => {
         let finalProjectId = dest?.projectId || newM.projectId;
         
         if (dest?.type === 'new_project' && dest.newProjectName) {
-            const newProjId = `proj-${Date.now()}`;
-            finalProjectId = newProjId;
-            const newProj: PinnedProject = {
-                id: newProjId,
+            const tempId = `proj-${Date.now()}`;
+            const created = await createProject({
+                id: tempId,
                 name: dest.newProjectName,
-                icon: FolderIcon, 
+                icon: FolderIcon,
                 status: 'Active',
                 date: new Date().toISOString().split('T')[0],
                 workspaceId: currentWorkspace.id,
                 members: []
-            };
-            setProjects(prev => [newProj, ...prev]);
-            onSelectProject(newProjId);
-        } else if (dest?.type === 'project' && dest.projectId) {
-            onSelectProject(dest.projectId);
+            });
+            if (!created) return null;
+            console.info('[project-created]', { source: 'destination-modal', id: created.id });
+            finalProjectId = created.id;
+        } else if (dest?.type === 'project') {
+            // Do NOT navigate/select project here. Navigation happens only after successful create.
         }
 
         const matrixWithProject = { ...newM, projectId: finalProjectId };
-        createMatrix(matrixWithProject);
+        return await createMatrix(matrixWithProject);
     };
 
-    const handleCreateReport = (newR: Report, dest?: { type: 'project' | 'standalone' | 'new_project', projectId?: string, newProjectName?: string }) => {
+    const handleCreateReport = async (newR: Report, dest?: { type: 'project' | 'standalone' | 'new_project', projectId?: string, newProjectName?: string }) => {
         let finalProjectId = dest?.projectId || newR.projectId;
 
         if (dest?.type === 'new_project' && dest.newProjectName) {
-            const newProjId = `proj-${Date.now()}`;
-            finalProjectId = newProjId;
-            const newProj: PinnedProject = {
-                id: newProjId,
+            const tempId = `proj-${Date.now()}`;
+            const created = await createProject({
+                id: tempId,
                 name: dest.newProjectName,
-                icon: FolderIcon, 
+                icon: FolderIcon,
                 status: 'Active',
                 date: new Date().toISOString().split('T')[0],
                 workspaceId: currentWorkspace.id,
                 members: []
-            };
-            setProjects(prev => [newProj, ...prev]);
-            onSelectProject(newProjId);
-        } else if (dest?.type === 'project' && dest.projectId) {
-            onSelectProject(dest.projectId);
+            });
+            if (!created) return null;
+            console.info('[project-created]', { source: 'destination-modal', id: created.id });
+            finalProjectId = created.id;
+        } else if (dest?.type === 'project') {
+            // Do NOT navigate/select project here. Navigation happens only after successful create.
         }
 
         const reportWithProject = { ...newR, projectId: finalProjectId };
-        createReport(reportWithProject);
+        return await createReport(reportWithProject);
     };
 
     // --- Modal Logic (using UI Context state) ---
@@ -89,6 +96,7 @@ const MainContent: React.FC<MainContentProps> = ({
     const [selectedDestProject, setSelectedDestProject] = useState('');
     const [newDestProjectName, setNewDestProjectName] = useState('');
     const [isExtracting, setIsExtracting] = useState(false);
+    const [runSpeciesCorrectionPass, setRunSpeciesCorrectionPass] = useState(false);
 
     // Effect to reset state when modal opens
     useEffect(() => {
@@ -97,6 +105,7 @@ const MainContent: React.FC<MainContentProps> = ({
             setSelectedDestProject('');
             setNewDestProjectName('');
             setIsExtracting(false);
+            setRunSpeciesCorrectionPass(false);
         }
     }, [destinationModal.isOpen]);
 
@@ -107,6 +116,13 @@ const MainContent: React.FC<MainContentProps> = ({
     const handleConfirmDest = async () => {
         const { type, message } = destinationModal;
         if (!message) return;
+
+        // PR2: If user is currently inside a standalone worksheet editor (/worksheets/:matrixId),
+        // "Copy → Worksheet" should append rows into that worksheet (no new routes/UI).
+        const appendTargetMatrixId = (() => {
+            const m = location.pathname.match(/^\/worksheets\/([^/]+)$/);
+            return m?.[1] || null;
+        })();
 
         let destination: { type: 'project' | 'standalone' | 'new_project', projectId?: string, newProjectName?: string };
 
@@ -134,13 +150,162 @@ const MainContent: React.FC<MainContentProps> = ({
                 lastModified: new Date().toLocaleDateString(),
                 tags: ['ai-import']
             };
-            handleCreateReport(report, destination);
+            const created = await handleCreateReport(report, destination);
+            if (!created) return;
+            console.info('[create-flow] copy to report', {
+                kind: 'report',
+                withinProject: Boolean(created.projectId),
+                projectId: created.projectId,
+                reportId: created.id,
+                tabId: Boolean(created.projectId) ? created.id : undefined
+            });
+            navigateToCreatedEntity({
+                navigate,
+                kind: 'report',
+                withinProject: Boolean(created.projectId),
+                projectId: created.projectId,
+                reportId: created.id,
+                focusTabId: created.id
+            });
             closeDestinationModal();
             showNotification('Report created from chat');
         } else {
             setIsExtracting(true);
             try {
-                const result = await aiService.structureTextAsMatrix(message.text);
+                const result = await aiService.structureTextAsMatrix(message.text, { runSpeciesCorrectionPass });
+
+                // Append mode: only when in standalone worksheet editor AND the user chose General Library.
+                if (appendTargetMatrixId && destination.type === 'standalone') {
+                    const target = matrices.find(m => m.id === appendTargetMatrixId);
+                    if (target) {
+                        // Merge columns (map by title) and append rows.
+                        const normalize = (s: string) => String(s || '').trim().toLowerCase();
+                        const existingCols = [...target.columns];
+                        const existingByTitle = new Map(existingCols.map(c => [normalize(c.title), c]));
+
+                        // Canonical columns should not be duplicated if they already exist.
+                        const canonicalTitles = new Set([
+                            'species (scientific)',
+                            'cultivar',
+                            'common name',
+                            'notes',
+                            'source'
+                        ]);
+
+                        const ensureColumn = (incomingCol: any) => {
+                            const key = normalize(incomingCol.title);
+                            const found = existingByTitle.get(key);
+                            if (found) return found;
+                            // Avoid duplicate canonicals by title
+                            if (canonicalTitles.has(key) && existingByTitle.has(key)) return existingByTitle.get(key)!;
+                            const newCol = { ...incomingCol, id: `col-app-${Date.now()}-${Math.random().toString(16).slice(2)}`, visible: true };
+                            existingCols.push(newCol);
+                            existingByTitle.set(key, newCol);
+                            return newCol;
+                        };
+
+                        // Build mapping for incoming columns -> existing columns (creating as needed).
+                        // Guardrail: cap newly-added attribute columns; overflow goes into Notes.
+                        const ATTR_CAP = 30;
+                        const isCanonical = (title: string) => canonicalTitles.has(normalize(title));
+                        const existingAttrCount = existingCols.filter(c => !isCanonical(c.title)).length;
+                        let remainingAttrSlots = Math.max(0, ATTR_CAP - existingAttrCount);
+
+                        // Find/ensure Notes column (only if needed).
+                        const notesKey = normalize('Notes');
+                        const getNotesCol = () => existingByTitle.get(notesKey) || null;
+
+                        const colMap = new Map<string, { id: string; title: string } | null>();
+                        for (const col of result.columns) {
+                            if (isCanonical(col.title)) {
+                                const ensured = ensureColumn(col);
+                                colMap.set(col.id, { id: ensured.id, title: ensured.title });
+                                continue;
+                            }
+                            if (remainingAttrSlots > 0) {
+                                const ensured = ensureColumn(col);
+                                colMap.set(col.id, { id: ensured.id, title: ensured.title });
+                                remainingAttrSlots -= normalize(col.title) === normalize(ensured.title) ? 0 : 0;
+                            } else {
+                                colMap.set(col.id, null);
+                            }
+                        }
+
+                        // Duplicate detection (scientific)
+                        const speciesCol = existingByTitle.get(normalize('Species (scientific)')) || existingByTitle.get(normalize('Species')) || null;
+                        const existingSpecies = new Set<string>();
+                        if (speciesCol) {
+                            target.rows.forEach(r => {
+                                const v = String(r.cells?.[speciesCol.id]?.value ?? '').trim();
+                                if (v) existingSpecies.add(v);
+                            });
+                        }
+
+                        const now = Date.now();
+                        let duplicateCount = 0;
+                        let firstDup: string | null = null;
+
+                        const appendedRows = result.rows.map((r, idx) => {
+                            const newId = `row-app-${now}-${idx}`;
+                            const newCells: any = {};
+                            const extras: string[] = [];
+
+                            for (const inCol of result.columns) {
+                                const mapping = colMap.get(inCol.id) || null;
+                                const v = String(r.cells?.[inCol.id]?.value ?? '');
+                                if (mapping) {
+                                    newCells[mapping.id] = { columnId: mapping.id, value: v };
+                                } else {
+                                    const vv = v.trim();
+                                    if (vv) extras.push(`${inCol.title}=${vv}`);
+                                }
+                            }
+
+                            // Notes for missing species and overflow extras
+                            const speciesVal = speciesCol ? String(newCells[speciesCol.id]?.value ?? '').trim() : '';
+                            if (speciesVal && existingSpecies.has(speciesVal)) {
+                                duplicateCount += 1;
+                                if (!firstDup) firstDup = speciesVal;
+                            }
+
+                            if (extras.length > 0 || !speciesVal) {
+                                const notesCol = getNotesCol() || ensureColumn({ id: 'notes', title: 'Notes', type: 'text', width: 400 });
+                                const existingNote = String(newCells[notesCol.id]?.value ?? '').trim();
+                                const parts = [];
+                                if (existingNote) parts.push(existingNote);
+                                if (!speciesVal) parts.push('Missing species');
+                                if (extras.length > 0) parts.push(`Extra: ${extras.join('; ')}`);
+                                newCells[notesCol.id] = { columnId: notesCol.id, value: parts.join(' • ') };
+                            }
+
+                            return { ...r, id: newId, cells: newCells };
+                        });
+
+                        const updated: Matrix = {
+                            ...target,
+                            columns: existingCols,
+                            rows: [...target.rows, ...appendedRows],
+                            updatedAt: new Date().toISOString()
+                        };
+
+                        await updateMatrix(updated);
+
+                        if (duplicateCount > 0) {
+                            showNotification(
+                                duplicateCount === 1 && firstDup
+                                    ? `Note: ${firstDup} already exists in this worksheet — added as a new row.`
+                                    : `Note: ${duplicateCount} species already exist in this worksheet — added as new rows.`
+                            );
+                        } else {
+                            showNotification('Added rows to worksheet');
+                        }
+
+                        closeDestinationModal();
+                        return;
+                    }
+                    // If target matrix not found, fall through to "create new worksheet" behavior.
+                }
+
                 const newMatrix: Matrix = {
                     id: `mtx-chat-${Date.now()}`,
                     title: 'Extracted Data',
@@ -148,21 +313,124 @@ const MainContent: React.FC<MainContentProps> = ({
                     columns: result.columns,
                     rows: result.rows
                 };
-                handleCreateMatrix(newMatrix, destination);
+                const created = await handleCreateMatrix(newMatrix, destination);
+                if (!created) {
+                    // Keep the user in place on failure (do not close modal or navigate).
+                    return;
+                }
+                console.info('[create-flow] copy to worksheet', {
+                    kind: 'worksheet',
+                    withinProject: Boolean(created.projectId),
+                    projectId: created.projectId,
+                    matrixId: created.id,
+                    tabId: Boolean(created.projectId) ? created.id : undefined
+                });
+                navigateToCreatedEntity({
+                    navigate,
+                    kind: 'worksheet',
+                    withinProject: Boolean(created.projectId),
+                    projectId: created.projectId,
+                    matrixId: created.id,
+                    focusTabId: created.id
+                });
                 showNotification('Worksheet created from chat');
+                closeDestinationModal();
             } catch (error) {
                 console.error("Extraction failed", error);
+
+                // PR1: If the input contains a markdown pipe table, try deterministic parsing
+                // before falling back to "single cell raw content".
+                if (hasMarkdownPipeTable(message.text)) {
+                    try {
+                        const shaped = await aiService.structureTextAsMatrix(message.text, { runSpeciesCorrectionPass });
+                        const newMatrix: Matrix = {
+                            id: `mtx-chat-${Date.now()}`,
+                            title: 'Extracted Data',
+                            description: 'Generated from chat analysis',
+                            columns: shaped.columns,
+                            rows: shaped.rows
+                        };
+                        const created = await handleCreateMatrix(newMatrix, destination);
+                        if (!created) {
+                            // Keep the user in place on failure (do not close modal or navigate).
+                            return;
+                        }
+                        console.info('[create-flow] copy to worksheet', {
+                            kind: 'worksheet',
+                            withinProject: Boolean(created.projectId),
+                            projectId: created.projectId,
+                            matrixId: created.id,
+                            tabId: Boolean(created.projectId) ? created.id : undefined
+                        });
+                        navigateToCreatedEntity({
+                            navigate,
+                            kind: 'worksheet',
+                            withinProject: Boolean(created.projectId),
+                            projectId: created.projectId,
+                            matrixId: created.id,
+                            focusTabId: created.id
+                        });
+                        showNotification('Worksheet created from chat');
+                        closeDestinationModal();
+                        return;
+                    } catch (e) {
+                        console.info('[species-correction] failed, continuing without correction');
+                        const parsed = parseMarkdownPipeTableAsMatrix(message.text);
+                        if (parsed) {
+                            const newMatrix: Matrix = {
+                                id: `mtx-chat-${Date.now()}`,
+                                title: 'Extracted Data',
+                                description: 'Generated from chat analysis',
+                                columns: parsed.columns,
+                                rows: parsed.rows
+                            };
+                            const created = await handleCreateMatrix(newMatrix, destination);
+                            if (!created) return;
+                            navigateToCreatedEntity({
+                                navigate,
+                                kind: 'worksheet',
+                                withinProject: Boolean(created.projectId),
+                                projectId: created.projectId,
+                                matrixId: created.id,
+                                focusTabId: created.id
+                            });
+                            showNotification('Worksheet created from chat');
+                            closeDestinationModal();
+                            return;
+                        }
+                    }
+                }
+
                 const fallbackMatrix = {
                     id: `mtx-chat-${Date.now()}`,
                     title: 'Raw Content',
                     columns: [{ id: 'c1', title: 'Content', type: 'text' as const, width: 600, isPrimaryKey: true }],
                     rows: [{ id: 'r1', cells: { c1: { columnId: 'c1', value: message.text } } }]
                 };
-                handleCreateMatrix(fallbackMatrix, destination);
+                const created = await handleCreateMatrix(fallbackMatrix, destination);
+                if (!created) {
+                    // Keep the user in place on failure (do not close modal or navigate).
+                    return;
+                }
+                console.info('[create-flow] copy to worksheet', {
+                    kind: 'worksheet',
+                    withinProject: Boolean(created.projectId),
+                    projectId: created.projectId,
+                    matrixId: created.id,
+                    tabId: Boolean(created.projectId) ? created.id : undefined
+                });
+                navigateToCreatedEntity({
+                    navigate,
+                    kind: 'worksheet',
+                    withinProject: Boolean(created.projectId),
+                    projectId: created.projectId,
+                    matrixId: created.id,
+                    focusTabId: created.id
+                });
                 showNotification('Worksheet created (raw mode)');
+                closeDestinationModal();
             } finally {
                 setIsExtracting(false);
-                closeDestinationModal();
             }
         }
     };
@@ -177,7 +445,7 @@ const MainContent: React.FC<MainContentProps> = ({
     return (
         <>
             <Routes>
-                {/* Global Routes wrapped in Global Layout (Contains Header) */}
+                {/* Global Routes wrapped in Global Layout */}
                 <Route element={<GlobalLayout />}>
                     <Route path="/" element={<GlobalWorkspace view="home" {...sharedProps} />} />
                     <Route path="/projects" element={<GlobalWorkspace view="projects" {...sharedProps} />} />
@@ -193,7 +461,7 @@ const MainContent: React.FC<MainContentProps> = ({
                 <Route path="/reports/*" element={<ReportsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
                 <Route path="/reports/:reportId" element={<ReportsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
                 
-                {/* Project Workspace (Has its own header) */}
+                {/* Project Workspace */}
                 <Route path="/project/:projectId/*" element={<ProjectWorkspace />} />
                 
                 <Route path="*" element={<Navigate to="/" replace />} />
@@ -217,7 +485,7 @@ const MainContent: React.FC<MainContentProps> = ({
                         <button 
                             onClick={handleConfirmDest}
                             disabled={isExtracting}
-                            className="px-6 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-bold text-sm shadow-sm transition-colors flex items-center gap-2 disabled:opacity-70"
+                            className="px-6 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-bold text-sm shadow-sm transition-colors flex items-center gap-2 disabled:opacity-70"
                         >
                             {isExtracting ? (
                                 <>
@@ -279,7 +547,7 @@ const MainContent: React.FC<MainContentProps> = ({
                                             onClick={(e) => e.stopPropagation()}
                                         >
                                             <option value="" disabled>Select Project...</option>
-                                            {projects.map(p => (
+                                            {persistedProjects.map(p => (
                                                 <option key={p.id} value={p.id}>{p.name}</option>
                                             ))}
                                         </select>
@@ -312,6 +580,25 @@ const MainContent: React.FC<MainContentProps> = ({
                                     )}
                                 </label>
                             </div>
+
+                            {destinationModal.type === 'worksheet' && (
+                                <div className="pt-2">
+                                    <label className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg bg-white">
+                                        <input
+                                            type="checkbox"
+                                            checked={runSpeciesCorrectionPass}
+                                            onChange={(e) => setRunSpeciesCorrectionPass(e.target.checked)}
+                                            className="mt-1 h-4 w-4 rounded border-slate-300 text-weflora-teal focus:ring-weflora-teal/30"
+                                        />
+                                        <div className="min-w-0">
+                                            <div className="text-sm font-bold text-slate-800">Run species correction (optional)</div>
+                                            <div className="text-xs text-slate-500">
+                                                Suggest scientific names and flag uncertain species. Creation will not be blocked.
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            )}
                         </>
                     )}
                 </div>

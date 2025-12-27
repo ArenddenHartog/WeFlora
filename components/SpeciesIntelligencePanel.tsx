@@ -70,7 +70,7 @@ const SpeciesIntelligencePanel: React.FC<SpeciesIntelligencePanelProps> = ({ spe
         if (speciesName) {
             fetchProfile();
         }
-    }, [speciesName]);
+    }, [speciesName, speciesList]);
 
     const handleSave = () => {
         if (!data || !onSaveToLibrary) return;
@@ -147,7 +147,7 @@ const SpeciesIntelligencePanel: React.FC<SpeciesIntelligencePanelProps> = ({ spe
                     </div>
                 ) : error ? (
                     <div className="p-8 text-center text-slate-500">
-                        <AlertTriangleIcon className="h-10 w-10 mx-auto mb-2 text-amber-400" />
+                        <AlertTriangleIcon className="h-10 w-10 mx-auto mb-2 text-weflora-amber" />
                         <p>{error}</p>
                         <button onClick={() => window.location.reload()} className="mt-4 text-weflora-teal hover:underline text-sm">Retry</button>
                     </div>
@@ -173,12 +173,12 @@ const SpeciesIntelligencePanel: React.FC<SpeciesIntelligencePanelProps> = ({ spe
                                 <span className="text-[10px] text-slate-400">Height</span>
                             </div>
                             <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
-                                <SunIcon className="h-5 w-5 text-amber-400 mb-1" />
+                                <SunIcon className="h-5 w-5 text-weflora-amber mb-1" />
                                 <span className="text-xs font-bold text-slate-800 truncate w-full" title={data.sunExposure}>{data.sunExposure}</span>
                                 <span className="text-[10px] text-slate-400">Exposure</span>
                             </div>
                             <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
-                                <DropletIcon className="h-5 w-5 text-blue-400 mb-1" />
+                                <DropletIcon className="h-5 w-5 text-weflora-teal mb-1" />
                                 <span className="text-xs font-bold text-slate-800 truncate w-full" title={data.waterNeeds}>{data.waterNeeds}</span>
                                 <span className="text-[10px] text-slate-400">Water</span>
                             </div>
@@ -186,10 +186,10 @@ const SpeciesIntelligencePanel: React.FC<SpeciesIntelligencePanelProps> = ({ spe
 
                         {/* FloraGPT Insights */}
                         <div className="px-4 py-2">
-                            <div className="p-4 bg-purple-50 border border-purple-100 rounded-xl relative overflow-hidden">
+                            <div className="p-4 bg-weflora-teal/10 border border-weflora-teal/20 rounded-xl relative overflow-hidden">
                                 <div className="flex items-center gap-2 mb-2">
-                                    <SparklesIcon className="h-4 w-4 text-purple-600" />
-                                    <span className="text-xs font-bold text-purple-700 uppercase">FloraGPT Insight</span>
+                                    <SparklesIcon className="h-4 w-4 text-weflora-dark" />
+                                    <span className="text-xs font-bold text-weflora-dark uppercase">FloraGPT Insight</span>
                                 </div>
                                 <p className="text-sm text-slate-700 leading-relaxed">
                                     {data.insight}
@@ -214,7 +214,7 @@ const SpeciesIntelligencePanel: React.FC<SpeciesIntelligencePanelProps> = ({ spe
                                                 href={web.uri} 
                                                 target="_blank" 
                                                 rel="noreferrer"
-                                                className="text-[10px] bg-white border border-slate-200 px-2 py-1 rounded-md text-blue-600 hover:underline truncate max-w-[150px] block"
+                                                className="text-[10px] bg-white border border-slate-200 px-2 py-1 rounded-md text-weflora-teal hover:text-weflora-dark hover:underline truncate max-w-[150px] block"
                                             >
                                                 {web.title}
                                             </a>
@@ -233,7 +233,7 @@ const SpeciesIntelligencePanel: React.FC<SpeciesIntelligencePanelProps> = ({ spe
                                         onClick={() => setActiveTab(tab)}
                                         className={`flex-1 pb-2 text-sm font-medium transition-colors ${
                                             activeTab === tab 
-                                            ? 'border-b-2 border-weflora-teal text-weflora-teal-dark' 
+                                            ? 'border-b-2 border-weflora-teal text-weflora-dark' 
                                             : 'text-slate-400 hover:text-slate-600'
                                         }`}
                                     >
@@ -263,13 +263,13 @@ const SpeciesIntelligencePanel: React.FC<SpeciesIntelligencePanelProps> = ({ spe
                                 {activeTab === 'Risks' && (
                                     <div className="space-y-3 animate-fadeIn">
                                         <div className="bg-white p-4 rounded-xl border border-slate-200">
-                                            <h3 className="text-xs font-bold text-red-500 uppercase mb-2 flex items-center gap-2">
+                                            <h3 className="text-xs font-bold text-weflora-red uppercase mb-2 flex items-center gap-2">
                                                 <AlertTriangleIcon className="h-4 w-4" /> Known Issues
                                             </h3>
                                             <ul className="space-y-2">
                                                 {data.risks.length > 0 ? data.risks.map((risk, i) => (
                                                     <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-weflora-red mt-1.5 shrink-0" />
                                                         {risk}
                                                     </li>
                                                 )) : <li className="text-sm text-slate-400 italic">No major risks identified.</li>}
@@ -298,7 +298,7 @@ const SpeciesIntelligencePanel: React.FC<SpeciesIntelligencePanelProps> = ({ spe
                                                 {data.alternatives.length > 0 ? data.alternatives.map((alt, i) => (
                                                     <div key={i} className="flex items-center justify-between text-sm p-2 hover:bg-slate-50 rounded cursor-pointer transition-colors" onClick={() => onAskAI(`Compare ${speciesName} with ${alt}`)}>
                                                         <span className="italic text-slate-700">{alt}</span>
-                                                        <span className="text-xs text-blue-600">Compare &rarr;</span>
+                                                        <span className="text-xs text-weflora-teal">Compare &rarr;</span>
                                                     </div>
                                                 )) : <div className="text-sm text-slate-400 italic">No alternatives suggested.</div>}
                                             </div>
@@ -315,9 +315,9 @@ const SpeciesIntelligencePanel: React.FC<SpeciesIntelligencePanelProps> = ({ spe
             <div className="p-4 bg-white border-t border-slate-200 shrink-0">
                 <button 
                     onClick={() => onAskAI(`Create a detailed report for ${speciesName} regarding...`)}
-                    className="w-full flex items-center justify-center gap-2 py-3 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-teal-dark transition-all shadow-lg"
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-weflora-teal text-white rounded-xl text-sm font-bold hover:bg-weflora-dark transition-all shadow-lg"
                 >
-                    <SparklesIcon className="h-4 w-4 text-purple-200" />
+                    <SparklesIcon className="h-4 w-4 text-weflora-teal/20" />
                     Ask FloraGPT about this
                 </button>
             </div>

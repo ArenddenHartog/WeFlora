@@ -27,7 +27,7 @@ interface SidebarProps {
     onNavigate: (view: string) => void; // Changed from ViewMode to string for flexibility
     isOpen: boolean;
     onClose: () => void;
-    onCreateProject: (project: PinnedProject) => void;
+    onCreateProject: (project: PinnedProject) => Promise<{ id: string } | null>;
     isCollapsed: boolean;
     toggleCollapse: () => void;
 }
@@ -40,9 +40,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     const navigate = useNavigate();
     const location = useLocation();
     
-    const { setActiveThreadId } = useChat();
+    const { activeThreadId, setActiveThreadId } = useChat();
     const { signOut } = useAuth();
-    const { showNotification } = useUI();
+    const { showNotification, sessionOpenOrigin, setSessionOpenOrigin } = useUI();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -58,7 +58,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [newProjectStatus, setNewProjectStatus] = useState<'Active' | 'Archived'>('Active');
   const [newProjectDate, setNewProjectDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const handleCreateProject = (e: React.FormEvent) => {
+  const handleCreateProject = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newProjectName.trim()) return;
 
@@ -72,7 +72,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           members: [{ id: 'me', name: user.name, initials: user.avatar }]
       };
       
-      onCreateProject(newProject);
+      const created = await onCreateProject(newProject);
+      if (!created) return;
       setIsProjectModalOpen(false);
       setNewProjectName('');
       setNewProjectStatus('Active');
@@ -101,33 +102,42 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const isActive = (path: string) => {
       if (path === '/') return location.pathname === '/';
+      // Normalize project domain routes so sidebar selection reflects the active domain.
+      // - /projects (hub) and /project/:id/* (workspace) both count as "Projects"
+      if (path === '/projects') return location.pathname.startsWith('/projects') || location.pathname.startsWith('/project/');
+      // Keep "Sessions" active while viewing a session opened from /sessions (even though the detail UI lives on /).
+      if (path === '/sessions') return location.pathname.startsWith('/sessions') || (sessionOpenOrigin === 'sessions' && Boolean(activeThreadId) && location.pathname === '/');
       return location.pathname.startsWith(path);
   }
+
+  const isSessionsThread = sessionOpenOrigin === "sessions" && !!activeThreadId;
 
   const NavItem = ({ 
       icon: Icon, 
       label, 
       path,
       onClick, 
-      color = 'teal' 
+      color = 'teal',
+      activeOverride
   }: { 
       icon: any, 
       label: string, 
       path: string,
       onClick: () => void,
-      color?: 'teal' | 'purple'
+      color?: 'teal' | 'purple',
+      activeOverride?: boolean
   }) => {
-      const active = isActive(path);
+      const active = typeof activeOverride === 'boolean' ? activeOverride : isActive(path);
       const colorStyles = {
           teal: {
               activeBg: 'bg-weflora-mint/30',
-              activeText: 'text-weflora-teal-dark',
+              activeText: 'text-weflora-dark',
               activeIcon: 'text-weflora-teal'
           },
           purple: {
-              activeBg: 'bg-purple-50',
-              activeText: 'text-purple-700',
-              activeIcon: 'text-purple-600'
+              activeBg: 'bg-weflora-teal/10',
+              activeText: 'text-weflora-dark',
+              activeIcon: 'text-weflora-dark'
           }
       };
 
@@ -181,15 +191,18 @@ const Sidebar: React.FC<SidebarProps> = ({
                   path="/"
                   onClick={() => { 
                       setActiveThreadId(null);
+                      setSessionOpenOrigin(null);
                       navigate('/'); 
                       if(window.innerWidth < 768) onClose(); 
                   }} 
+                  activeOverride={!isSessionsThread && isActive('/')}
                />
                <NavItem 
                   icon={MessageSquareIcon} 
                   label="Sessions" 
                   path="/sessions"
                   onClick={() => { navigate('/sessions'); if(window.innerWidth < 768) onClose(); }} 
+                  activeOverride={isSessionsThread || isActive('/sessions')}
                />
                <NavItem 
                   icon={FolderIcon} 
@@ -278,7 +291,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       <div className="p-2">
                           <button 
                             onClick={signOut}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors"
                           >
                               <LogOutIcon className="h-4 w-4" />
                               Log out
@@ -309,7 +322,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </button>
                     <button
                         onClick={handleCreateProject}
-                        className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium text-sm shadow-sm transition-colors"
+                        className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium text-sm shadow-sm transition-colors"
                     >
                         Create Project
                     </button>
@@ -368,7 +381,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             footer={
                 <button
                     onClick={() => setIsMembersModalOpen(false)}
-                    className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium text-sm transition-colors shadow-sm"
+                    className="px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium text-sm transition-colors shadow-sm"
                 >
                     Done
                 </button>
@@ -397,7 +410,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       <button 
                         type="submit" 
                         disabled={!inviteEmail.trim()}
-                        className="px-3 py-1.5 bg-weflora-teal text-white text-sm font-medium rounded hover:bg-weflora-teal-dark disabled:opacity-50 transition-colors"
+                        className="px-3 py-1.5 bg-weflora-teal text-white text-sm font-medium rounded hover:bg-weflora-dark disabled:opacity-50 transition-colors"
                       >
                           Send
                       </button>

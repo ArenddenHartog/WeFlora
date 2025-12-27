@@ -4,12 +4,13 @@ import type { Report, Matrix, ReportTemplate } from '../types';
 import { 
     BoldIcon, ItalicIcon, ListIcon, HeadingIcon, FileTextIcon, XIcon, PencilIcon,
     PlusIcon, SparklesIcon, HistoryIcon, DownloadIcon, CheckCircleIcon, RefreshIcon, EyeIcon, EyeOffIcon,
-    FilePdfIcon, FileSheetIcon, BookIcon, LayoutGridIcon, UserCircleIcon, TrashIcon, FileCodeIcon, ArrowUpIcon, BookmarkIcon,
+    FilePdfIcon, FileSheetIcon, BookIcon, LayoutGridIcon, UserCircleIcon, FileCodeIcon, ArrowUpIcon, BookmarkIcon,
     TableIcon, UndoIcon, RedoIcon
 } from './icons';
 import { MessageRenderer } from './MessageRenderer';
 import InsertWorksheetModal from './InsertWorksheetModal';
 import { useUI } from '../contexts/UIContext';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 interface ReportEditorViewProps {
     report?: Report;
@@ -40,16 +41,16 @@ export const ManageReportPanel: React.FC<{
     useEffect(() => {
         setTitle(report.title);
         setTags(report.tags || []);
-    }, [report.id]);
+    }, [report.id, report.title, report.tags]);
 
-    const handleSave = () => {
+    const handleSave = React.useCallback(() => {
         onUpdate({ 
             ...report, 
             title, 
             tags,
             lastModified: new Date().toLocaleDateString() 
         });
-    };
+    }, [onUpdate, report, tags, title]);
 
     useEffect(() => {
         const timeout = setTimeout(() => {
@@ -58,7 +59,7 @@ export const ManageReportPanel: React.FC<{
             }
         }, 500);
         return () => clearTimeout(timeout);
-    }, [title, tags]);
+    }, [handleSave, report.tags, report.title, tags, title]);
 
     const handleAddTag = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && newTagInput.trim()) {
@@ -97,7 +98,7 @@ export const ManageReportPanel: React.FC<{
                         {tags.map(tag => (
                             <span key={tag} className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded border border-slate-200 shadow-sm">
                                 #{tag}
-                                <button onClick={() => removeTag(tag)} className="text-slate-400 hover:text-red-500"><XIcon className="h-3 w-3" /></button>
+                                <button onClick={() => removeTag(tag)} className="text-slate-400 hover:text-weflora-red"><XIcon className="h-3 w-3" /></button>
                             </span>
                         ))}
                         <input type="text" value={newTagInput} onChange={(e) => setNewTagInput(e.target.value)} onKeyDown={handleAddTag} placeholder="Add tag..." className="bg-transparent text-xs outline-none min-w-[60px] flex-1 text-slate-900" />
@@ -123,13 +124,14 @@ const ReportEditorView: React.FC<ReportEditorViewProps> = ({
     const [historyIndex, setHistoryIndex] = useState(-1);
     const historyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [isBookmarked, setIsBookmarked] = useState(false);
+    const [pendingDeleteReportId, setPendingDeleteReportId] = useState<string | null>(null);
 
     useEffect(() => {
         if (activeReport) {
             setHistory([activeReport.content || '']);
             setHistoryIndex(0);
         }
-    }, [activeReport?.id]);
+    }, [activeReport]);
 
     useEffect(() => {
         setContent(activeReport?.content || '');
@@ -205,9 +207,7 @@ const ReportEditorView: React.FC<ReportEditorViewProps> = ({
 
     const handleDeleteReport = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        if (window.confirm("Are you sure you want to delete this report?")) {
-            if (onDeleteReport) onDeleteReport(id);
-        }
+        setPendingDeleteReportId(id);
     };
 
     const applyFormat = (marker: string) => {
@@ -267,7 +267,7 @@ const ReportEditorView: React.FC<ReportEditorViewProps> = ({
         }
     };
 
-    if (!activeReport) return <div className="flex flex-col items-center justify-center h-full text-slate-400 bg-slate-50"><FileTextIcon className="h-12 w-12 mb-4 opacity-20" /><p>No report selected.</p>{onCreateReport && <button onClick={onCreateReport} className="mt-4 px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm hover:bg-weflora-teal-dark transition-colors">Create New Report</button>}</div>;
+    if (!activeReport) return <div className="flex flex-col items-center justify-center h-full text-slate-400 bg-slate-50"><FileTextIcon className="h-12 w-12 mb-4 opacity-20" /><p>No report selected.</p>{onCreateReport && <button onClick={onCreateReport} className="mt-4 px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm hover:bg-weflora-dark transition-colors">Create New Report</button>}</div>;
 
     const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
 
@@ -282,7 +282,15 @@ const ReportEditorView: React.FC<ReportEditorViewProps> = ({
                             {reports && reports.map(r => (
                                 <div key={r.id} onClick={() => onActiveReportIdChange && onActiveReportIdChange(r.id)} className={`group relative flex items-center gap-2 pl-3 pr-2 py-2 text-sm font-bold rounded-t-lg transition-all border-t border-x cursor-pointer select-none ${activeReport.id === r.id ? 'bg-white border-slate-200 text-slate-800 border-b-white z-10 -mb-[1px]' : 'bg-transparent border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`} style={{ maxWidth: '200px' }} role="button">
                                     <span className="truncate flex-1">{r.title}</span>
-                                    {onDeleteReport && <button onClick={(e) => handleDeleteReport(e, r.id)} className={`p-0.5 rounded-md hover:bg-red-100 hover:text-red-500 transition-colors ${activeReport.id === r.id ? 'text-slate-300' : 'text-transparent group-hover:text-slate-300'}`}><XIcon className="h-3 w-3" /></button>}
+                                    {onDeleteReport && (
+                                        <button
+                                            onClick={(e) => handleDeleteReport(e, r.id)}
+                                            className={`h-8 w-8 flex items-center justify-center cursor-pointer rounded-md hover:bg-weflora-red/20 hover:text-weflora-red transition-colors ${activeReport.id === r.id ? 'text-slate-300' : 'text-transparent group-hover:text-slate-300'}`}
+                                            title="Delete report"
+                                        >
+                                            <XIcon className="h-3 w-3" />
+                                        </button>
+                                    )}
                                 </div>
                             ))}
                             {onCreateReport && <button onClick={onCreateReport} className="mb-2 ml-1 p-1.5 text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10 rounded-md transition-colors" title="New Report"><PlusIcon className="h-4 w-4" /></button>}
@@ -314,11 +322,11 @@ const ReportEditorView: React.FC<ReportEditorViewProps> = ({
                         <button onClick={handleRedo} className="p-1.5 hover:bg-weflora-mint/10 hover:text-weflora-teal rounded text-slate-500 transition-colors disabled:opacity-30 disabled:hover:bg-transparent" title="Redo" disabled={historyIndex >= history.length - 1}><RedoIcon className="h-4 w-4" /></button>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button onClick={() => setIsInsertModalOpen(true)} className="flex items-center gap-1.5 px-2 py-1 bg-weflora-mint/10 hover:bg-weflora-mint/30 text-weflora-teal-dark rounded text-xs font-bold transition-colors border border-transparent hover:border-weflora-teal/30" title="Insert from Worksheet"><TableIcon className="h-3.5 w-3.5" />Insert Worksheet Data</button>
+                        <button onClick={() => setIsInsertModalOpen(true)} className="flex items-center gap-1.5 px-2 py-1 bg-weflora-mint/10 hover:bg-weflora-mint/30 text-weflora-dark rounded text-xs font-bold transition-colors border border-transparent hover:border-weflora-teal/30" title="Insert from Worksheet"><TableIcon className="h-3.5 w-3.5" />Insert Worksheet Data</button>
                         <div className="h-4 w-px bg-slate-300 mx-1"></div>
                         <button onClick={() => setIsPreviewOpen(!isPreviewOpen)} className={`flex items-center justify-center p-2 rounded-lg transition-all border ${isPreviewOpen ? 'bg-weflora-teal text-white border-weflora-teal' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`} title={isPreviewOpen ? "Edit" : "Preview"}><EyeIcon className="h-3.5 w-3.5" /></button>
                         <div className="h-4 w-px bg-slate-300 mx-1"></div>
-                        {onToggleAssistant && <button onClick={onToggleAssistant} className="flex items-center gap-1.5 px-3 py-1.5 bg-weflora-mint/20 text-weflora-teal-dark border border-weflora-teal hover:bg-weflora-mint/30 rounded-lg transition-colors" title="Open Writing Assistant"><SparklesIcon className="h-3.5 w-3.5" /><span className="text-xs font-bold hidden sm:inline">Assistant</span></button>}
+                        {onToggleAssistant && <button onClick={onToggleAssistant} className="flex items-center gap-1.5 px-3 py-1.5 bg-weflora-mint/20 text-weflora-dark border border-weflora-teal hover:bg-weflora-mint/30 rounded-lg transition-colors" title="Open Writing Assistant"><SparklesIcon className="h-3.5 w-3.5" /><span className="text-xs font-bold hidden sm:inline">Assistant</span></button>}
                     </div>
                 </div>
                 
@@ -332,12 +340,29 @@ const ReportEditorView: React.FC<ReportEditorViewProps> = ({
                     </div>
                     {isPreviewOpen && (
                         <div className="w-1/2 h-full bg-slate-50 overflow-y-auto p-8 animate-fadeIn border-l border-slate-200 flex-none relative">
-                            <div className="prose prose-sm max-w-none prose-headings:font-bold prose-a:text-blue-600"><MessageRenderer text={content || '*No content to preview*'} /></div>
+                            <div className="prose prose-sm max-w-none prose-headings:font-bold prose-a:text-weflora-teal"><MessageRenderer text={content || '*No content to preview*'} /></div>
                         </div>
                     )}
                 </div>
              </div>
              {isInsertModalOpen && <InsertWorksheetModal isOpen={true} onClose={() => setIsInsertModalOpen(false)} onInsert={insertText} matrices={availableMatrices} />}
+
+             {onDeleteReport && (
+                <ConfirmDeleteModal
+                    isOpen={Boolean(pendingDeleteReportId)}
+                    title="Delete report?"
+                    description={`This will permanently delete "${
+                        pendingDeleteReportId ? (reports?.find(r => r.id === pendingDeleteReportId)?.title || activeReport?.title || 'this report') : 'this report'
+                    }". This cannot be undone.`}
+                    confirmLabel="Delete report"
+                    onCancel={() => setPendingDeleteReportId(null)}
+                    onConfirm={() => {
+                        if (!pendingDeleteReportId) return;
+                        onDeleteReport(pendingDeleteReportId);
+                        setPendingDeleteReportId(null);
+                    }}
+                />
+             )}
         </div>
     );
 };

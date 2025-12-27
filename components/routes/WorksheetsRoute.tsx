@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProject } from '../../contexts/ProjectContext';
 import { useData } from '../../contexts/DataContext';
@@ -7,6 +7,7 @@ import { useUI } from '../../contexts/UIContext';
 import { useChat } from '../../contexts/ChatContext';
 import { aiService } from '../../services/aiService';
 import type { Matrix, WorksheetDocument, ChatMessage, MatrixRow } from '../../types';
+import { navigateToCreatedEntity } from '../../utils/navigation';
 import WorksheetTemplatesView from '../WorksheetTemplatesView';
 import WorksheetContainer from '../WorksheetContainer';
 import WorksheetWizard from '../WorksheetWizard';
@@ -15,8 +16,8 @@ import ChatView from '../ChatView';
 import ManageWorksheetPanel from '../ManageWorksheetPanel';
 import SpeciesIntelligencePanel from '../SpeciesIntelligencePanel';
 import { 
-    DatabaseIcon, SlidersIcon, SparklesIcon, ChevronRightIcon, 
-    TableIcon, XIcon, LeafIcon
+    DatabaseIcon, SlidersIcon, ChevronRightIcon, 
+    TableIcon, XIcon, LeafIcon, SparklesIcon
 } from '../icons';
 
 // Header Button Helper
@@ -26,7 +27,7 @@ const HeaderActionButton = ({ icon: Icon, label, active, onClick }: any) => (
         className={`
             flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border transition-all shadow-sm whitespace-nowrap
             ${active 
-                ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal-dark' 
+                ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark' 
                 : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }
         `}
@@ -56,6 +57,7 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
     const [panelWidth, setPanelWidth] = useState(400);
     const [isWizardOpen, setIsWizardOpen] = useState(false);
     const [inspectedEntity, setInspectedEntity] = useState<string | null>(null);
+    const [focusTabId, setFocusTabId] = useState<string | undefined>(undefined);
 
     // Derived Data
     const standaloneMatrices = matrices.filter(m => !m.projectId);
@@ -63,11 +65,25 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
 
     // --- Actions ---
 
-    const handleCreate = (matrix: Matrix) => {
+    const handleCreate = async (matrix: Matrix) => {
         // Ensure it's marked as standalone
         const newMatrix = { ...matrix, projectId: undefined };
-        createMatrix(newMatrix);
-        navigate(`/worksheets/${newMatrix.id}`);
+        const created = await createMatrix(newMatrix);
+        if (!created) return null;
+        console.info('[create-flow] build worksheet (worksheets hub)', {
+            kind: 'worksheet',
+            withinProject: Boolean(created.projectId),
+            projectId: created.projectId,
+            matrixId: created.id,
+            tabId: Boolean(created.projectId) ? created.id : undefined
+        });
+        navigateToCreatedEntity({
+            navigate,
+            kind: 'worksheet',
+            withinProject: false,
+            matrixId: created.id
+        });
+        return created;
     };
 
     const handleUpdate = (updated: Matrix) => {
@@ -87,11 +103,15 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
         description: activeMatrix.description,
         createdAt: activeMatrix.updatedAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        tabs: matrices.filter(m => m.id === activeMatrix.id || m.parentId === activeMatrix.id)
-            .sort((a, b) => (a.id === activeMatrix.id ? -1 : 1))
+        tabs: (() => {
+            const allTabs = matrices.filter(m => m.id === activeMatrix.id || m.parentId === activeMatrix.id);
+            const root = allTabs.find(t => t.id === activeMatrix.id);
+            const children = allTabs.filter(t => t.id !== activeMatrix.id).sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER));
+            return root ? [root, ...children] : children;
+        })()
     } : null;
 
-    const handleUpdateDoc = (doc: WorksheetDocument) => {
+    const handleUpdateDoc = async (doc: WorksheetDocument) => {
         const currentTabs = matrices.filter(m => m.id === doc.id || m.parentId === doc.id);
         const newTabs = doc.tabs;
 
@@ -101,15 +121,16 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
         }
 
         // Handle Tab CRUD
-        newTabs.forEach(tab => {
+        for (const tab of newTabs) {
             const existing = currentTabs.find(t => t.id === tab.id);
             if (!existing) {
                 // Mark as standalone if parent has no project
-                createMatrix({ ...tab, projectId: undefined });
+                const created = await createMatrix({ ...tab, projectId: undefined });
+                if (created?.id) setFocusTabId(created.id);
             } else if (JSON.stringify(existing) !== JSON.stringify(tab)) {
                 handleUpdate(tab);
             }
-        });
+        }
 
         currentTabs.forEach(oldTab => {
             if (!newTabs.find(t => t.id === oldTab.id)) {
@@ -204,10 +225,22 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
                         <h1 className="text-lg font-bold text-slate-900 truncate max-w-md">{activeMatrix.title}</h1>
                     </div>
                     <div className="flex items-center gap-2">
-                         <HeaderActionButton icon={LeafIcon} label="Species" active={rightPanel === 'species'} onClick={() => togglePanel('species')} />
+                         {Boolean(inspectedEntity) && (
+                            <HeaderActionButton icon={LeafIcon} label="Species" active={rightPanel === 'species'} onClick={() => togglePanel('species')} />
+                         )}
                          <HeaderActionButton icon={DatabaseIcon} label="Files" active={rightPanel === 'files'} onClick={() => togglePanel('files')} />
                          <HeaderActionButton icon={SlidersIcon} label="Settings" active={rightPanel === 'manage'} onClick={() => togglePanel('manage')} />
-                         <HeaderActionButton icon={SparklesIcon} label="FloraGPT" active={rightPanel === 'chat'} onClick={() => togglePanel('chat')} />
+                         <button
+                            onClick={() => togglePanel('chat')}
+                            className={`h-9 w-9 flex items-center justify-center rounded-lg transition-colors border ${
+                                rightPanel === 'chat'
+                                    ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-teal'
+                                    : 'bg-white border-slate-200 text-slate-500 hover:text-weflora-teal hover:bg-weflora-mint/10'
+                            }`}
+                            title="Assistant"
+                         >
+                            <SparklesIcon className="h-4 w-4" />
+                         </button>
                     </div>
                 </header>
 
@@ -215,6 +248,7 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
                     <div className="flex-1 min-w-0 h-full">
                         <WorksheetContainer 
                             document={worksheetDoc}
+                            initialActiveTabId={focusTabId}
                             onUpdateDocument={handleUpdateDoc}
                             onRunAICell={(p, f) => aiService.runAICell(p, f)}
                             onAnalyze={(f, c, cols) => aiService.analyzeDocuments(f, c, cols)}

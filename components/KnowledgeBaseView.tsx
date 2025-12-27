@@ -3,10 +3,11 @@ import React, { useState, useMemo, useRef } from 'react';
 import type { KnowledgeItem, ProjectFile, PinnedProject } from '../types';
 import { 
     SearchIcon, MenuIcon, UploadIcon, DatabaseIcon, 
-    FileTextIcon, FileSheetIcon, FilePdfIcon, TrashIcon, SparklesIcon,
+    FileTextIcon, FileSheetIcon, FilePdfIcon, XIcon, SparklesIcon,
     FolderIcon, CheckIcon, ChevronRightIcon, ArrowUpIcon
 } from './icons';
 import BaseModal from './BaseModal';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 interface KnowledgeBaseViewProps {
     items: KnowledgeItem[];
@@ -33,6 +34,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [pendingFiles, setPendingFiles] = useState<File[]>([]);
     const [targetProjectId, setTargetProjectId] = useState<string>('');
+    const [pendingDeleteItem, setPendingDeleteItem] = useState<any | null>(null);
 
     // Prepare unified file list for 'All' and 'Knowledge' modes, and for searching
     const unifiedItems = useMemo(() => {
@@ -105,9 +107,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
 
     const handleDelete = (e: React.MouseEvent, item: any) => {
         e.stopPropagation();
-        if (window.confirm("Are you sure you want to delete this file?")) {
-            onDelete(item);
-        }
+        setPendingDeleteItem(item);
     };
 
     const renderProjectCards = () => {
@@ -126,7 +126,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                                 <div className="h-12 w-12 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
                                     <FolderIcon className="h-6 w-6" />
                                 </div>
-                                <div className="text-xs font-bold bg-slate-50 text-slate-500 px-2 py-1 rounded-full group-hover:bg-weflora-mint/10 group-hover:text-weflora-teal-dark transition-colors">
+                                <div className="text-xs font-bold bg-slate-50 text-slate-500 px-2 py-1 rounded-full group-hover:bg-weflora-mint/10 group-hover:text-weflora-dark transition-colors">
                                     {fileCount} Files
                                 </div>
                             </div>
@@ -153,10 +153,10 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredItems.map((item, index) => (
-                    <div key={index} className="group p-4 bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-weflora-teal transition-all relative flex flex-col">
+                    <div key={index} className="group p-4 pb-10 bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-weflora-teal transition-all relative flex flex-col">
                         <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center gap-3 overflow-hidden">
-                                <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${item.source === 'knowledge' ? 'bg-purple-50 text-purple-600' : 'bg-slate-100 text-slate-500'}`}>
+                                <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${item.source === 'knowledge' ? 'bg-weflora-teal/10 text-weflora-dark' : 'bg-slate-100 text-slate-500'}`}>
                                     <item.icon className="h-5 w-5" />
                                 </div>
                                 <div className="min-w-0">
@@ -167,6 +167,13 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                                     </div>
                                 </div>
                             </div>
+                            <button 
+                                onClick={(e) => handleDelete(e, item)}
+                                className="absolute top-3 right-3 h-8 w-8 flex items-center justify-center cursor-pointer text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                title="Delete file"
+                            >
+                                <XIcon className="h-3.5 w-3.5" />
+                            </button>
                         </div>
 
                         <div className="flex flex-wrap gap-1 mb-4 flex-1 content-start">
@@ -181,22 +188,18 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                             <div className="text-[10px] text-slate-400">
                                 {item.size} • {item.date}
                             </div>
-                            <div className="flex items-center gap-1">
-                                <button 
-                                    onClick={() => onAskAI(item.original || item)}
-                                    className="p-1.5 text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
-                                    title="Ask AI about this file"
-                                >
-                                    <SparklesIcon className="h-3.5 w-3.5" />
-                                </button>
-                                <button 
-                                    onClick={(e) => handleDelete(e, item)}
-                                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                >
-                                    <TrashIcon className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
+                            <button 
+                                onClick={() => onAskAI(item.original || item)}
+                                className="p-1.5 text-weflora-dark bg-weflora-teal/10 rounded-lg hover:bg-weflora-teal/20 transition-colors"
+                                title="Ask AI about this file"
+                            >
+                                <SparklesIcon className="h-3.5 w-3.5" />
+                            </button>
                         </div>
+
+                        <span className="absolute bottom-3 right-3 text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-1 rounded pointer-events-none">
+                            {item.source === 'project' ? 'Project File' : item.source === 'knowledge' ? 'Reference' : 'File'}
+                        </span>
                     </div>
                 ))}
                 {filteredItems.length === 0 && (
@@ -224,7 +227,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                      </div>
                      <button 
                         onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-teal-dark font-medium shadow-sm transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium shadow-sm transition-colors"
                      >
                         <UploadIcon className="h-4 w-4" />
                         <span className="hidden sm:inline">Upload Files</span>
@@ -309,7 +312,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                         </button>
                         <button 
                             onClick={confirmUpload}
-                            className="px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm font-medium hover:bg-weflora-teal-dark shadow-sm transition-colors"
+                            className="px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm font-medium hover:bg-weflora-dark shadow-sm transition-colors"
                         >
                             Upload Files
                         </button>
@@ -365,6 +368,21 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                     </div>
                 </div>
             </BaseModal>
+
+            <ConfirmDeleteModal
+                isOpen={Boolean(pendingDeleteItem)}
+                title="Delete file?"
+                description={`This will permanently delete "${
+                    pendingDeleteItem ? (pendingDeleteItem.title || pendingDeleteItem.name || 'this file') : 'this file'
+                }". This cannot be undone.`}
+                confirmLabel="Delete file"
+                onCancel={() => setPendingDeleteItem(null)}
+                onConfirm={() => {
+                    if (!pendingDeleteItem) return;
+                    onDelete(pendingDeleteItem);
+                    setPendingDeleteItem(null);
+                }}
+            />
         </div>
     );
 };

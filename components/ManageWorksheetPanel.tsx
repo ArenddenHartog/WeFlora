@@ -7,6 +7,8 @@ import {
     ShieldCheckIcon, ToolIcon, CurrencyDollarIcon, BarChartIcon, SparklesIcon
 } from './icons';
 import ColumnSettingsModal from './ColumnSettingsModal';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
+import { SKILL_TEMPLATES, SkillTemplate } from '../services/skillTemplates';
 
 const ManageWorksheetPanel: React.FC<{
     matrix?: Matrix;
@@ -16,67 +18,11 @@ const ManageWorksheetPanel: React.FC<{
 }> = ({ matrix, onUpdate, onClose, onUpload }) => {
     const [draggedColId, setDraggedColId] = useState<string | null>(null);
     const [editingColumn, setEditingColumn] = useState<MatrixColumn | null>(null);
+    const [pendingDeleteColumnId, setPendingDeleteColumnId] = useState<string | null>(null);
 
     // --- TEMPLATE DATA ---
-    interface SkillTemplate {
-        id: string;
-        category: 'Compliance' | 'Maintenance' | 'Finance' | 'Analysis';
-        name: string;
-        description: string;
-        promptTemplate: string;
-        outputType: 'text' | 'badge' | 'score' | 'currency';
-    }
-
-    const SKILL_TEMPLATES: SkillTemplate[] = [
-        {
-            id: 'st-zoning',
-            category: 'Compliance',
-            name: 'Zoning Check',
-            description: 'Checks if species complies with standard urban zoning.',
-            promptTemplate: 'Analyze {Row} against standard urban zoning requirements. Output format: "Status - Key Factor" (e.g. "Approved - Non-invasive").',
-            outputType: 'badge'
-        },
-        {
-            id: 'st-native',
-            category: 'Compliance',
-            name: 'Native Status',
-            description: 'Verifies native status for the region.',
-            promptTemplate: 'Determine if {Row} is native to [Insert Region]. Output format: "Status - Origin" (e.g. "Native - Local Ecotype").',
-            outputType: 'badge'
-        },
-        {
-            id: 'st-maint-sched',
-            category: 'Maintenance',
-            name: 'Maintenance Schedule',
-            description: 'Generates a brief pruning/watering summary.',
-            promptTemplate: 'Create a 1-sentence maintenance summary for {Row} focusing on pruning and watering needs.',
-            outputType: 'text'
-        },
-        {
-            id: 'st-urgency',
-            category: 'Maintenance',
-            name: 'Pruning Urgency',
-            description: 'Estimates urgency based on growth rate.',
-            promptTemplate: 'Estimate pruning urgency for {Row} based on typical growth rate. Output format: "Score/100 - Frequency" (e.g. "80/100 - Annual").',
-            outputType: 'score'
-        },
-        {
-            id: 'st-cost-est',
-            category: 'Finance',
-            name: 'Cost Estimator',
-            description: 'Estimates average market unit cost.',
-            promptTemplate: 'Estimate the average market unit cost for {Row} (standard size). Output format: "$Amount".',
-            outputType: 'currency'
-        },
-        {
-            id: 'st-resilience',
-            category: 'Analysis',
-            name: 'Resilience Score',
-            description: 'Scores urban resilience (drought/pollution).',
-            promptTemplate: 'Rate the urban resilience of {Row} considering drought and pollution. Output format: "Score/100 - Key Trait".',
-            outputType: 'score'
-        }
-    ];
+    // Using imported SKILL_TEMPLATES
+    const skillTemplatesList = Object.values(SKILL_TEMPLATES);
 
     if (!matrix) return (
         <div className="flex flex-col h-full bg-slate-50 border-l border-slate-200 p-6 text-center text-slate-400">
@@ -100,11 +46,7 @@ const ManageWorksheetPanel: React.FC<{
     };
 
     const handleDeleteColumn = (colId: string) => {
-        if (window.confirm("Delete this column? This cannot be undone.")) {
-            const newCols = matrix.columns.filter(c => c.id !== colId);
-            onUpdate({ ...matrix, columns: newCols });
-            setEditingColumn(null);
-        }
+        setPendingDeleteColumnId(colId);
     };
 
     const handleUpdateColumn = (updatedCol: MatrixColumn) => {
@@ -129,15 +71,21 @@ const ManageWorksheetPanel: React.FC<{
 
     // Skill Adder
     const handleAddSkill = (template: SkillTemplate) => {
-        if (matrix.columns.some(c => c.title === template.name)) return;
+        if (matrix.columns.some(c => c.type === 'ai' && c.skillConfig?.templateId === template.id)) return;
+        
+        console.info('[skills:add]', { matrixId: matrix.id, templateId: template.id });
+
+        const defaultParams: Record<string, any> = {};
+        template.parameters.forEach(p => { defaultParams[p.key] = p.defaultValue; });
 
         const skillConfig: SkillConfiguration = {
             id: `skill-${Date.now()}`,
             name: template.name,
-            description: template.description,
-            promptTemplate: template.promptTemplate,
+            templateId: template.id,
+            params: defaultParams,
             attachedContextIds: [], // User can add later in modal
-            outputType: template.outputType
+            outputType: template.outputType,
+            promptTemplate: '' // Legacy requirement
         };
 
         const newCol: MatrixColumn = {
@@ -147,7 +95,7 @@ const ManageWorksheetPanel: React.FC<{
             width: 220,
             visible: true,
             skillConfig: skillConfig,
-            aiPrompt: template.promptTemplate // Legacy fallback
+            aiPrompt: '' // Legacy fallback
         };
 
         onUpdate({ ...matrix, columns: [...matrix.columns, newCol] });
@@ -209,7 +157,7 @@ const ManageWorksheetPanel: React.FC<{
                         type="text" 
                         value={matrix.title}
                         onChange={(e) => onUpdate({ ...matrix, title: e.target.value })}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-weflora-teal/30 focus:border-weflora-teal text-slate-900"
                         placeholder="Worksheet Title"
                     />
                 </div>
@@ -231,7 +179,7 @@ const ManageWorksheetPanel: React.FC<{
                                 onDragOver={handleDragOver}
                                 onDrop={(e) => handleDrop(e, col.id)}
                                 className={`flex items-center gap-2 p-2 bg-white border rounded-lg group shadow-sm transition-all ${
-                                    draggedColId === col.id ? 'opacity-50 ring-2 ring-blue-400' : 'border-slate-200 hover:border-slate-300'
+                                    draggedColId === col.id ? 'opacity-50 ring-2 ring-weflora-teal/40' : 'border-slate-200 hover:border-slate-300'
                                 }`}
                             >
                                 <div className="cursor-grab text-slate-300 hover:text-slate-500 flex-shrink-0">
@@ -266,7 +214,7 @@ const ManageWorksheetPanel: React.FC<{
                                     </button>
                                     <button 
                                         onClick={() => handleDeleteColumn(col.id)}
-                                        className="p-1.5 rounded hover:bg-red-50 text-slate-300 hover:text-red-500"
+                                        className="h-8 w-8 flex items-center justify-center cursor-pointer rounded hover:bg-weflora-red/10 text-slate-300 hover:text-weflora-red"
                                         title="Delete Column"
                                     >
                                         <XIcon className="h-3.5 w-3.5" />
@@ -281,12 +229,12 @@ const ManageWorksheetPanel: React.FC<{
 
                 {/* 3. FloraGPT Skill Library */}
                 <section>
-                    <h3 className="text-xs font-bold text-weflora-teal-dark uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-weflora-dark uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
                         <SparklesIcon className="h-4 w-4" /> FloraGPT Skills
                     </h3>
                     <div className="space-y-2">
-                        {SKILL_TEMPLATES.map((tmpl) => {
-                            const exists = matrix.columns.some(c => c.title === tmpl.name);
+                        {skillTemplatesList.map((tmpl) => {
+                            const exists = matrix.columns.some(c => c.type === 'ai' && c.skillConfig?.templateId === tmpl.id);
                             return (
                                 <button
                                     key={tmpl.id}
@@ -298,11 +246,11 @@ const ManageWorksheetPanel: React.FC<{
                                         : 'bg-white border-weflora-teal/20 hover:border-weflora-teal hover:shadow-sm cursor-pointer group'
                                     }`}
                                 >
-                                    <div className={`p-2 rounded-lg ${exists ? 'bg-weflora-mint/30 text-weflora-teal' : 'bg-weflora-mint/10 text-weflora-teal group-hover:bg-weflora-mint/30 group-hover:text-weflora-teal-dark'}`}>
+                                    <div className={`p-2 rounded-lg ${exists ? 'bg-weflora-mint/30 text-weflora-teal' : 'bg-weflora-mint/10 text-weflora-teal group-hover:bg-weflora-mint/30 group-hover:text-weflora-dark'}`}>
                                         {getCategoryIcon(tmpl.category)}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className={`text-sm font-bold ${exists ? 'text-weflora-teal-dark' : 'text-slate-800'}`}>{tmpl.name}</div>
+                                        <div className={`text-sm font-bold ${exists ? 'text-weflora-dark' : 'text-slate-800'}`}>{tmpl.name}</div>
                                         <div className="text-[10px] text-slate-500 line-clamp-1">{tmpl.description}</div>
                                     </div>
                                     {exists ? (
@@ -378,6 +326,23 @@ const ManageWorksheetPanel: React.FC<{
                     onUpload={onUpload} 
                 />
             )}
+
+            <ConfirmDeleteModal
+                isOpen={Boolean(pendingDeleteColumnId)}
+                title="Delete column?"
+                description={`This will permanently delete "${
+                    pendingDeleteColumnId ? (matrix.columns.find(c => c.id === pendingDeleteColumnId)?.title || 'this column') : 'this column'
+                }" from this worksheet. This cannot be undone.`}
+                confirmLabel="Delete column"
+                onCancel={() => setPendingDeleteColumnId(null)}
+                onConfirm={() => {
+                    if (!pendingDeleteColumnId) return;
+                    const newCols = matrix.columns.filter(c => c.id !== pendingDeleteColumnId);
+                    onUpdate({ ...matrix, columns: newCols });
+                    setEditingColumn(null);
+                    setPendingDeleteColumnId(null);
+                }}
+            />
         </div>
     );
 };
