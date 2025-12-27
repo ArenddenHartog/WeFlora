@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import type { WorksheetDocument, Matrix, MatrixColumn, Species, ProjectFile } from '../types';
+import type { WorksheetDocument, Matrix, MatrixColumn, Species, ProjectFile, MatrixCell } from '../types';
 import MatrixView from './MatrixView';
 import { 
     TableIcon, PlusIcon, PencilIcon, CheckIcon, XIcon, MoreHorizontalIcon,
@@ -32,10 +32,32 @@ interface WorksheetContainerProps {
     projectContext?: string;
     onResolveFile?: (fileId: string) => Promise<File | null>;
     onInspectEntity?: (entityName: string) => void;
+    onActiveTabChange?: (matrixId: string) => void;
 }
 
+const getExportCellContent = (cell?: MatrixCell) => {
+    if (!cell) return '';
+    
+    // 1. Error Status
+    if (cell.status === 'error') {
+        return `[Error] ${cell.reasoning || cell.value || 'Unknown error'}`;
+    }
+
+    // 2. Prefer Display Value (Cleaned) + Reasoning
+    if (cell.displayValue) {
+        if (cell.reasoning) {
+             // Combine for completeness in single-cell export
+             return `${cell.displayValue} | ${cell.reasoning}`; 
+        }
+        return cell.displayValue;
+    }
+
+    // 3. Fallback to raw value
+    return String(cell.value || '');
+};
+
 const WorksheetContainer: React.FC<WorksheetContainerProps> = ({ 
-    document: worksheetDoc, initialActiveTabId, onUpdateDocument, onRunAICell, onAnalyze, speciesList, onClose, onOpenManage, onOpenAssistant, assistantActive, onActiveMatrixIdChange, projectFiles, onUpload, projectContext, onResolveFile, onInspectEntity
+    document: worksheetDoc, initialActiveTabId, onUpdateDocument, onRunAICell, onAnalyze, speciesList, onClose, onOpenManage, onOpenAssistant, assistantActive, onActiveMatrixIdChange, projectFiles, onUpload, projectContext, onResolveFile, onInspectEntity, onActiveTabChange
 }) => {
     const { showNotification } = useUI();
     const [activeTabId, setActiveTabId] = useState<string>(initialActiveTabId || worksheetDoc.tabs[0]?.id || '');
@@ -56,6 +78,10 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
     // UI State for toggles
     const [isBookmarked, setIsBookmarked] = useState(false);
     const [pendingDeleteTabId, setPendingDeleteTabId] = useState<string | null>(null);
+
+    useEffect(() => {
+        onActiveTabChange?.(activeTabId);
+    }, [activeTabId, onActiveTabChange]);
 
     useEffect(() => {
         if (!worksheetDoc.tabs.find(t => t.id === activeTabId) && worksheetDoc.tabs.length > 0) {
@@ -267,7 +293,11 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
         
         if (format === 'csv') {
             const headers = activeMatrix.columns.map(c => c.title).join(',');
-            const rows = activeMatrix.rows.map(r => activeMatrix.columns.map(c => `"${String(r.cells[c.id]?.value || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+            const rows = activeMatrix.rows.map(r => 
+                activeMatrix.columns.map(c => 
+                    `"${getExportCellContent(r.cells[c.id]).replace(/"/g, '""')}"`
+                ).join(',')
+            ).join('\n');
             const blob = new Blob([`${headers}\n${rows}`], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
@@ -275,7 +305,7 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
             link.click();
         } else if (format === 'xlsx') {
             // Simple HTML table export for Excel
-            const html = `<table border="1"><thead><tr>${activeMatrix.columns.map(c => `<th>${c.title}</th>`).join('')}</tr></thead><tbody>${activeMatrix.rows.map(r => `<tr>${activeMatrix.columns.map(c => `<td>${r.cells[c.id]?.value || ''}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+            const html = `<table border="1"><thead><tr>${activeMatrix.columns.map(c => `<th>${c.title}</th>`).join('')}</tr></thead><tbody>${activeMatrix.rows.map(r => `<tr>${activeMatrix.columns.map(c => `<td>${getExportCellContent(r.cells[c.id])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
             const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);

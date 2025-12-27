@@ -1,6 +1,6 @@
-
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { MatrixColumn, DiscoveredStructure, ContextItem, MatrixRow, Matrix, MatrixColumnType, Report, ProjectInsights } from '../types';
+import { SkillOutputType, SkillValidationResult } from './skillTemplates';
 
 // Initialize the SDK
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GOOGLE_API_KEY });
@@ -29,6 +29,18 @@ const parseJSONSafely = (text: string) => {
         console.error("JSON Parse Error", e);
         return {};
     }
+};
+
+// -- Helper: Simple Prompt Hash --
+const hashPrompt = (prompt: string): string => {
+    let hash = 0;
+    if (prompt.length === 0) return hash.toString();
+    for (let i = 0; i < prompt.length; i++) {
+        const char = prompt.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(16);
 };
 
 // --- Helper: Deterministic markdown pipe-table parsing (Copy → Worksheet) ---
@@ -941,6 +953,114 @@ export class AIService {
            console.error("Skill execution failed", e);
            return "Error";
        }
+  }
+
+  // --- NEW: Structured Skill Execution with Retry ---
+  async runSkillCell(args: {
+    prompt: string;
+    outputType: SkillOutputType;
+    validator: (raw: string) => SkillValidationResult;
+    contextFiles: File[];
+    globalContext?: string;
+    evidenceRequired?: boolean;
+    noGuessing?: boolean;
+  }): Promise<{
+    rawText: string;
+    displayValue: string;
+    reasoning: string;
+    normalized: any;
+    outputType: SkillOutputType;
+    ok: boolean;
+    error?: string;
+    model?: string;
+    promptHash?: string;
+  }> {
+    const { prompt, outputType, validator, contextFiles, globalContext, evidenceRequired, noGuessing } = args;
+    const model = 'gemini-2.5-flash';
+    
+    // Construct System Instruction based on policy
+    let systemInstruction = "You are an expert analyst.";
+    if (evidenceRequired) {
+        systemInstruction += " You must cite specific evidence from the provided documents. Do not hallucinate.";
+    }
+    if (noGuessing) {
+        systemInstruction += " If the answer is not explicitly found in the context, state that data is insufficient. Do not guess.";
+    }
+
+    const runAttempt = async (currentPrompt: string): Promise<string> => {
+        const parts: any[] = [];
+        if (globalContext) {
+            parts.push({ text: `Global Project Context:\n${globalContext}\n---\n` });
+        }
+        parts.push({ text: currentPrompt });
+        
+        for (const file of contextFiles) {
+            const base64Data = await fileToBase64(file);
+            parts.push({
+                inlineData: {
+                    mimeType: file.type,
+                    data: base64Data
+                }
+            });
+        }
+
+        const response = await ai.models.generateContent({
+            model: model,
+            contents: { parts },
+            config: { systemInstruction }
+        });
+        
+        return response.text?.trim() || "";
+    };
+
+    try {
+        // Attempt 1
+        let rawText = await runAttempt(prompt);
+        let validation = validator(rawText);
+
+        // Attempt 2 (Retry) if validation fails
+        if (!validation.ok) {
+            console.warn(`Skill validation failed (Type: ${outputType}). Retrying with strict format instruction...`);
+            
+            // Append explicit format reminder based on error or generic requirement
+            const retryInstruction = `
+            Previous output was invalid: "${validation.error}".
+            CRITICAL: Your output MUST match the format exactly.
+            Include '— reason' at the end.
+            Do NOT include markdown blocks, preambles, or extra text.
+            Just the value and the reason.
+            `;
+            
+            rawText = await runAttempt(prompt + "\n\n" + retryInstruction);
+            validation = validator(rawText);
+        }
+
+        return {
+            rawText,
+            displayValue: validation.displayValue || rawText, // Fallback to raw if display missing but normalized might exist? Actually if !ok displayValue might be undefined.
+            reasoning: validation.reasoning || "",
+            normalized: validation.normalized,
+            outputType,
+            ok: validation.ok,
+            error: validation.error,
+            model: model,
+            promptHash: hashPrompt(prompt)
+        };
+
+    } catch (e: any) {
+        console.error("runSkillCell failed completely", e);
+        return {
+            rawText: "",
+            displayValue: "Error",
+            reasoning: e.message || "Unknown error during execution",
+            normalized: null,
+            outputType,
+            ok: false,
+            error: e.message,
+            model: model,
+            promptHash: hashPrompt(prompt)
+        };
+    }
   }
 
   async discoverStructures(files: File[]): Promise<DiscoveredStructure[]> {

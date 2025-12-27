@@ -5,9 +5,13 @@ import BaseModal from './BaseModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { 
     FileSheetIcon, FilePdfIcon, FileCodeIcon, CheckIcon, 
-    SparklesIcon, PlusIcon, XIcon, SearchIcon, UploadIcon,
-    AdjustmentsHorizontalIcon
+    SparklesIcon, PlusIcon, XIcon, SearchIcon, UploadIcon, LockClosedIcon,
+    LockClosedIcon,
+    AdjustmentsHorizontalIcon,
+    ChevronDownIcon,
+    ChevronUpIcon
 } from './icons';
+import { SKILL_TEMPLATES, SkillTemplateId, SkillTemplate, getSkillTemplate } from '../services/skillTemplates';
 
 interface ColumnSettingsModalProps {
     column: MatrixColumn;
@@ -22,7 +26,10 @@ const FORMAT_OPTIONS = [
     { label: 'Free Text', value: 'text', description: 'Standard text response' },
     { label: 'Smart Badge', value: 'badge', description: "Status - Brief Rationale" },
     { label: 'Score (0-100)', value: 'score', description: "Score/100 - Key Reason" },
-    { label: 'Currency', value: 'currency', description: "$Amount" },
+    { label: 'Currency', value: 'currency', description: "€Amount" },
+    { label: 'Quantity', value: 'quantity', description: "Amount Unit - Reason" },
+    { label: 'Enum', value: 'enum', description: "Selection - Reason" },
+    { label: 'Range', value: 'range', description: "Min-Max - Reason" },
 ];
 
 const COLORS = [
@@ -51,12 +58,35 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
         id: `skill-${Date.now()}`,
         name: 'New Skill',
         promptTemplate: column.aiPrompt || '',
+        templateId: undefined,
+        params: {},
         attachedContextIds: [],
         outputType: 'text',
         conditionalFormatting: []
     });
 
-    // New Rule State
+    const [isLegacyExpanded, setIsLegacyExpanded] = useState(false);
+    const [previewPrompt, setPreviewPrompt] = useState('');
+    
+    // Guard loop
+    const lastColumnId = useRef(column.id);
+    useEffect(() => {
+        if (lastColumnId.current !== column.id) {
+            setEditedCol({ ...column });
+            setSkillConfig(column.skillConfig || {
+                id: `skill-${Date.now()}`,
+                name: 'New Skill',
+                promptTemplate: column.aiPrompt || '',
+                templateId: undefined,
+                params: {},
+                attachedContextIds: [],
+                outputType: 'text',
+                conditionalFormatting: []
+            });
+            lastColumnId.current = column.id;
+        }
+    }, [column]);
+
     const [newRuleCondition, setNewRuleCondition] = useState<ConditionalFormattingRule['condition']>('contains');
     const [newRuleValue, setNewRuleValue] = useState('');
     const [newRuleStyle, setNewRuleStyle] = useState<ConditionalFormattingRule['style']>('green');
@@ -65,6 +95,40 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
     // File Search State
     const [fileSearch, setFileSearch] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (skillConfig.templateId) {
+            console.info('[skill-config:changed]', { templateId: skillConfig.templateId });
+        }
+    }, [skillConfig.templateId]);
+
+    // Effect: Update preview when template or params change
+    useEffect(() => {
+        if (skillConfig.templateId && SKILL_TEMPLATES[skillConfig.templateId]) {
+            const template = SKILL_TEMPLATES[skillConfig.templateId];
+            const mockRow = { 'Entity': '[Sample Entity Name]' }; // Placeholder
+            const mockFiles = ['[Attached File 1]', '[Attached File 2]']; // Placeholders
+            
+            // Build params with defaults + overrides
+            const params: Record<string, any> = {};
+            template.parameters.forEach(p => {
+                params[p.key] = skillConfig.params?.[p.key] !== undefined ? skillConfig.params[p.key] : p.defaultValue;
+            });
+
+            try {
+                const prompt = template.promptBuilder(mockRow, params, mockFiles);
+                setPreviewPrompt(prompt);
+                // Also update outputType to match template (read-only enforcement)
+                if (skillConfig.outputType !== template.outputType) {
+                    setSkillConfig(prev => ({ ...prev, outputType: template.outputType }));
+                }
+            } catch (e) {
+                setPreviewPrompt("Error generating preview.");
+            }
+        } else {
+            setPreviewPrompt(skillConfig.promptTemplate || '');
+        }
+    }, [skillConfig.templateId, skillConfig.params, skillConfig.promptTemplate, skillConfig.outputType]);
 
     // Sync editedCol with Skill Config on Save
     const handleSave = () => {
@@ -78,9 +142,68 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
         onSave(finalCol);
     };
 
+    const handleTemplateChange = (templateId: string) => {
+        console.info('[skill-template:selected]', { id: templateId });
+        
+        if (!templateId || templateId === 'custom') {
+            setSkillConfig(prev => ({ 
+                ...prev, 
+                templateId: undefined, 
+                name: 'Custom Skill',
+                // Keep existing prompt if user was editing custom, or clear if coming from template?
+                // Usually better to keep it if it was custom, but if switching FROM template, maybe clear?
+                // The requirement says: "do NOT auto-overwrite title unless it’s still default 'New Skill'"
+            }));
+            return;
+        }
+
+        const template = getSkillTemplate(templateId);
+        if (template) {
+            // Initialize params with defaults
+            const defaultParams: Record<string, any> = {};
+            template.parameters.forEach(p => {
+                defaultParams[p.key] = p.defaultValue;
+            });
+
+            const newConfig = { 
+                ...skillConfig,
+                templateId: template.id as SkillTemplateId, 
+                name: template.name,
+                outputType: template.outputType,
+                params: defaultParams,
+                promptTemplate: '' // Clear custom prompt template when switching to skill
+            };
+            
+            console.info('[skill-template:applied]', { 
+                templateId: newConfig.templateId, 
+                outputType: newConfig.outputType 
+            });
+
+            setSkillConfig(newConfig);
+            
+            // Set column title to template name if it's default or new
+            if (editedCol.title === 'New Skill' || editedCol.title === 'New Column' || !editedCol.title) {
+                setEditedCol(prev => ({ ...prev, title: template.name }));
+            } else {
+                // If user changed title, confirm overwrite? 
+                // For now, prompt instruction says: "Set column title (editedCol.title) to tmpl.name (so it matches the template)"
+                // But let's be safe and do it only if it looks like a default title or they specifically selected a template
+                setEditedCol(prev => ({ ...prev, title: template.name }));
+            }
+        }
+    };
+
+    const handleParamChange = (paramId: string, value: any) => {
+        setSkillConfig(prev => ({
+            ...prev,
+            params: {
+                ...(prev.params || {}),
+                [paramId]: value
+            }
+        }));
+    };
+
     const handleFormatChange = (newFormat: string) => {
-        // We no longer modify the promptTemplate text here.
-        // We only update the configuration state.
         setSkillConfig(prev => ({ ...prev, outputType: newFormat as any }));
     };
 
@@ -129,6 +252,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
     );
 
     const activeFormat = FORMAT_OPTIONS.find(f => f.value === skillConfig.outputType);
+    const selectedTemplate = skillConfig.templateId ? SKILL_TEMPLATES[skillConfig.templateId] : null;
 
     return (
         <>
@@ -190,34 +314,123 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                         <div className="p-4">
                             {/* LOGIC TAB */}
                             {activeTab === 'logic' && (
-                                <div className="space-y-3">
+                                <div className="space-y-4">
+                                    {/* 1. Skill Template Selector */}
                                     <div>
-                                        <label className="block text-xs font-bold text-weflora-dark mb-1">Skill Name</label>
-                                        <input type="text" value={skillConfig.name} onChange={e => setSkillConfig({...skillConfig, name: e.target.value})} className="w-full bg-white border border-weflora-teal/30 rounded-lg px-3 py-2 text-sm text-slate-900 focus:border-weflora-teal outline-none"/>
+                                        <label className="block text-xs font-bold text-weflora-dark mb-1">Skill Template</label>
+                                        <select 
+                                            value={skillConfig.templateId || 'custom'} 
+                                            onChange={(e) => handleTemplateChange(e.target.value)}
+                                            className="w-full bg-white border border-weflora-teal/30 rounded-lg px-3 py-2 text-sm text-slate-900 focus:border-weflora-teal outline-none"
+                                        >
+                                            <option value="custom">-- Custom Skill --</option>
+                                            {Object.values(SKILL_TEMPLATES).map(t => (
+                                                <option key={t.id} value={t.id}>{t.name}</option>
+                                            ))}
+                                        </select>
+                                        {selectedTemplate && (
+                                            <p className="text-[10px] text-slate-500 mt-1">{selectedTemplate.description}</p>
+                                        )}
                                     </div>
-                                    <div>
-                                        <div className="flex justify-between items-center mb-1">
-                                            <label className="block text-xs font-bold text-weflora-dark">Instruction (Prompt)</label>
-                                            {skillConfig.outputType !== 'text' && (
-                                                <span className="text-[10px] bg-weflora-teal text-white px-2 py-0.5 rounded-full flex items-center gap-1" title="Output format is controlled by the Format tab">
-                                                    <AdjustmentsHorizontalIcon className="h-3 w-3" />
-                                                    Format: {activeFormat?.label}
-                                                </span>
+
+                                    {/* 2. Parameters (if template selected) */}
+                                    {selectedTemplate && selectedTemplate.parameters.length > 0 && (
+                                        <div className="bg-white border border-weflora-teal/20 rounded-lg p-3 space-y-3">
+                                            <h4 className="text-xs font-bold text-weflora-teal uppercase tracking-wide mb-2">Parameters</h4>
+                                            {selectedTemplate.parameters.map(param => (
+                                                <div key={param.key}>
+                                                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                                                        {param.label} {param.required && <span className="text-red-400">*</span>}
+                                                    </label>
+                                                    {param.type === 'select' ? (
+                                                        <select
+                                                            value={skillConfig.params?.[param.key] || param.defaultValue || ''}
+                                                            onChange={(e) => handleParamChange(param.key, e.target.value)}
+                                                            className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 bg-slate-50 focus:bg-white outline-none focus:border-weflora-teal"
+                                                        >
+                                                            {param.options?.map(opt => (
+                                                                <option key={opt} value={opt}>{opt}</option>
+                                                            ))}
+                                                        </select>
+                                                    ) : (
+                                                        <input
+                                                            type={param.type === 'number' ? 'number' : 'text'}
+                                                            value={skillConfig.params?.[param.key] || param.defaultValue || ''}
+                                                            onChange={(e) => handleParamChange(param.key, e.target.value)}
+                                                            className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 bg-slate-50 focus:bg-white outline-none focus:border-weflora-teal"
+                                                        />
+                                                    )}
+                                                    {param.description && <p className="text-[10px] text-slate-400 mt-0.5">{param.description}</p>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* 3. Legacy / Custom Prompt */}
+                                    {!selectedTemplate ? (
+                                        <div>
+                                            <div className="flex justify-between items-center mb-1">
+                                                <label className="block text-xs font-bold text-weflora-dark">Instruction (Prompt)</label>
+                                                {skillConfig.outputType !== 'text' && (
+                                                    <span className="text-[10px] bg-weflora-teal text-white px-2 py-0.5 rounded-full flex items-center gap-1" title="Output format is controlled by the Format tab">
+                                                        <AdjustmentsHorizontalIcon className="h-3 w-3" />
+                                                        Format: {activeFormat?.label}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <textarea 
+                                                value={skillConfig.promptTemplate} 
+                                                onChange={e => setSkillConfig({...skillConfig, promptTemplate: e.target.value})} 
+                                                placeholder="Analyze {Row} for..." 
+                                                rows={5} 
+                                                disabled={!!skillConfig.templateId}
+                                                className={`w-full border border-weflora-teal/30 rounded-lg px-3 py-2 text-sm text-slate-900 focus:border-weflora-teal outline-none resize-none ${!!skillConfig.templateId ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : 'bg-white'}`}
+                                            />
+                                            {!!skillConfig.templateId && (
+                                                <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
+                                                    <LockClosedIcon className="h-3 w-3" />
+                                                    This template is locked. You can attach files and choose allowed output styles.
+                                                </p>
+                                            )}
+                                            {!skillConfig.templateId && (
+                                            <div className="flex justify-between items-start mt-1">
+                                                <p className="text-[10px] text-weflora-teal">
+                                                    Tip: Use <code>{`{Column Name}`}</code> to reference other cells.
+                                                </p>
+                                            </div>
                                             )}
                                         </div>
-                                        <textarea 
-                                            value={skillConfig.promptTemplate} 
-                                            onChange={e => setSkillConfig({...skillConfig, promptTemplate: e.target.value})} 
-                                            placeholder="Analyze {Row} for..." 
-                                            rows={5} 
-                                            className="w-full bg-white border border-weflora-teal/30 rounded-lg px-3 py-2 text-sm text-slate-900 focus:border-weflora-teal outline-none resize-none"
-                                        />
-                                        <div className="flex justify-between items-start mt-1">
-                                            <p className="text-[10px] text-weflora-teal">
-                                                Tip: Use <code>{`{Column Name}`}</code> to reference other cells.
-                                            </p>
+                                    ) : (
+                                        /* 4. Prompt Preview (Read Only) */
+                                        <div className="space-y-2">
+                                            <div 
+                                                className="flex items-center gap-1 cursor-pointer" 
+                                                onClick={() => setIsLegacyExpanded(!isLegacyExpanded)}
+                                            >
+                                                <label className="block text-xs font-bold text-weflora-dark cursor-pointer">Prompt Preview</label>
+                                                {isLegacyExpanded ? <ChevronUpIcon className="h-3 w-3 text-slate-400"/> : <ChevronDownIcon className="h-3 w-3 text-slate-400"/>}
+                                            </div>
+                                            
+                                            {isLegacyExpanded && (
+                                                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                                                    <pre className="text-[10px] text-slate-600 whitespace-pre-wrap font-mono">
+                                                        {previewPrompt}
+                                                    </pre>
+                                                    <div className="mt-2 text-[10px] text-slate-400 italic border-t border-slate-200 pt-1">
+                                                        This prompt is generated automatically by the template.
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Show legacy prompt warning if it exists but we are in template mode */}
+                                            {skillConfig.promptTemplate && skillConfig.promptTemplate.length > 10 && (
+                                                <div className="text-[10px] text-amber-600 bg-amber-50 p-2 rounded border border-amber-200 mt-2">
+                                                    <strong>Legacy Prompt Detected:</strong> This column has a custom prompt saved ("{skillConfig.promptTemplate.substring(0, 15)}..."). 
+                                                    Switching to "Custom Skill" will restore it. Using a template overrides custom prompts.
+                                                </div>
+                                            )}
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             )}
 
@@ -291,8 +504,17 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                             onChange={(e) => handleFormatChange(e.target.value)}
                                             className="w-full border border-weflora-teal/30 rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:border-weflora-teal outline-none bg-white"
                                         >
-                                            {FORMAT_OPTIONS.map(opt => (
-                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                            {FORMAT_OPTIONS.filter(opt => {
+                                                if (!selectedTemplate) return true;
+                                                const allowed = selectedTemplate.allowedOutputTypes || [selectedTemplate.outputType];
+                                                // Always include the current default output type of the template even if not explicit in allowed list (safety)
+                                                if (!allowed.includes(selectedTemplate.outputType)) allowed.push(selectedTemplate.outputType);
+                                                return allowed.includes(opt.value as any);
+                                            }).map(opt => (
+                                                <option key={opt.value} value={opt.value}>
+                                                    {opt.label}
+                                                    {selectedTemplate && selectedTemplate.outputType === opt.value ? ' (default)' : ''}
+                                                </option>
                                             ))}
                                         </select>
                                         <p className="text-[10px] text-slate-500 mt-1">
@@ -300,69 +522,6 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                         </p>
                                     </div>
 
-                                    {/* 2. Visual Rules Engine */}
-                                    <div>
-                                        <label className="block text-xs font-bold text-weflora-dark mb-2">Visual Rules (Conditional Formatting)</label>
-                                        <div className="space-y-2 mb-3">
-                                            {skillConfig.conditionalFormatting?.map((rule, idx) => (
-                                                <div key={rule.id} className="flex items-center gap-2 text-xs bg-weflora-mint/20 p-2 rounded border border-weflora-teal/20">
-                                                    <span className="text-weflora-teal font-mono text-[10px] w-4">{idx + 1}.</span>
-                                                    <span className="text-slate-600">If</span>
-                                                    <span className="font-bold text-slate-800 capitalize">{rule.condition.replace('_', ' ')}</span>
-                                                    <span className="bg-white px-1.5 py-0.5 rounded border border-weflora-teal/30 text-slate-800 font-mono max-w-[80px] truncate" title={rule.value}>"{rule.value}"</span>
-                                                    <span className="text-slate-600">then</span>
-                                                    <div className={`w-4 h-4 rounded-full ${COLORS.find(c => c.value === rule.style)?.bg}`}></div>
-                                                    <button
-                                                        onClick={() => handleRemoveRule(rule.id)}
-                                                        className="ml-auto h-8 w-8 flex items-center justify-center cursor-pointer text-slate-400 hover:text-weflora-red hover:bg-weflora-red/10 rounded"
-                                                        title="Delete rule"
-                                                    >
-                                                        <XIcon className="h-3.5 w-3.5" />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                            {(!skillConfig.conditionalFormatting || skillConfig.conditionalFormatting.length === 0) && (
-                                                <div className="text-[10px] text-slate-400 italic p-2 border border-dashed border-slate-200 rounded text-center">
-                                                    No rules defined. Default AI coloring will be used.
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Rule Builder Form */}
-                                        <div className="flex items-center gap-2 p-2 bg-white border border-weflora-teal/30 rounded-lg shadow-sm">
-                                            <select 
-                                                value={newRuleCondition}
-                                                onChange={(e) => setNewRuleCondition(e.target.value as any)}
-                                                className="text-xs border border-slate-200 rounded px-1 py-1.5 bg-white text-slate-900 outline-none w-24"
-                                            >
-                                                {CONDITIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                                            </select>
-                                            <input 
-                                                type="text" 
-                                                placeholder="Value..." 
-                                                value={newRuleValue}
-                                                onChange={(e) => setNewRuleValue(e.target.value)}
-                                                className="flex-1 text-xs border border-slate-200 bg-white text-slate-900 rounded px-2 py-1.5 outline-none"
-                                            />
-                                            <div className="flex gap-1">
-                                                {COLORS.map(c => (
-                                                    <button 
-                                                        key={c.value}
-                                                        onClick={() => setNewRuleStyle(c.value as any)}
-                                                        className={`w-5 h-5 rounded-full ${c.bg} ${newRuleStyle === c.value ? 'ring-2 ring-weflora-teal ring-offset-1' : 'opacity-60 hover:opacity-100'}`}
-                                                        title={c.value}
-                                                    />
-                                                ))}
-                                            </div>
-                                            <button 
-                                                onClick={handleAddRule}
-                                                disabled={!newRuleValue.trim()}
-                                                className="p-1.5 bg-weflora-teal text-white rounded hover:bg-weflora-dark disabled:opacity-50"
-                                            >
-                                                <PlusIcon className="h-3.5 w-3.5" />
-                                            </button>
-                                        </div>
-                                    </div>
                                 </div>
                             )}
                         </div>

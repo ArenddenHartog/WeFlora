@@ -404,7 +404,10 @@ ${report.content.substring(0, 3000)}${report.content.length > 3000 ? '...(trunca
                         : 'Project Settings';
 
             if (activeTab === 'worksheets') {
-                const matrixToManage = matrices.length > 0 ? matrices[0] : undefined; 
+                const matrixToManage = 
+                    (activeWorksheetMatrixId && matrices.find(m => m.id === activeWorksheetMatrixId))
+                    ?? (matrices.length > 0 ? matrices[0] : undefined);
+                
                 if (matrixToManage) {
                     return (
                         <ManageWorksheetPanel
@@ -568,6 +571,7 @@ ${report.content.substring(0, 3000)}${report.content.length > 3000 ? '...(trunca
                             setInspectedEntity(entity);
                             setRightPanel('entity');
                         }}
+                        onActiveTabChange={setActiveWorksheetMatrixId}
                     />
                 );
             case 'reports':
