@@ -57,8 +57,8 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
     const [skillConfig, setSkillConfig] = useState<SkillConfiguration>(column.skillConfig || {
         id: `skill-${Date.now()}`,
         name: 'New Skill',
+        description: column.skillConfig?.description,
         promptTemplate: column.aiPrompt || '',
-        templateId: undefined,
         params: {},
         attachedContextIds: [],
         outputType: 'text',
@@ -108,15 +108,19 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
             const template = SKILL_TEMPLATES[skillConfig.templateId];
             const mockRow = { 'Entity': '[Sample Entity Name]' }; // Placeholder
             const mockFiles = ['[Attached File 1]', '[Attached File 2]']; // Placeholders
-            
+        
             // Build params with defaults + overrides
             const params: Record<string, any> = {};
-            template.parameters.forEach(p => {
+            (template.params || []).forEach(p => {
                 params[p.key] = skillConfig.params?.[p.key] !== undefined ? skillConfig.params[p.key] : p.defaultValue;
             });
 
             try {
-                const prompt = template.promptBuilder(mockRow, params, mockFiles);
+                const prompt = template.buildPrompt({
+                    row: mockRow,
+                    params,
+                    attachedFileNames: mockFiles
+                });
                 setPreviewPrompt(prompt);
                 // Also update outputType to match template (read-only enforcement)
                 if (skillConfig.outputType !== template.outputType) {
@@ -161,7 +165,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
         if (template) {
             // Initialize params with defaults
             const defaultParams: Record<string, any> = {};
-            template.parameters.forEach(p => {
+            (template.params ?? []).forEach(p => {
                 defaultParams[p.key] = p.defaultValue;
             });
 
@@ -253,6 +257,7 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
 
     const activeFormat = FORMAT_OPTIONS.find(f => f.value === skillConfig.outputType);
     const selectedTemplate = skillConfig.templateId ? SKILL_TEMPLATES[skillConfig.templateId] : null;
+    const templateParams = selectedTemplate?.params ?? [];
 
     return (
         <>
@@ -332,12 +337,16 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                             <p className="text-[10px] text-slate-500 mt-1">{selectedTemplate.description}</p>
                                         )}
                                     </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-weflora-teal-dark mb-1">Skill Name</label>
+                                        <input type="text" value={skillConfig.name} onChange={e => setSkillConfig({...skillConfig, name: e.target.value})} className="w-full bg-white border border-weflora-teal/30 rounded-lg px-3 py-2 text-sm text-slate-900 focus:border-weflora-teal outline-none"/>
+                                    </div>
 
                                     {/* 2. Parameters (if template selected) */}
-                                    {selectedTemplate && selectedTemplate.parameters.length > 0 && (
+                                    {selectedTemplate && templateParams.length > 0 && (
                                         <div className="bg-white border border-weflora-teal/20 rounded-lg p-3 space-y-3">
                                             <h4 className="text-xs font-bold text-weflora-teal uppercase tracking-wide mb-2">Parameters</h4>
-                                            {selectedTemplate.parameters.map(param => (
+                                            {templateParams.map(param => (
                                                 <div key={param.key}>
                                                     <label className="block text-xs font-medium text-slate-700 mb-1">
                                                         {param.label} {param.required && <span className="text-red-400">*</span>}
@@ -462,33 +471,9 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                             type="file" 
                                             ref={fileInputRef} 
                                             className="hidden" 
-                                            multiple 
+                                            multiple
                                             onChange={handleFileUpload}
                                         />
-                                    </div>
-
-                                    <div className="max-h-[200px] overflow-y-auto space-y-1 border border-weflora-teal/20 rounded-lg bg-white p-1 custom-scrollbar">
-                                        {projectFiles.length === 0 && <div className="text-center py-4 text-xs text-slate-400">No files in project.</div>}
-                                        {filteredFiles.map(file => {
-                                            const isSelected = skillConfig.attachedContextIds.includes(file.id);
-                                            return (
-                                                <div 
-                                                    key={file.id} 
-                                                    onClick={() => toggleFileAttachment(file.id)}
-                                                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer border transition-all ${isSelected ? 'bg-weflora-mint/20 border-weflora-teal ring-1 ring-weflora-teal' : 'bg-white border-transparent hover:bg-slate-50'}`}
-                                                >
-                                                    <div className="shrink-0">{getFileIcon(file.name)}</div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="text-xs font-bold text-slate-700 truncate">{file.name}</div>
-                                                        <div className="text-[10px] text-slate-400">{file.size}</div>
-                                                    </div>
-                                                    {isSelected && <CheckIcon className="h-4 w-4 text-weflora-teal" />}
-                                                </div>
-                                            );
-                                        })}
-                                        {filteredFiles.length === 0 && projectFiles.length > 0 && (
-                                            <div className="text-center py-2 text-xs text-slate-400">No matching files.</div>
-                                        )}
                                     </div>
                                 </div>
                             )}

@@ -21,9 +21,8 @@ const ManageWorksheetPanel: React.FC<{
     const [pendingDeleteColumnId, setPendingDeleteColumnId] = useState<string | null>(null);
 
     // --- TEMPLATE DATA ---
-    // Using imported SKILL_TEMPLATES
+    // Normalize map to list for rendering
     const skillTemplatesList = Object.values(SKILL_TEMPLATES);
-
     if (!matrix) return (
         <div className="flex flex-col h-full bg-slate-50 border-l border-slate-200 p-6 text-center text-slate-400">
             <SlidersIcon className="h-10 w-10 mx-auto mb-2 opacity-20" />
@@ -76,12 +75,13 @@ const ManageWorksheetPanel: React.FC<{
         console.info('[skills:add]', { matrixId: matrix.id, templateId: template.id });
 
         const defaultParams: Record<string, any> = {};
-        template.parameters.forEach(p => { defaultParams[p.key] = p.defaultValue; });
+        const templateParams = template.params ?? [];
+        templateParams.forEach(p => { defaultParams[p.key] = p.defaultValue; });
 
         const skillConfig: SkillConfiguration = {
             id: `skill-${Date.now()}`,
-            name: template.name,
             templateId: template.id,
+            name: template.name,
             params: defaultParams,
             attachedContextIds: [], // User can add later in modal
             outputType: template.outputType,

@@ -515,7 +515,8 @@ const MatrixView: React.FC<MatrixViewProps> = ({
 
                 // Params
                 const params: Record<string, any> = {};
-                template.parameters.forEach(p => {
+                const templateParams = template.params ?? [];
+                templateParams.forEach(p => {
                     params[p.key] = skillConfig.params?.[p.key] !== undefined ? skillConfig.params[p.key] : p.defaultValue;
                 });
 

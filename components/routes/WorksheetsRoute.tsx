@@ -58,6 +58,7 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
     const [isWizardOpen, setIsWizardOpen] = useState(false);
     const [inspectedEntity, setInspectedEntity] = useState<string | null>(null);
     const [focusTabId, setFocusTabId] = useState<string | undefined>(undefined);
+    const [visibleMatrixId, setVisibleMatrixId] = useState<string | null>(null);
 
     // Derived Data
     const standaloneMatrices = matrices.filter(m => !m.projectId);
@@ -110,6 +111,8 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
             return root ? [root, ...children] : children;
         })()
     } : null;
+
+    const matrixForManage = visibleMatrixId ? matrices.find(m => m.id === visibleMatrixId) : activeMatrix;
 
     const handleUpdateDoc = async (doc: WorksheetDocument) => {
         const currentTabs = matrices.filter(m => m.id === doc.id || m.parentId === doc.id);
@@ -255,6 +258,7 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
                             onClose={() => navigate('/worksheets')}
                             speciesList={species}
                             onOpenManage={() => togglePanel('manage')} 
+                            onActiveTabChange={(id) => setVisibleMatrixId(id)}
                             projectFiles={Object.values(projectFiles).flat()}
                             onUpload={(files) => files.forEach(f => uploadProjectFile(f, 'generic'))}
                             onResolveFile={resolveProjectFile}
@@ -268,7 +272,7 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
 
                 <ResizablePanel isOpen={rightPanel !== 'none'} onClose={() => setRightPanel('none')} width={panelWidth} setWidth={setPanelWidth} minWidth={320} maxWidth={800}>
                     {rightPanel === 'manage' && (
-                        <ManageWorksheetPanel matrix={activeMatrix} onUpdate={handleUpdate} onClose={() => setRightPanel('none')} onUpload={(files) => files.forEach(f => uploadProjectFile(f, 'generic'))} />
+                        <ManageWorksheetPanel matrix={matrixForManage} onUpdate={handleUpdate} onClose={() => setRightPanel('none')} onUpload={(files) => files.forEach(f => uploadProjectFile(f, 'generic'))} />
                     )}
                     {rightPanel === 'chat' && (
                         <div className="h-full bg-white flex flex-col">
