@@ -503,6 +503,13 @@ const MatrixView: React.FC<MatrixViewProps> = ({
             // Path 1: Template
             if (skillConfig?.templateId && SKILL_TEMPLATES[skillConfig.templateId]) {
                 const template = SKILL_TEMPLATES[skillConfig.templateId];
+                if (skillConfig.outputType && skillConfig.outputType !== template.outputType) {
+                    console.warn('[skill-output:override]', {
+                        templateId: template.id,
+                        configured: skillConfig.outputType,
+                        enforced: template.outputType
+                    });
+                }
                 
                 // Row Context
                 const rowContext: Record<string, any> = { 'Entity': rowName };

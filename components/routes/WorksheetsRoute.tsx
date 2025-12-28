@@ -8,6 +8,7 @@ import { useChat } from '../../contexts/ChatContext';
 import { aiService } from '../../services/aiService';
 import type { Matrix, WorksheetDocument, ChatMessage, MatrixRow } from '../../types';
 import { navigateToCreatedEntity } from '../../utils/navigation';
+import ErrorBoundary from '../../src/ErrorBoundary';
 import WorksheetTemplatesView from '../WorksheetTemplatesView';
 import WorksheetContainer from '../WorksheetContainer';
 import WorksheetWizard from '../WorksheetWizard';
@@ -249,70 +250,74 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
 
                 <div className="flex-1 flex min-w-0 relative overflow-hidden">
                     <div className="flex-1 min-w-0 h-full">
-                        <WorksheetContainer 
-                            document={worksheetDoc}
-                            initialActiveTabId={focusTabId}
-                            onUpdateDocument={handleUpdateDoc}
-                            onRunAICell={(p, f) => aiService.runAICell(p, f)}
-                            onAnalyze={(f, c, cols) => aiService.analyzeDocuments(f, c, cols)}
-                            onClose={() => navigate('/worksheets')}
-                            speciesList={species}
-                            onOpenManage={() => togglePanel('manage')} 
-                            onActiveTabChange={(id) => setVisibleMatrixId(id)}
-                            projectFiles={Object.values(projectFiles).flat()}
-                            onUpload={(files) => files.forEach(f => uploadProjectFile(f, 'generic'))}
-                            onResolveFile={resolveProjectFile}
-                            onInspectEntity={(entity) => {
-                                setInspectedEntity(entity);
-                                setRightPanel('species');
-                            }}
-                        />
+                        <ErrorBoundary name="Worksheet Workspace">
+                            <WorksheetContainer 
+                                document={worksheetDoc}
+                                initialActiveTabId={focusTabId}
+                                onUpdateDocument={handleUpdateDoc}
+                                onRunAICell={(p, f) => aiService.runAICell(p, f)}
+                                onAnalyze={(f, c, cols) => aiService.analyzeDocuments(f, c, cols)}
+                                onClose={() => navigate('/worksheets')}
+                                speciesList={species}
+                                onOpenManage={() => togglePanel('manage')} 
+                                onActiveTabChange={(id) => setVisibleMatrixId(id)}
+                                projectFiles={Object.values(projectFiles).flat()}
+                                onUpload={(files) => files.forEach(f => uploadProjectFile(f, 'generic'))}
+                                onResolveFile={resolveProjectFile}
+                                onInspectEntity={(entity) => {
+                                    setInspectedEntity(entity);
+                                    setRightPanel('species');
+                                }}
+                            />
+                        </ErrorBoundary>
                     </div>
                 </div>
 
                 <ResizablePanel isOpen={rightPanel !== 'none'} onClose={() => setRightPanel('none')} width={panelWidth} setWidth={setPanelWidth} minWidth={320} maxWidth={800}>
-                    {rightPanel === 'manage' && (
-                        <ManageWorksheetPanel matrix={matrixForManage} onUpdate={handleUpdate} onClose={() => setRightPanel('none')} onUpload={(files) => files.forEach(f => uploadProjectFile(f, 'generic'))} />
-                    )}
-                    {rightPanel === 'chat' && (
-                        <div className="h-full bg-white flex flex-col">
-                             <ChatView 
-                                chat={{ id: `ws-chat-${activeMatrix.id}`, title: 'Worksheet Assistant', description: 'Analyzing this sheet', icon: SparklesIcon, time: 'Now' }} 
-                                messages={activeEntityMessages} 
-                                onBack={() => setRightPanel('none')} 
-                                onSendMessage={handleEntityChatSend}
-                                isGenerating={isGenerating} 
-                                onRegenerateMessage={() => {}}
-                                onOpenMenu={() => {}}
-                                variant="panel"
-                                onContinueInReport={(msg) => onOpenDestinationModal('report', msg)}
-                                onContinueInWorksheet={(msg) => onOpenDestinationModal('worksheet', msg)}
-                             />
-                        </div>
-                    )}
-                    {rightPanel === 'files' && (
-                        <div className="flex flex-col h-full bg-slate-50">
-                            <header className="p-4 border-b border-slate-200 bg-white flex justify-between items-center">
-                                <div className="font-bold text-slate-800 flex items-center gap-2"><DatabaseIcon className="h-5 w-5 text-weflora-teal"/> Global Files</div>
-                                <button onClick={() => setRightPanel('none')}><XIcon className="h-5 w-5 text-slate-400"/></button>
-                            </header>
-                            <div className="p-8 text-center text-slate-400">Select a project to access specific files.</div>
-                        </div>
-                    )}
-                    {rightPanel === 'species' && (
-                        <SpeciesIntelligencePanel 
-                            speciesName={inspectedEntity || ""} 
-                            speciesList={species} 
-                            onClose={() => setRightPanel('none')} 
-                            onAskAI={(query) => { 
-                                // Redirect question to chat
-                                togglePanel('chat');
-                                setTimeout(() => handleEntityChatSend(query), 100); 
-                            }}
-                            onAddToWorksheet={handleAddSpeciesToWorksheet}
-                            onSaveToLibrary={addSpecies}
-                        />
-                    )}
+                    <ErrorBoundary name="Worksheet Side Panel">
+                        {rightPanel === 'manage' && (
+                            <ManageWorksheetPanel matrix={matrixForManage} onUpdate={handleUpdate} onClose={() => setRightPanel('none')} onUpload={(files) => files.forEach(f => uploadProjectFile(f, 'generic'))} />
+                        )}
+                        {rightPanel === 'chat' && (
+                            <div className="h-full bg-white flex flex-col">
+                                 <ChatView 
+                                    chat={{ id: `ws-chat-${activeMatrix.id}`, title: 'Worksheet Assistant', description: 'Analyzing this sheet', icon: SparklesIcon, time: 'Now' }} 
+                                    messages={activeEntityMessages} 
+                                    onBack={() => setRightPanel('none')} 
+                                    onSendMessage={handleEntityChatSend}
+                                    isGenerating={isGenerating} 
+                                    onRegenerateMessage={() => {}}
+                                    onOpenMenu={() => {}}
+                                    variant="panel"
+                                    onContinueInReport={(msg) => onOpenDestinationModal('report', msg)}
+                                    onContinueInWorksheet={(msg) => onOpenDestinationModal('worksheet', msg)}
+                                 />
+                            </div>
+                        )}
+                        {rightPanel === 'files' && (
+                            <div className="flex flex-col h-full bg-slate-50">
+                                <header className="p-4 border-b border-slate-200 bg-white flex justify-between items-center">
+                                    <div className="font-bold text-slate-800 flex items-center gap-2"><DatabaseIcon className="h-5 w-5 text-weflora-teal"/> Global Files</div>
+                                    <button onClick={() => setRightPanel('none')}><XIcon className="h-5 w-5 text-slate-400"/></button>
+                                </header>
+                                <div className="p-8 text-center text-slate-400">Select a project to access specific files.</div>
+                            </div>
+                        )}
+                        {rightPanel === 'species' && (
+                            <SpeciesIntelligencePanel 
+                                speciesName={inspectedEntity || ""} 
+                                speciesList={species} 
+                                onClose={() => setRightPanel('none')} 
+                                onAskAI={(query) => { 
+                                    // Redirect question to chat
+                                    togglePanel('chat');
+                                    setTimeout(() => handleEntityChatSend(query), 100); 
+                                }}
+                                onAddToWorksheet={handleAddSpeciesToWorksheet}
+                                onSaveToLibrary={addSpecies}
+                            />
+                        )}
+                    </ErrorBoundary>
                 </ResizablePanel>
             </div>
         );
@@ -321,27 +326,29 @@ const WorksheetsRoute: React.FC<WorksheetsRouteProps> = ({ onOpenDestinationModa
     // List View
     return (
         <>
-            <WorksheetTemplatesView 
-                items={worksheetTemplates} 
-                standaloneMatrices={standaloneMatrices.filter(m => !m.parentId)} 
-                onOpenMenu={() => {}} 
-                onUseTemplate={(t) => handleCreate({ ...t, id: `mtx-${Date.now()}`, rows: t.rows || [] })} 
-                onCreateTemplate={saveWorksheetTemplate} 
-                onDeleteMatrix={handleDelete} 
-                onOpenMatrix={(m) => navigate(`/worksheets/${m.id}`)} 
-                onOpenCreateWorksheet={() => setIsWizardOpen(true)} 
-            />
-            {isWizardOpen && (
-                <WorksheetWizard 
-                    onClose={() => setIsWizardOpen(false)} 
-                    onCreate={handleCreate} 
-                    onDiscover={(f) => aiService.discoverStructures(f)} 
-                    onAnalyze={(f, c, cols) => aiService.analyzeDocuments(f, c, cols)} 
-                    templates={worksheetTemplates} 
-                    speciesList={species} 
-                    onFileSave={(f) => uploadProjectFile(f.file!, 'generic')} 
+            <ErrorBoundary name="Worksheet Templates">
+                <WorksheetTemplatesView 
+                    items={worksheetTemplates} 
+                    standaloneMatrices={standaloneMatrices.filter(m => !m.parentId)} 
+                    onOpenMenu={() => {}} 
+                    onUseTemplate={(t) => handleCreate({ ...t, id: `mtx-${Date.now()}`, rows: t.rows || [] })} 
+                    onCreateTemplate={saveWorksheetTemplate} 
+                    onDeleteMatrix={handleDelete} 
+                    onOpenMatrix={(m) => navigate(`/worksheets/${m.id}`)} 
+                    onOpenCreateWorksheet={() => setIsWizardOpen(true)} 
                 />
-            )}
+                {isWizardOpen && (
+                    <WorksheetWizard 
+                        onClose={() => setIsWizardOpen(false)} 
+                        onCreate={handleCreate} 
+                        onDiscover={(f) => aiService.discoverStructures(f)} 
+                        onAnalyze={(f, c, cols) => aiService.analyzeDocuments(f, c, cols)} 
+                        templates={worksheetTemplates} 
+                        speciesList={species} 
+                        onFileSave={(f) => uploadProjectFile(f.file!, 'generic')} 
+                    />
+                )}
+            </ErrorBoundary>
         </>
     );
 };
