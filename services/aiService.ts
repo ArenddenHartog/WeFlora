@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { MatrixColumn, DiscoveredStructure, ContextItem, MatrixRow, Matrix, MatrixColumnType, Report, ProjectInsights } from '../types';
+import { MatrixColumn, DiscoveredStructure, ContextItem, MatrixRow, Matrix, MatrixColumnType, Report, ProjectInsights, MemorySummary } from '../types';
 import { SkillOutputType, SkillValidationResult } from './skillTemplates';
 
 // Initialize the SDK
@@ -663,6 +663,46 @@ export class AIService {
       } catch (e) {
           console.error("Refine text failed", e);
           return text; 
+      }
+  }
+
+  async summarizeUserMemory(history: string): Promise<MemorySummary> {
+      const prompt = `
+You are extracting stable, long-term user memory from chat history.
+Summarize ONLY durable facts, preferences, and user profile details that are explicitly stated.
+Do NOT infer or hallucinate.
+
+Return strict JSON with:
+{
+  "profile": ["string", ...],
+  "preferences": ["string", ...],
+  "stableFacts": ["string", ...],
+  "summary": "short paragraph"
+}
+
+If nothing is available, use empty arrays and an empty summary string.
+
+Conversation History:
+${history}
+      `;
+
+      try {
+          const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: prompt,
+              config: { responseMimeType: 'application/json' }
+          });
+
+          const parsed = parseJSONSafely(response.text || '');
+          const profile = Array.isArray(parsed.profile) ? parsed.profile.filter(Boolean) : [];
+          const preferences = Array.isArray(parsed.preferences) ? parsed.preferences.filter(Boolean) : [];
+          const stableFacts = Array.isArray(parsed.stableFacts) ? parsed.stableFacts.filter(Boolean) : [];
+          const summary = typeof parsed.summary === 'string' ? parsed.summary.trim() : '';
+
+          return { profile, preferences, stableFacts, summary };
+      } catch (e) {
+          console.error('Memory summary failed', e);
+          return { profile: [], preferences: [], stableFacts: [], summary: '' };
       }
   }
 

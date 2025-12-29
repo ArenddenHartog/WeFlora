@@ -91,6 +91,39 @@ export interface ContextItem {
     description?: string; // Metadata or snippet
 }
 
+export interface MemoryPolicy {
+    id?: string;
+    userId: string;
+    shortTermWindow: number;
+    topN: number;
+    summaryTrigger: number;
+    summaryMinGapMinutes: number;
+    memoryEnabled: boolean;
+    allowSummaries: boolean;
+    maxMemoryItems: number;
+}
+
+export type MemoryItemKind = 'profile' | 'preference' | 'fact' | 'summary';
+
+export interface MemoryItem {
+    id: string;
+    userId: string;
+    kind: MemoryItemKind;
+    content: string;
+    sourceThreadId?: string;
+    metadata?: Record<string, any>;
+    createdAt?: string;
+    lastUsedAt?: string;
+    importance?: number;
+}
+
+export interface MemorySummary {
+    profile: string[];
+    preferences: string[];
+    stableFacts: string[];
+    summary: string;
+}
+
 // -- Thread / Research Session Types --
 export interface Thread {
     id: string;
@@ -202,6 +235,7 @@ export interface ChatMessage {
     contextSnapshot?: ContextItem[]; // Traceability: What context was active when this message was sent?
     reasoningSteps?: ReasoningStep[]; // For Deep Research visualization
     suggestedActions?: Array<{ label: string, action: string, icon?: string }>; // "Convert to Worksheet"
+    createdAt?: string;
 }
 
 // -- Analytics & Visualizations --
