@@ -20,6 +20,7 @@ interface ColumnSettingsModalProps {
     onDelete: (colId: string) => void;
     onClose: () => void;
     projectFiles?: ProjectFile[];
+    allProjectFiles?: ProjectFile[];
     onUpload?: (files: File[]) => void;
 }
 
@@ -50,7 +51,7 @@ const CONDITIONS = [
     { value: 'less_than', label: 'Less Than' },
 ];
 
-const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSave, onDelete, onClose, projectFiles = [], onUpload }) => {
+const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSave, onDelete, onClose, projectFiles = [], allProjectFiles = [], onUpload }) => {
     const [editedCol, setEditedCol] = useState({ ...column });
     const [activeTab, setActiveTab] = useState<'logic' | 'files' | 'display'>('logic');
     
@@ -251,7 +252,12 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
         return <FileCodeIcon className="h-4 w-4 text-slate-500" />;
     };
 
-    const filteredFiles = projectFiles.filter(f => 
+    const combinedFiles = [
+        ...projectFiles,
+        ...allProjectFiles.filter(f => !projectFiles.some(pf => pf.id === f.id))
+    ];
+
+    const filteredFiles = combinedFiles.filter(f => 
         f.name.toLowerCase().includes(fileSearch.toLowerCase())
     );
 

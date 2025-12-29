@@ -414,6 +414,8 @@ ${report.content.substring(0, 3000)}${report.content.length > 3000 ? '...(trunca
                             onUpdate={updateMatrix}
                             onClose={() => setRightPanel('none')}
                             onUpload={(fs) => fs.forEach(f => uploadProjectFile(f, projectId))}
+                            projectFiles={files}
+                            allProjectFiles={Object.values(allFiles).flat()}
                         />
                     );
                 }
