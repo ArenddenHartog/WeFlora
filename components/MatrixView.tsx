@@ -16,6 +16,7 @@ import ColumnSettingsModal from './ColumnSettingsModal';
 import { MessageRenderer } from './MessageRenderer';
 import { useUI } from '../contexts/UIContext';
 import { SKILL_TEMPLATES } from '../services/skillTemplates';
+import type { SkillRowContext } from '../services/skills/types';
 
 interface MatrixViewProps {
     matrices: Matrix[];
@@ -59,6 +60,50 @@ const getFormatInstruction = (type?: 'text' | 'badge' | 'score' | 'currency') =>
         default:
             return ""; // Free text
     }
+};
+
+const normalizeTitle = (title: string) => title.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const findColumnByTitle = (columns: MatrixColumn[], candidates: string[]) => {
+    const targetSet = new Set(candidates.map(normalizeTitle));
+    return columns.find((col) => targetSet.has(normalizeTitle(col.title)));
+};
+
+const SPECIES_COLUMN_ALIASES = [
+    'species',
+    'species scientific',
+    'scientific name',
+    'latin name',
+    'botanical name',
+    'plant name',
+    'plantname',
+    'plant',
+    'tree species',
+    'species name',
+    'soort',
+    'sort',
+    'plantnaam',
+    'soortnaam'
+];
+
+const SCIENTIFIC_NAME_REGEX = /^[A-Z][a-z]+\\s+[a-z][a-z-]+/;
+const NUMERIC_VALUE_REGEX = /^\\d+(?:[.,]\\d+)?$/;
+const DATE_LIKE_REGEX = /^\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}$/;
+
+const scoreSpeciesColumn = (column: MatrixColumn, rows: MatrixRow[], speciesSet: Set<string>) => {
+    let score = 0;
+    let hits = 0;
+    const sampleRows = rows.slice(0, 25);
+    sampleRows.forEach((row) => {
+        const raw = String(row.cells?.[column.id]?.value ?? '').trim();
+        if (!raw) return;
+        if (SCIENTIFIC_NAME_REGEX.test(raw)) score += 2;
+        if (speciesSet.has(raw.toLowerCase())) score += 3;
+        if (NUMERIC_VALUE_REGEX.test(raw)) score -= 2;
+        if (DATE_LIKE_REGEX.test(raw)) score -= 2;
+        hits += 1;
+    });
+    return { score, hits };
 };
 
 // --- Helper: Parse Reasoning ---
@@ -512,11 +557,31 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                 }
                 
                 // Row Context
-                const rowContext: Record<string, any> = { 'Entity': rowName };
+                const rowContext: SkillRowContext = {
+                    rowLabel: rowName,
+                    cellsByColumnTitle: {},
+                    cellsByColumnId: {}
+                };
                 const currentMatrix = activeMatrixRef.current;
                 if (currentMatrix) {
+                    const speciesCol = await resolveSpeciesColumn(currentMatrix);
+                    const cultivarCol = findColumnByTitle(currentMatrix.columns, ['cultivar']);
+                    const commonCol = findColumnByTitle(currentMatrix.columns, ['common name', 'common']);
+
+                    if (speciesCol) {
+                        rowContext.speciesScientific = String(rowData.cells[speciesCol.id]?.value || '').trim() || undefined;
+                    } else {
+                        rowContext.speciesScientific = undefined;
+                    }
+                    if (cultivarCol) rowContext.cultivar = String(rowData.cells[cultivarCol.id]?.value || '').trim() || undefined;
+                    if (commonCol) rowContext.commonName = String(rowData.cells[commonCol.id]?.value || '').trim() || undefined;
+
                     currentMatrix.columns.forEach(c => {
-                         if (!rowContext[c.title]) rowContext[c.title] = rowData.cells[c.id]?.value;
+                         const cellValue = rowData.cells[c.id]?.value;
+                         if (cellValue !== undefined && cellValue !== null) {
+                             rowContext.cellsByColumnTitle![c.title] = String(cellValue);
+                             rowContext.cellsByColumnId![c.id] = String(cellValue);
+                         }
                     });
                 }
 
@@ -527,16 +592,26 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                     params[p.key] = skillConfig.params?.[p.key] !== undefined ? skillConfig.params[p.key] : p.defaultValue;
                 });
 
-                const compiledPrompt = template.promptBuilder(rowContext, params, fileNames);
+                const compiledPrompt = template.buildPrompt({
+                    row: rowContext,
+                    params,
+                    attachedFileNames: fileNames,
+                    projectContext
+                });
 
                 const result = await aiService.runSkillCell({
                     prompt: compiledPrompt,
                     outputType: template.outputType,
-                    validator: template.validator,
+                    validator: (raw) => template.validate(raw, params),
                     contextFiles,
-                    globalContext: projectContext,
-                    evidenceRequired: template.evidencePolicy.evidenceRequired,
-                    noGuessing: template.evidencePolicy.noGuessing
+                    evidenceRequired: template.evidenceRequired,
+                    noGuessing: template.noGuessing,
+                    allowedEnums: template.allowedEnums,
+                    allowedUnits: template.allowedUnits,
+                    allowedPeriods: template.allowedPeriods,
+                    allowedCurrencies: template.allowedCurrencies,
+                    defaultUnit: template.defaultUnit,
+                    defaultPeriod: params.period ?? template.defaultPeriod
                 });
 
                 if (!result.ok) return { ok: false, error: result.error || result.reasoning };
@@ -584,6 +659,65 @@ const MatrixView: React.FC<MatrixViewProps> = ({
         }
         return { ok: false, error: "Configuration Error" };
     };
+
+    const speciesColumnCacheRef = useRef<Map<string, string | null>>(new Map());
+
+    const resolveSpeciesColumn = useCallback(async (matrix: Matrix): Promise<MatrixColumn | null> => {
+        if (speciesColumnCacheRef.current.has(matrix.id)) {
+            const cached = speciesColumnCacheRef.current.get(matrix.id) || null;
+            return cached ? matrix.columns.find((col) => col.title === cached) || null : null;
+        }
+
+        const aliasMatch = findColumnByTitle(matrix.columns, SPECIES_COLUMN_ALIASES);
+        if (aliasMatch) {
+            speciesColumnCacheRef.current.set(matrix.id, aliasMatch.title);
+            return aliasMatch;
+        }
+
+        const speciesSet = new Set(
+            speciesList.map((s) => s.scientificName.toLowerCase()).filter(Boolean)
+        );
+        let best: { column: MatrixColumn; score: number; hits: number } | null = null;
+        let runnerUp: { column: MatrixColumn; score: number; hits: number } | null = null;
+        matrix.columns.forEach((column) => {
+            const { score, hits } = scoreSpeciesColumn(column, matrix.rows, speciesSet);
+            if (!best || score > best.score) {
+                runnerUp = best;
+                best = { column, score, hits };
+            } else if (!runnerUp || score > runnerUp.score) {
+                runnerUp = { column, score, hits };
+            }
+        });
+
+        if (best && best.score >= 4 && (!runnerUp || best.score - runnerUp.score >= 2)) {
+            speciesColumnCacheRef.current.set(matrix.id, best.column.title);
+            return best.column;
+        }
+
+        if (best && best.score >= 4 && runnerUp && best.score - runnerUp.score < 2) {
+            console.warn("[species-detect] ambiguous heuristic match", {
+                matrixId: matrix.id,
+                best: { title: best.column.title, score: best.score },
+                runnerUp: { title: runnerUp.column.title, score: runnerUp.score }
+            });
+        }
+
+        const enableLLMDetection = import.meta.env.VITE_ENABLE_LLM_COLUMN_DETECTION === 'true';
+        if (enableLLMDetection) {
+            const inferredTitle = await aiService.inferSpeciesColumn({
+                columns: matrix.columns,
+                rows: matrix.rows
+            });
+            if (inferredTitle) {
+                const inferred = matrix.columns.find((col) => col.title === inferredTitle) || null;
+                speciesColumnCacheRef.current.set(matrix.id, inferredTitle);
+                return inferred;
+            }
+        }
+
+        speciesColumnCacheRef.current.set(matrix.id, null);
+        return null;
+    }, [speciesList]);
 
     const handleRunAICell = async (rowId: string, colId: string) => {
         const startMatrix = activeMatrixRef.current;

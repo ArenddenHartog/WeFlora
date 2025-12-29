@@ -1,14 +1,15 @@
 // services/skillTemplates.ts
 import type { SkillOutputType } from "../types";
+import type { SkillRowContext } from "./skills/types.ts";
 import {
   validateBadge,
   validateScore,
   validateCurrency,
   validateQuantity,
   validateEnum,
-  validateRange,
   validateText
-} from "./skills/validators";
+} from "./skills/validators.ts";
+import { buildSkillContextBlock } from "./skills/prompting.ts";
 
 export type SkillTemplateId =
   | "compliance_policy"
@@ -46,15 +47,6 @@ export type SkillValidationResult = {
   error?: string;
 };
 
-export type SkillRowContext = {
-  speciesScientific?: string;  // "Quercus robur"
-  cultivar?: string;          // "'Elsrijk'"
-  commonName?: string;        // "oak"
-  rowLabel?: string;          // fallback row.entityName
-  // optional: columnId->value map for other references
-  cellsByColumnId?: Record<string, string>;
-};
-
 export interface SkillTemplate {
   id: SkillTemplateId;
   name: string;
@@ -72,7 +64,9 @@ export interface SkillTemplate {
 
   // For quantity/currency:
   allowedUnits?: string[];
+  allowedCurrencies?: string[];
   defaultUnit?: string;
+  defaultPeriod?: "day" | "week" | "month" | "year";
   allowedPeriods?: ("day" | "week" | "month" | "year")[];
 
   // Legacy prompt template for compatibility, or when no builder logic exists (less prioritized)
@@ -113,15 +107,11 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
         : (row.rowLabel ?? "");
 
       return [
-        projectContext ? `Project context:\n${projectContext}\n---\n` : "",
-        `You are a municipal planting compliance analyst.`,
+        buildSkillContextBlock({ row, attachedFileNames, projectContext }),
+        "",
         `Species to evaluate: ${species}`,
         `Policy scope: ${params.policyScope}`,
-        `Attached evidence documents: ${attachedFileNames.join(", ") || "(none)"}`,
-        `Rules:`,
-        `- If the answer is not explicitly supported by attached documents, return: "Insufficient Data — <what is missing & next step>".`,
-        `- Do not guess.`,
-        `Output format (exact): "Compliant|Rejected|Insufficient Data — reason".`,
+        `Output format: "Compliant|Rejected|Insufficient Data — reason".`,
       ].filter(Boolean).join("\n");
     },
     validate: (raw) => validateBadge(raw, ["Compliant", "Rejected", "Insufficient Data"])
@@ -149,14 +139,16 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
         { label: "Per month", value: "month" }
       ]},
     ],
-    buildPrompt: ({ row, params }) => {
+    buildPrompt: ({ row, params, attachedFileNames, projectContext }) => {
       const species = row.speciesScientific
         ? `${row.speciesScientific}${row.cultivar ? ` ${row.cultivar}` : ""}`
         : (row.rowLabel ?? "");
       return [
+        buildSkillContextBlock({ row, attachedFileNames, projectContext }),
+        "",
         `Estimate irrigation water demand for: ${species}`,
         `Season: ${params.season}`,
-        `Return a single quantity in the format: "N ${"L"}/${params.period} — reason".`,
+        `Output format: "N ${"L"}/${params.period} — reason".`,
         `Reason must be pragmatic and mention key drivers (e.g., drought tolerance, size class assumptions).`,
       ].join("\n");
     },
@@ -170,9 +162,11 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     category: "Resilience",
     outputType: "score",
     params: [],
-    buildPrompt: ({ row }) => {
+    buildPrompt: ({ row, attachedFileNames, projectContext }) => {
       const species = row.speciesScientific ? row.speciesScientific : (row.rowLabel ?? "");
       return [
+        buildSkillContextBlock({ row, attachedFileNames, projectContext }),
+        "",
         `Assess heat resilience for species: ${species}`,
         `Output format: "NN/100 — reason" (NN integer 0-100).`,
         `Reason must cite key traits (leaf/soil tolerance, urban heat suitability).`
@@ -191,9 +185,11 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     params: [
       { key: "localPests", type: "string", label: "Local pests (optional)", defaultValue: "" },
     ],
-    buildPrompt: ({ row, params }) => {
+    buildPrompt: ({ row, params, attachedFileNames, projectContext }) => {
       const species = row.speciesScientific ? row.speciesScientific : (row.rowLabel ?? "");
       return [
+        buildSkillContextBlock({ row, attachedFileNames, projectContext }),
+        "",
         `Assess pest susceptibility for: ${species}`,
         params.localPests ? `Consider local pests: ${params.localPests}` : "",
         `Output format: "High|Medium|Low — reason".`,
@@ -213,9 +209,11 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     params: [
       { key: "region", type: "string", label: "Region", defaultValue: "Netherlands" },
     ],
-    buildPrompt: ({ row, params }) => {
+    buildPrompt: ({ row, params, attachedFileNames, projectContext }) => {
       const species = row.speciesScientific ? row.speciesScientific : (row.rowLabel ?? "");
       return [
+        buildSkillContextBlock({ row, attachedFileNames, projectContext }),
+        "",
         `Determine status for ${species} in region: ${params.region}`,
         `Output format: "Native|Non-native|Invasive|Unknown — reason".`,
         `If uncertain, use Unknown.`
@@ -230,15 +228,18 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     description: "Estimate annual maintenance cost.",
     category: "Maintenance",
     outputType: "currency",
+    allowedCurrencies: ["€"],
     params: [
       { key: "period", type: "select", label: "Period", defaultValue: "year", options: [
         { label: "Per year", value: "year" },
         { label: "Per month", value: "month" }
       ]},
     ],
-    buildPrompt: ({ row, params }) => {
+    buildPrompt: ({ row, params, attachedFileNames, projectContext }) => {
       const species = row.speciesScientific ? row.speciesScientific : (row.rowLabel ?? "");
       return [
+        buildSkillContextBlock({ row, attachedFileNames, projectContext }),
+        "",
         `Estimate maintenance cost for: ${species}`,
         `Output format: "€NNN/${params.period} — reason".`,
         `Reason must mention typical pruning, watering, pest control assumptions.`
@@ -255,9 +256,11 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     outputType: "enum",
     allowedEnums: ["Monthly", "Quarterly", "Seasonal", "Annual", "As-needed"],
     params: [],
-    buildPrompt: ({ row }) => {
+    buildPrompt: ({ row, attachedFileNames, projectContext }) => {
       const species = row.speciesScientific ? row.speciesScientific : (row.rowLabel ?? "");
       return [
+        buildSkillContextBlock({ row, attachedFileNames, projectContext }),
+        "",
         `Recommend a maintenance schedule frequency for: ${species}`,
         `Output format: "Monthly|Quarterly|Seasonal|Annual|As-needed — reason".`
       ].join("\n");
@@ -274,9 +277,11 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     params: [
       { key: "constraint", type: "string", label: "Constraint", defaultValue: "Urban street tree, limited soil volume" }
     ],
-    buildPrompt: ({ row, params }) => {
+    buildPrompt: ({ row, params, attachedFileNames, projectContext }) => {
       const species = row.speciesScientific ? row.speciesScientific : (row.rowLabel ?? "");
       return [
+        buildSkillContextBlock({ row, attachedFileNames, projectContext }),
+        "",
         `Suggest 1-2 alternative species for: ${species}`,
         `Constraint: ${params.constraint}`,
         `Output format: "<short statement> — reason".`,
@@ -297,8 +302,15 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     description: "Calculate CO2 sequestration.",
     category: "Carbon",
     outputType: "quantity",
+    defaultUnit: "kg",
+    defaultPeriod: "year",
     params: [],
-    buildPrompt: ({ row }) => `Calculate CO2 for ${row.speciesScientific || row.rowLabel}. Format: N kg/year — reason`,
+    buildPrompt: ({ row, attachedFileNames, projectContext }) => [
+      buildSkillContextBlock({ row, attachedFileNames, projectContext }),
+      "",
+      `Calculate CO2 for ${row.speciesScientific || row.rowLabel}.`,
+      `Output format: "N kg/year — reason".`
+    ].join("\n"),
     validate: (raw) => validateQuantity(raw, { allowedUnits: ["kg"] })
   },
 
@@ -310,7 +322,12 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     outputType: "enum",
     allowedEnums: ["High", "Medium", "Low"],
     params: [],
-    buildPrompt: ({ row }) => `Determine pruning urgency for ${row.speciesScientific || row.rowLabel}. Format: High|Medium|Low — reason`,
+    buildPrompt: ({ row, attachedFileNames, projectContext }) => [
+      buildSkillContextBlock({ row, attachedFileNames, projectContext }),
+      "",
+      `Determine pruning urgency for ${row.speciesScientific || row.rowLabel}.`,
+      `Output format: "High|Medium|Low — reason".`
+    ].join("\n"),
     validate: (raw) => validateEnum(raw, ["High", "Medium", "Low"])
   },
 
@@ -322,7 +339,12 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     outputType: "badge",
     evidenceRequired: true,
     params: [],
-    buildPrompt: ({ row }) => `Check zoning for ${row.speciesScientific || row.rowLabel}. Format: Compliant|Rejected|Insufficient Data — reason`,
+    buildPrompt: ({ row, attachedFileNames, projectContext }) => [
+      buildSkillContextBlock({ row, attachedFileNames, projectContext }),
+      "",
+      `Check zoning for ${row.speciesScientific || row.rowLabel}.`,
+      `Output format: "Compliant|Rejected|Insufficient Data — reason".`
+    ].join("\n"),
     validate: (raw) => validateBadge(raw, ["Compliant", "Rejected", "Insufficient Data"])
   },
 
@@ -333,7 +355,12 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     category: "Recommendations",
     outputType: "text",
     params: [],
-    buildPrompt: ({ row }) => `Write planting spec for ${row.speciesScientific || row.rowLabel}. Format: <text> — reason`,
+    buildPrompt: ({ row, attachedFileNames, projectContext }) => [
+      buildSkillContextBlock({ row, attachedFileNames, projectContext }),
+      "",
+      `Write planting spec for ${row.speciesScientific || row.rowLabel}.`,
+      `Output format: "<text> — reason".`
+    ].join("\n"),
     validate: (raw) => validateText(raw)
   }
 };

@@ -8,8 +8,13 @@ export interface CanonicalResponse {
   error?: string;
 }
 
-// Helper regex for the separator " — "
-const SEPARATOR_REGEX = /\s*[-–—]\s*/;
+export type OutputValidationOptions = {
+  allowedEnums?: string[];
+  allowedUnits?: string[];
+  allowedPeriods?: string[];
+  allowedCurrencies?: string[];
+  defaultPeriod?: string;
+};
 
 function parseValueAndReason(input: string): { valuePart: string; reasonPart: string } | null {
   const match = input.match(/^(.*?)(\s+[-–—]\s+)(.*)$/);
@@ -198,4 +203,40 @@ export const validators = {
   enum: validateEnum,
   range: validateRange,
   text: validateText
+};
+
+export const getValidatorForOutputType = (
+  outputType: keyof typeof validators,
+  options?: OutputValidationOptions
+): ((input: string) => CanonicalResponse) => {
+  switch (outputType) {
+    case "badge":
+      return (input) => validateBadge(input, options?.allowedEnums);
+    case "score":
+      return validateScore;
+    case "currency":
+      return (input) =>
+        validateCurrency(input, {
+          allowedCurrencies: options?.allowedCurrencies,
+          allowedPeriods: options?.allowedPeriods,
+          defaultPeriod: options?.defaultPeriod
+        });
+    case "quantity":
+      return (input) =>
+        validateQuantity(input, {
+          allowedUnits: options?.allowedUnits,
+          allowedPeriods: options?.allowedPeriods,
+          defaultPeriod: options?.defaultPeriod
+        });
+    case "enum":
+      if (options?.allowedEnums && options.allowedEnums.length > 0) {
+        return (input) => validateEnum(input, options.allowedEnums!);
+      }
+      return validateText;
+    case "range":
+      return validateRange;
+    case "text":
+    default:
+      return validateText;
+  }
 };
