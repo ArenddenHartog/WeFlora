@@ -8,6 +8,7 @@ import type { Chat, ChatMessage, Thread, ContextItem } from '../types';
 import { aiService } from '../services/aiService';
 import { serializeMatrix, serializeReport } from '../utils/serializers';
 import { FileSheetIcon } from '../components/icons';
+import { buildMemoryInstruction, buildPromptWithHistory, fetchRecentThreadMessages, fetchTopMemoryItems, getOrCreateMemoryPolicy, maybeSummarizeThread, runMemoryQaChecks } from '../services/memoryService';
 
 interface ChatContextType {
     chats: { [projectId: string]: Chat[] };
@@ -83,7 +84,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         messages: msgs?.map((m: any) => ({
                             id: m.id,
                             sender: m.sender,
-                            text: m.text
+                            text: m.text,
+                            createdAt: m.created_at
                         })) || []
                     };
                 }));
@@ -202,7 +204,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 sender: 'user',
                 text: text,
                 attachments: filesToSend?.map(f => ({ id: `temp-${f.name}`, name: f.name, icon: FileSheetIcon, file: f })),
-                contextSnapshot: contextItems
+                contextSnapshot: contextItems,
+                createdAt: new Date().toISOString()
             };
             setMessages(prev => [...prev, userMsg]);
 
@@ -215,6 +218,20 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // 4. Save User Message to DB
             if (currentThreadId) {
                 supabase.from('messages').insert({ thread_id: currentThreadId, sender: 'user', text: text });
+            }
+
+            const userId = (await supabase.auth.getUser()).data.user?.id || '';
+            const memoryPolicy = userId ? await getOrCreateMemoryPolicy(userId) : null;
+            const recentMessages = memoryPolicy && currentThreadId
+                ? await fetchRecentThreadMessages(currentThreadId, memoryPolicy.shortTermWindow)
+                : [];
+            const memoryItems = memoryPolicy && userId && memoryPolicy.memoryEnabled
+                ? await fetchTopMemoryItems(userId, memoryPolicy.topN)
+                : [];
+            const memoryInstruction = memoryPolicy?.memoryEnabled ? buildMemoryInstruction(memoryItems) : '';
+            if (memoryPolicy && userId) {
+                const qaReport = runMemoryQaChecks({ userId, policy: memoryPolicy, memoryItems });
+                if (!qaReport.ok) console.warn('Memory QA checkpoint warnings', qaReport.issues);
             }
 
             // 5. HYDRATE CONTEXT (LIVE UPDATE)
@@ -251,13 +268,16 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             // 6. Stream Response
             const aiMsgId = `ai-${Date.now()}`;
-            const initialAiMsg: ChatMessage = { id: aiMsgId, sender: 'ai', text: '', grounding: undefined };
+            const initialAiMsg: ChatMessage = { id: aiMsgId, sender: 'ai', text: '', grounding: undefined, createdAt: new Date().toISOString() };
             setMessages(prev => [...prev, initialAiMsg]);
 
             let accumulatedText = "";
             let finalGrounding = undefined;
 
-            const stream = aiService.generateChatStream(text, allFilesForAI, instructions || '', model, hydratedContext, enableThinking);
+            const promptWithHistory = buildPromptWithHistory(text, recentMessages);
+            const effectiveInstructions = [instructions, memoryInstruction].filter(Boolean).join('\n\n');
+
+            const stream = aiService.generateChatStream(promptWithHistory, allFilesForAI, effectiveInstructions, model, hydratedContext, enableThinking);
 
             for await (const chunk of stream) {
                 if (chunk.text) accumulatedText += chunk.text;
@@ -267,7 +287,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
 
             if (currentThreadId) {
-                await addMessageToThread(currentThreadId, { id: aiMsgId, sender: 'ai', text: accumulatedText, grounding: finalGrounding });
+                await addMessageToThread(currentThreadId, { id: aiMsgId, sender: 'ai', text: accumulatedText, grounding: finalGrounding, createdAt: new Date().toISOString() });
+                if (userId && memoryPolicy) {
+                    await maybeSummarizeThread({ userId, threadId: currentThreadId, policy: memoryPolicy });
+                }
             }
 
         } catch (e: any) {
