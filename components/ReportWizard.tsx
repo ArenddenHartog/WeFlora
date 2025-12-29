@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Report, ReportTemplate } from '../types';
 import { 
     FileTextIcon, UploadIcon, MagicWandIcon, PlusIcon, 
@@ -7,6 +7,8 @@ import {
 } from './icons';
 import BaseModal from './BaseModal';
 import { aiService } from '../services/aiService';
+import FilePicker from './FilePicker';
+import { FILE_VALIDATION } from '../services/fileService';
 
 interface ReportWizardProps {
     onClose: () => void;
@@ -32,8 +34,6 @@ const ReportWizard: React.FC<ReportWizardProps> = ({ onClose, onCreate, template
     const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
     const [templateSearch, setTemplateSearch] = useState('');
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
     useEffect(() => {
         if (initialFile) {
             setMode('import');
@@ -45,13 +45,9 @@ const ReportWizard: React.FC<ReportWizardProps> = ({ onClose, onCreate, template
 
     // --- Actions ---
 
-    const handleImportClick = () => {
-        fileInputRef.current?.click();
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            const file = e.target.files[0];
+    const handleFileChange = (files: File[]) => {
+        if (files.length > 0) {
+            const file = files[0];
             setMode('import');
             setImportFile(file);
             setStep(1);
@@ -117,17 +113,20 @@ const ReportWizard: React.FC<ReportWizardProps> = ({ onClose, onCreate, template
 
     const renderOptionCards = () => (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
-            <button 
-                onClick={handleImportClick}
-                className="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-weflora-teal hover:shadow-md transition-all text-center group h-48"
-            >
-                <div className="h-12 w-12 bg-weflora-mint/20 rounded-full flex items-center justify-center text-weflora-teal mb-3 group-hover:scale-110 transition-transform">
-                    <UploadIcon className="h-6 w-6" />
-                </div>
-                <div className="font-bold text-slate-900 mb-1">Import Document</div>
-                <div className="text-xs text-slate-500 px-2">Analyze a PDF or Doc to generate a report draft.</div>
-            </button>
-            <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.docx,.txt" onChange={handleFileChange} />
+            <FilePicker accept={FILE_VALIDATION.ACCEPTED_FILE_TYPES} onPick={handleFileChange}>
+                {({ open }) => (
+                    <button 
+                        onClick={open}
+                        className="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 rounded-xl hover:border-weflora-teal hover:shadow-md transition-all text-center group h-48"
+                    >
+                        <div className="h-12 w-12 bg-weflora-mint/20 rounded-full flex items-center justify-center text-weflora-teal mb-3 group-hover:scale-110 transition-transform">
+                            <UploadIcon className="h-6 w-6" />
+                        </div>
+                        <div className="font-bold text-slate-900 mb-1">Import Document</div>
+                        <div className="text-xs text-slate-500 px-2">Analyze a PDF or Doc to generate a report draft.</div>
+                    </button>
+                )}
+            </FilePicker>
 
             <button 
                 onClick={() => setStep(1)} 

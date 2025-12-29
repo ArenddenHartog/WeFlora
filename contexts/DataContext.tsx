@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../services/supabaseClient';
+import { deleteFile } from '../services/fileService';
 import { useAuth } from './AuthContext';
 import { FEATURES } from '../src/config/features';
 import type { 
@@ -190,7 +191,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const deleteKnowledgeItem = async (id: string) => {
         setKnowledgeItems(prev => prev.filter(item => item.id !== id));
-        await supabase.from('files').delete().eq('id', id);
+        await deleteFile(id);
     };
 
     const saveWorksheetTemplate = async (tpl: WorksheetTemplate) => {

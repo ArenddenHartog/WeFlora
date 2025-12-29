@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import type { 
     PinnedProject, Matrix, Report, Task, TeamComment, 
@@ -24,12 +24,14 @@ import SpeciesIntelligencePanel from './SpeciesIntelligencePanel';
 import ProjectOverview from './ProjectOverview';
 import ProjectHeader from './ProjectHeader';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import FilePicker from './FilePicker';
 import { useChat } from '../contexts/ChatContext';
 import { useUI } from '../contexts/UIContext';
 import { useProject } from '../contexts/ProjectContext';
 import { useData } from '../contexts/DataContext';
 import { aiService } from '../services/aiService';
 import { navigateToCreatedEntity } from '../utils/navigation';
+import { FILE_VALIDATION } from '../services/fileService';
 
 const EmptyState = ({ 
     icon: Icon, 
@@ -98,7 +100,6 @@ const ProjectWorkspace: React.FC = () => {
     const [panelWidth, setPanelWidth] = useState(400);
     // Removed local previewFile state
     const [inspectedEntity, setInspectedEntity] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const [pendingDeleteFileId, setPendingDeleteFileId] = useState<string | null>(null);
 
     // Focus state for "new tab created" redirects (passed via navigate state)
@@ -161,10 +162,8 @@ const ProjectWorkspace: React.FC = () => {
         });
     };
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            Array.from(e.target.files).forEach(f => uploadProjectFile(f, projectId));
-        }
+    const handleFileUpload = (files: File[]) => {
+        files.forEach(f => uploadProjectFile(f, projectId));
     };
 
     const handleDeleteFile = (e: React.MouseEvent, fileId: string) => {
@@ -415,6 +414,8 @@ ${report.content.substring(0, 3000)}${report.content.length > 3000 ? '...(trunca
                             onUpdate={updateMatrix}
                             onClose={() => setRightPanel('none')}
                             onUpload={(fs) => fs.forEach(f => uploadProjectFile(f, projectId))}
+                            projectFiles={files}
+                            allProjectFiles={Object.values(allFiles).flat()}
                         />
                     );
                 }
@@ -496,46 +497,51 @@ ${report.content.substring(0, 3000)}${report.content.length > 3000 ? '...(trunca
             case 'files':
                 return (
                     <div className="flex flex-col h-full">
-                        <div className="flex justify-between items-center p-6 pb-0">
-                            <h2 className="text-lg font-bold text-slate-800">Project Files</h2>
-                            <button 
-                                onClick={() => fileInputRef.current?.click()}
-                                className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium transition-colors shadow-sm"
-                            >
-                                <UploadIcon className="h-4 w-4" />
-                                <span>Upload Files</span>
-                            </button>
-                            <input type="file" multiple ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-                        </div>
-                        
-                        {files.length === 0 ? (
-                            <EmptyState 
-                                icon={DatabaseIcon} 
-                                title="No Files Yet" 
-                                description="Upload documents, datasets, or images to this project." 
-                                actionLabel="Upload File" 
-                                onAction={() => fileInputRef.current?.click()} 
-                            />
-                        ) : (
-                            <div className="p-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 overflow-y-auto">
-                                {files.map(file => (
-                                    <div key={file.id} onClick={() => openFilePreview(file)} className="flex flex-col items-center p-4 bg-slate-50 hover:bg-white border border-slate-200 hover:border-weflora-teal rounded-xl cursor-pointer transition-all hover:shadow-sm group text-center relative">
-                                        <div className="h-12 w-12 bg-white rounded-lg flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform">
-                                            <file.icon className="h-6 w-6 text-slate-500 group-hover:text-weflora-teal" />
-                                        </div>
-                                        <div className="font-bold text-sm text-slate-800 line-clamp-2 mb-1">{file.name}</div>
-                                        <div className="text-xs text-slate-400">{file.size} • {file.date}</div>
+                        <FilePicker accept={FILE_VALIDATION.ACCEPTED_FILE_TYPES} multiple onPick={handleFileUpload}>
+                            {({ open }) => (
+                                <>
+                                    <div className="flex justify-between items-center p-6 pb-0">
+                                        <h2 className="text-lg font-bold text-slate-800">Project Files</h2>
                                         <button 
-                                            onClick={(e) => handleDeleteFile(e, file.id)}
-                                            className="absolute top-2 right-2 h-8 w-8 flex items-center justify-center cursor-pointer text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                            title="Delete File"
+                                            onClick={open}
+                                            className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium transition-colors shadow-sm"
                                         >
-                                            <XIcon className="h-3.5 w-3.5" />
+                                            <UploadIcon className="h-4 w-4" />
+                                            <span>Upload Files</span>
                                         </button>
                                     </div>
-                                ))}
-                            </div>
-                        )}
+                                    
+                                    {files.length === 0 ? (
+                                        <EmptyState 
+                                            icon={DatabaseIcon} 
+                                            title="No Files Yet" 
+                                            description="Upload documents, datasets, or images to this project." 
+                                            actionLabel="Upload File" 
+                                            onAction={open} 
+                                        />
+                                    ) : (
+                                        <div className="p-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 overflow-y-auto">
+                                            {files.map(file => (
+                                                <div key={file.id} onClick={() => openFilePreview(file)} className="flex flex-col items-center p-4 bg-slate-50 hover:bg-white border border-slate-200 hover:border-weflora-teal rounded-xl cursor-pointer transition-all hover:shadow-sm group text-center relative">
+                                                    <div className="h-12 w-12 bg-white rounded-lg flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform">
+                                                        <file.icon className="h-6 w-6 text-slate-500 group-hover:text-weflora-teal" />
+                                                    </div>
+                                                    <div className="font-bold text-sm text-slate-800 line-clamp-2 mb-1">{file.name}</div>
+                                                    <div className="text-xs text-slate-400">{file.size} • {file.date}</div>
+                                                    <button 
+                                                        onClick={(e) => handleDeleteFile(e, file.id)}
+                                                        className="absolute top-2 right-2 h-8 w-8 flex items-center justify-center cursor-pointer text-slate-300 hover:text-weflora-red hover:bg-weflora-red/10 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                                        title="Delete File"
+                                                    >
+                                                        <XIcon className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </FilePicker>
                     </div>
                 );
             case 'worksheets':

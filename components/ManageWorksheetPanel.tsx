@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import type { Matrix, MatrixColumn, MatrixColumnType, SkillConfiguration } from '../types';
+import type { Matrix, MatrixColumn, MatrixColumnType, SkillConfiguration, ProjectFile } from '../types';
 import { 
     SlidersIcon, XIcon, GripVerticalIcon, AdjustmentsHorizontalIcon, 
     EyeIcon, EyeOffIcon, PlusIcon, CheckIcon,
@@ -15,7 +15,9 @@ const ManageWorksheetPanel: React.FC<{
     onUpdate: (matrix: Matrix) => void;
     onClose: () => void;
     onUpload?: (files: File[]) => void;
-}> = ({ matrix, onUpdate, onClose, onUpload }) => {
+    projectFiles?: ProjectFile[];
+    allProjectFiles?: ProjectFile[];
+}> = ({ matrix, onUpdate, onClose, onUpload, projectFiles, allProjectFiles }) => {
     const [draggedColId, setDraggedColId] = useState<string | null>(null);
     const [editingColumn, setEditingColumn] = useState<MatrixColumn | null>(null);
     const [pendingDeleteColumnId, setPendingDeleteColumnId] = useState<string | null>(null);
@@ -324,6 +326,8 @@ const ManageWorksheetPanel: React.FC<{
                     onDelete={handleDeleteColumn}
                     onClose={() => setEditingColumn(null)}
                     onUpload={onUpload} 
+                    projectFiles={projectFiles}
+                    allProjectFiles={allProjectFiles}
                 />
             )}
 

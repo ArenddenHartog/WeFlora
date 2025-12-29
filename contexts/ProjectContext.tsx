@@ -5,28 +5,14 @@ import { useAuth } from './AuthContext';
 import { useUI } from './UIContext';
 import { FEATURES } from '../src/config/features';
 import type { PinnedProject, ProjectFile, Matrix, Report, Task, TeamComment, ProjectData } from '../types';
-import { FolderIcon, FileSheetIcon, FilePdfIcon, FileCodeIcon } from '../components/icons';
+import { FolderIcon } from '../components/icons';
 import { dbIdOrUndefined, isUuid } from '../utils/ids';
+import { mapFileEntityToProjectFile, mapRecordToFileEntity, resolveFile, uploadFile, deleteFile } from '../services/fileService';
 
 const emptyProjectData: ProjectData = {
     analytics: { costs: [], water: [], diversity: [] },
     map: { trees: [] }
 };
-
-// --- VALIDATION CONSTANTS ---
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_MIME_TYPES = [
-    'application/pdf', 
-    'text/plain', 
-    'text/csv',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // xlsx
-    'application/vnd.ms-excel', // xls
-    'application/msword', // doc
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
-    'image/jpeg', 
-    'image/png', 
-    'image/webp'
-];
 
 interface ProjectContextType {
     projects: PinnedProject[];
@@ -57,7 +43,7 @@ interface ProjectContextType {
     setComments: React.Dispatch<React.SetStateAction<TeamComment[]>>;
     
     // Storage Actions
-    uploadProjectFile: (file: File, projectId: string) => Promise<void>;
+    uploadProjectFile: (file: File, projectId: string) => Promise<ProjectFile | null>;
     deleteProjectFile: (fileId: string, projectId: string) => Promise<void>;
     resolveProjectFile: (fileId: string) => Promise<File | null>;
 }
@@ -145,21 +131,10 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
                 fileData.forEach((f: any) => {
                     const pid = f.project_id || 'generic';
                     if (!groupedFiles[pid]) groupedFiles[pid] = [];
-                    
-                    let Icon = FileCodeIcon;
-                    if (f.name.endsWith('.pdf')) Icon = FilePdfIcon;
-                    if (f.name.endsWith('.xlsx') || f.name.endsWith('.xls') || f.name.endsWith('.csv')) Icon = FileSheetIcon;
-
+                    const entity = mapRecordToFileEntity(f);
                     groupedFiles[pid].push({
-                        id: f.id,
-                        name: f.name,
-                        size: f.size,
-                        date: new Date(f.created_at).toLocaleDateString(),
-                        category: f.category,
-                        source: 'upload',
-                        icon: Icon,
-                        tags: f.tags,
-                        file: undefined // Only loaded on resolve
+                        ...mapFileEntityToProjectFile(entity),
+                        file: undefined
                     });
                 });
                 setFiles(groupedFiles);
@@ -534,75 +509,32 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
 
     const uploadProjectFile = async (file: File, projectId: string) => {
-        const userId = (await supabase.auth.getUser()).data.user?.id;
-        if (!userId) return;
+        const { projectFile, error } = await uploadFile(file, {
+            projectId: projectId === 'generic' ? null : projectId,
+            scope: projectId === 'generic' ? 'knowledge' : 'project',
+            category: 'Input Data'
+        });
 
-        if (file.size > MAX_FILE_SIZE) {
-            showNotification(`File too large. Max size is 10MB.`, 'error');
-            return;
-        }
-        if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-            showNotification(`Invalid file type: ${file.type}.`, 'error');
-            return;
-        }
-
-        const { data: fileRecord, error: dbError } = await supabase.from('files').insert({
-            project_id: projectId === 'generic' ? null : projectId,
-            user_id: userId,
-            name: file.name,
-            size: `${(file.size / 1024).toFixed(1)} KB`,
-            category: 'Input Data',
-            tags: []
-        }).select().single();
-
-        if (dbError || !fileRecord) {
-            showNotification("Database error during upload.", 'error');
-            return;
+        if (error || !projectFile) {
+            showNotification(error || 'Upload failed.', 'error');
+            return null;
         }
 
-        const securePath = `${userId}/${fileRecord.id}`;
-        const { error: storageError } = await supabase.storage.from('project_files').upload(securePath, file);
-
-        if (storageError) {
-            await supabase.from('files').delete().eq('id', fileRecord.id);
-            showNotification("Storage upload failed.", 'error');
-            return;
-        }
-
-        let Icon = FileCodeIcon;
-        if (file.name.endsWith('.pdf')) Icon = FilePdfIcon;
-        if (file.name.endsWith('.xlsx') || file.name.endsWith('.xlsx') || file.name.endsWith('.csv')) Icon = FileSheetIcon;
-
-        const newFile: ProjectFile = {
-            id: fileRecord.id,
-            name: file.name,
-            size: fileRecord.size,
-            date: new Date().toLocaleDateString(),
-            category: 'Input Data',
-            source: 'upload',
-            icon: Icon,
-            tags: [],
-            file: file 
-        };
+        const newFile: ProjectFile = { ...projectFile, file };
 
         setFiles(prev => ({
             ...prev,
             [projectId]: [...(prev[projectId] || []), newFile]
         }));
-        
-        showNotification("File uploaded successfully.");
+
+        showNotification('File uploaded successfully.');
+        return newFile;
     };
 
     const deleteProjectFile = async (fileId: string, projectId: string) => {
-        const userId = (await supabase.auth.getUser()).data.user?.id;
-        if (!userId) return;
-
-        const securePath = `${userId}/${fileId}`;
-        await supabase.storage.from('project_files').remove([securePath]);
-        const { error: dbError } = await supabase.from('files').delete().eq('id', fileId);
-        
-        if (dbError) {
-            showNotification("Failed to delete file record.", 'error');
+        const { error } = await deleteFile(fileId);
+        if (error) {
+            showNotification(error, 'error');
             return;
         }
 
@@ -621,17 +553,8 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         const local = flatFiles.find(f => f.id === fileId);
         if (local && local.file) return local.file;
 
-        const userId = (await supabase.auth.getUser()).data.user?.id;
-        if (!userId) return null;
-
-        const securePath = `${userId}/${fileId}`;
-        const { data, error } = await supabase.storage.from('project_files').download(securePath);
-        
-        if (error || !data) return null;
-
         const metadata = flatFiles.find(f => f.id === fileId);
-        const fileName = metadata ? metadata.name : 'downloaded_file';
-        return new File([data], fileName, { type: data.type });
+        return resolveFile(fileId, metadata?.name);
     };
 
     return (

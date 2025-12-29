@@ -3,15 +3,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { MatrixColumn, MatrixColumnType, SkillConfiguration, ProjectFile, ConditionalFormattingRule } from '../types';
 import BaseModal from './BaseModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import FilePicker from './FilePicker';
 import { 
     FileSheetIcon, FilePdfIcon, FileCodeIcon, CheckIcon, 
     SparklesIcon, PlusIcon, XIcon, SearchIcon, UploadIcon, LockClosedIcon,
-    LockClosedIcon,
     AdjustmentsHorizontalIcon,
     ChevronDownIcon,
     ChevronUpIcon
 } from './icons';
 import { SKILL_TEMPLATES, SkillTemplateId, SkillTemplate, getSkillTemplate } from '../services/skillTemplates';
+import { FILE_VALIDATION } from '../services/fileService';
 
 interface ColumnSettingsModalProps {
     column: MatrixColumn;
@@ -19,6 +20,7 @@ interface ColumnSettingsModalProps {
     onDelete: (colId: string) => void;
     onClose: () => void;
     projectFiles?: ProjectFile[];
+    allProjectFiles?: ProjectFile[];
     onUpload?: (files: File[]) => void;
 }
 
@@ -49,7 +51,7 @@ const CONDITIONS = [
     { value: 'less_than', label: 'Less Than' },
 ];
 
-const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSave, onDelete, onClose, projectFiles = [], onUpload }) => {
+const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSave, onDelete, onClose, projectFiles = [], allProjectFiles = [], onUpload }) => {
     const [editedCol, setEditedCol] = useState({ ...column });
     const [activeTab, setActiveTab] = useState<'logic' | 'files' | 'display'>('logic');
     
@@ -94,7 +96,11 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
 
     // File Search State
     const [fileSearch, setFileSearch] = useState('');
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const handleFileUpload = (files: File[]) => {
+        if (files.length > 0 && onUpload) {
+            onUpload(files);
+        }
+    };
 
     useEffect(() => {
         if (skillConfig.templateId) {
@@ -220,11 +226,6 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
         });
     };
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0 && onUpload) {
-            onUpload(Array.from(e.target.files));
-        }
-    };
 
     const handleAddRule = () => {
         if (!newRuleValue.trim()) return;
@@ -251,7 +252,12 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
         return <FileCodeIcon className="h-4 w-4 text-slate-500" />;
     };
 
-    const filteredFiles = projectFiles.filter(f => 
+    const combinedFiles = [
+        ...projectFiles,
+        ...allProjectFiles.filter(f => !projectFiles.some(pf => pf.id === f.id))
+    ];
+
+    const filteredFiles = combinedFiles.filter(f => 
         f.name.toLowerCase().includes(fileSearch.toLowerCase())
     );
 
@@ -461,19 +467,53 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                                 className="w-full pl-7 pr-2 py-1.5 bg-white border border-weflora-teal/30 rounded-lg text-xs outline-none focus:border-weflora-teal"
                                             />
                                         </div>
-                                        <button 
-                                            onClick={() => fileInputRef.current?.click()} 
-                                            className="px-3 py-1.5 bg-weflora-mint/30 text-weflora-dark rounded-lg text-xs font-bold hover:bg-weflora-mint/50 transition-colors flex items-center gap-1"
-                                        >
-                                            <UploadIcon className="h-3 w-3" /> Upload
-                                        </button>
-                                        <input 
-                                            type="file" 
-                                            ref={fileInputRef} 
-                                            className="hidden" 
-                                            multiple
-                                            onChange={handleFileUpload}
-                                        />
+                                        <FilePicker accept={FILE_VALIDATION.ACCEPTED_FILE_TYPES} multiple onPick={handleFileUpload}>
+                                            {({ open }) => (
+                                                <button 
+                                                    onClick={open} 
+                                                    className="px-3 py-1.5 bg-weflora-mint/30 text-weflora-dark rounded-lg text-xs font-bold hover:bg-weflora-mint/50 transition-colors flex items-center gap-1"
+                                                >
+                                                    <UploadIcon className="h-3 w-3" /> Upload
+                                            </button>
+                                        )}
+                                        </FilePicker>
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-[10px] text-slate-500">
+                                        <span>{filteredFiles.length} file{filteredFiles.length === 1 ? '' : 's'} found</span>
+                                        <span>{skillConfig.attachedContextIds.length} attached</span>
+                                    </div>
+
+                                    <div className="max-h-56 overflow-y-auto border border-slate-200 rounded-lg bg-white">
+                                        {filteredFiles.length === 0 ? (
+                                            <div className="p-3 text-xs text-slate-400 text-center">
+                                                No files match your search. Try uploading or adjusting the filter.
+                                            </div>
+                                        ) : (
+                                            <div className="divide-y divide-slate-100">
+                                                {filteredFiles.map(file => {
+                                                    const isAttached = skillConfig.attachedContextIds.includes(file.id);
+                                                    return (
+                                                        <button
+                                                            key={file.id}
+                                                            onClick={() => toggleFileAttachment(file.id)}
+                                                            className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${
+                                                                isAttached ? 'bg-weflora-mint/20' : 'hover:bg-slate-50'
+                                                            }`}
+                                                        >
+                                                            <span className="flex-shrink-0">{getFileIcon(file.name)}</span>
+                                                            <span className="flex-1 min-w-0">
+                                                                <div className="font-semibold text-slate-700 truncate">{file.name}</div>
+                                                                <div className="text-[10px] text-slate-400">
+                                                                    {file.size || 'Size unknown'}{file.date ? ` • ${file.date}` : ''}
+                                                                </div>
+                                                            </span>
+                                                            {isAttached && <CheckIcon className="h-3 w-3 text-weflora-teal" />}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
