@@ -474,9 +474,46 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                                     className="px-3 py-1.5 bg-weflora-mint/30 text-weflora-dark rounded-lg text-xs font-bold hover:bg-weflora-mint/50 transition-colors flex items-center gap-1"
                                                 >
                                                     <UploadIcon className="h-3 w-3" /> Upload
-                                                </button>
-                                            )}
+                                            </button>
+                                        )}
                                         </FilePicker>
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-[10px] text-slate-500">
+                                        <span>{filteredFiles.length} file{filteredFiles.length === 1 ? '' : 's'} found</span>
+                                        <span>{skillConfig.attachedContextIds.length} attached</span>
+                                    </div>
+
+                                    <div className="max-h-56 overflow-y-auto border border-slate-200 rounded-lg bg-white">
+                                        {filteredFiles.length === 0 ? (
+                                            <div className="p-3 text-xs text-slate-400 text-center">
+                                                No files match your search. Try uploading or adjusting the filter.
+                                            </div>
+                                        ) : (
+                                            <div className="divide-y divide-slate-100">
+                                                {filteredFiles.map(file => {
+                                                    const isAttached = skillConfig.attachedContextIds.includes(file.id);
+                                                    return (
+                                                        <button
+                                                            key={file.id}
+                                                            onClick={() => toggleFileAttachment(file.id)}
+                                                            className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${
+                                                                isAttached ? 'bg-weflora-mint/20' : 'hover:bg-slate-50'
+                                                            }`}
+                                                        >
+                                                            <span className="flex-shrink-0">{getFileIcon(file.name)}</span>
+                                                            <span className="flex-1 min-w-0">
+                                                                <div className="font-semibold text-slate-700 truncate">{file.name}</div>
+                                                                <div className="text-[10px] text-slate-400">
+                                                                    {file.size || 'Size unknown'}{file.date ? ` • ${file.date}` : ''}
+                                                                </div>
+                                                            </span>
+                                                            {isAttached && <CheckIcon className="h-3 w-3 text-weflora-teal" />}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
