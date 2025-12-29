@@ -11,9 +11,8 @@ import {
 } from './icons';
 import { useProject } from '../contexts/ProjectContext';
 import { useData } from '../contexts/DataContext';
-
-const ACCEPTED_FILE_TYPES = ".pdf,.doc,.docx,.odt,.html,.htm,.xls,.xlsx,.csv,.txt,.dwg,.dxf";
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+import FilePicker from './FilePicker';
+import { FILE_VALIDATION } from '../services/fileService';
 
 interface ChatInputProps {
     // Logic Props
@@ -37,7 +36,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     onSend, isLoading, onFileClick, onRemoveContextFile, draftKey, initialContextItems, contextProjectId 
 }) => {
     // -- Data Access via Hooks (Dependency Injection) --
-    const { files: allFiles, matrices: allMatrices, reports: allReports } = useProject();
+    const { files: allFiles, matrices: allMatrices, reports: allReports, uploadProjectFile } = useProject();
     const { knowledgeItems, promptTemplates } = useData();
 
     // -- Derived State for Context Picker --
@@ -78,7 +77,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
     
     const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const textAreaRef = useRef<HTMLTextAreaElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const contextPickerRef = useRef<HTMLDivElement>(null);
@@ -281,30 +279,30 @@ const ChatInput: React.FC<ChatInputProps> = ({
         }
     };
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            const files = Array.from(e.target.files) as File[];
-            const validFiles: ContextItem[] = [];
-            
-            files.forEach(file => {
-                if (file.size > MAX_FILE_SIZE) {
-                    alert(`Skipped "${file.name}": File size exceeds 10MB limit.`);
-                    return;
-                }
-                validFiles.push({
-                    id: `upl-${Date.now()}-${file.name}`,
-                    name: file.name,
-                    source: 'upload',
-                    file: file
-                });
-            });
-
-            if (validFiles.length > 0) {
-                setSelectedContextItems(prev => [...prev, ...validFiles]);
+    const handleFileSelect = async (files: File[]) => {
+        if (files.length === 0) return;
+        const uploaded = await Promise.all(files.map(async (file) => {
+            if (file.size > FILE_VALIDATION.MAX_FILE_SIZE) {
+                alert(`Skipped "${file.name}": File size exceeds 10MB limit.`);
+                return null;
             }
-            setIsContextPickerOpen(false);
+            return uploadProjectFile(file, contextProjectId || 'generic');
+        }));
+
+        const validFiles: ContextItem[] = uploaded
+            .filter((file): file is ProjectFile => Boolean(file))
+            .map((file) => ({
+                id: `upl-${file.id}`,
+                name: file.name,
+                source: 'upload',
+                itemId: file.id,
+                file: file.file
+            }));
+
+        if (validFiles.length > 0) {
+            setSelectedContextItems(prev => [...prev, ...validFiles]);
         }
-        if (fileInputRef.current) fileInputRef.current.value = '';
+        setIsContextPickerOpen(false);
     };
 
     const addContextItem = (item: any, type: 'project' | 'knowledge') => {
@@ -390,9 +388,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
     const filteredMatrices = filterItems(availableMatrices);
 
     return (
-        <div ref={containerRef} className={`bg-white border transition-all rounded-xl shadow-sm relative flex flex-col ${isDeepResearchEnabled || isReasoningEnabled ? 'border-weflora-teal ring-2 ring-weflora-mint/30' : 'border-slate-200 focus-within:ring-2 focus-within:ring-weflora-teal/20 focus-within:border-weflora-teal'}`}>
-            <input type="file" multiple accept={ACCEPTED_FILE_TYPES} ref={fileInputRef} className="hidden" onChange={handleFileSelect} />
-
+        <FilePicker accept={FILE_VALIDATION.ACCEPTED_FILE_TYPES} multiple onPick={handleFileSelect}>
+            {({ open }) => (
+                <div ref={containerRef} className={`bg-white border transition-all rounded-xl shadow-sm relative flex flex-col ${isDeepResearchEnabled || isReasoningEnabled ? 'border-weflora-teal ring-2 ring-weflora-mint/30' : 'border-slate-200 focus-within:ring-2 focus-within:ring-weflora-teal/20 focus-within:border-weflora-teal'}`}>
             {/* Header: Mode Selector */}
             <div className="flex items-center gap-1 p-1.5 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
                 <button onClick={() => handleModeSelect('chat')} className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg text-xs transition-all relative ${responseMode === 'chat' ? 'bg-white text-slate-800 shadow-sm ring-1 ring-slate-200 font-bold' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700 font-medium'}`}><MessageSquareIcon className={`h-3.5 w-3.5 ${responseMode === 'chat' ? 'text-weflora-teal' : ''}`} /> Chat</button>
@@ -452,7 +450,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     <div className="flex-1 overflow-y-auto p-1 custom-scrollbar">
                         {contextTab === 'files' && (
                             <>
-                                <div onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer text-slate-700 transition-colors"><div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500"><UploadIcon className="h-4 w-4" /></div><div className="flex-1"><div className="text-xs font-bold">Upload Local File</div><div className="text-[10px] text-slate-400">PDF, Excel, CSV, Word</div></div></div>
+                                <div onClick={open} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer text-slate-700 transition-colors"><div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500"><UploadIcon className="h-4 w-4" /></div><div className="flex-1"><div className="text-xs font-bold">Upload Local File</div><div className="text-[10px] text-slate-400">PDF, Excel, CSV, Word</div></div></div>
                                 {filteredFiles.map(file => (
                                     <div key={file.id} onClick={() => addContextItem(file, 'project')} className="flex items-center gap-3 p-2 hover:bg-weflora-teal/10 rounded-lg cursor-pointer transition-colors group">
                                         <div className="w-8 h-8 rounded-lg bg-weflora-mint/20 text-weflora-teal flex items-center justify-center"><FolderIcon className="h-4 w-4" /></div>
@@ -496,7 +494,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 </div>,
                 document.body
             )}
-        </div>
+                </div>
+            )}
+        </FilePicker>
     );
 };
 

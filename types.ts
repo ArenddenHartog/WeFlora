@@ -64,6 +64,27 @@ export interface ProjectFile {
     tags?: string[];
 }
 
+export type FileScope = 'project' | 'knowledge' | 'worksheet' | 'report' | 'chat' | 'general';
+export type FileVisibility = 'private' | 'team' | 'public';
+export type FileStatus = 'pending' | 'active' | 'archived' | 'deleted' | 'error';
+
+export interface FileEntity {
+    id: string;
+    ownerId: string;
+    projectId?: string | null;
+    scope: FileScope;
+    mimeType: string;
+    storagePath: string;
+    tags: string[];
+    visibility: FileVisibility;
+    status: FileStatus;
+    name: string;
+    size: string;
+    createdAt: string;
+    category?: KnowledgeCategory;
+    relatedEntityId?: string | null;
+}
+
 // -- Knowledge Base Types --
 export type KnowledgeCategory = 'Internal' | 'Policy' | 'Research' | 'External' | 'Project Assets' | 'Input Data';
 

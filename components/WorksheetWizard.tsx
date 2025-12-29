@@ -1,11 +1,13 @@
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import type { Matrix, MatrixColumn, MatrixRow, MatrixColumnType, DiscoveredStructure, WorksheetTemplate, Species, ProjectFile } from '../types';
 import { 
     TelescopeIcon, LayoutGridIcon, MagicWandIcon, TableIcon, UploadIcon, 
     SparklesIcon, RefreshIcon, CheckIcon, SearchIcon, XIcon, FileSheetIcon, FilePdfIcon
 } from './icons';
 import BaseModal from './BaseModal';
+import FilePicker from './FilePicker';
+import { FILE_VALIDATION } from '../services/fileService';
 
 const WizardStepper = ({ step }: { step: number }) => {
     let activeIdx = 0;
@@ -73,8 +75,6 @@ const WorksheetWizard: React.FC<{
     const [selectedSpeciesIds, setSelectedSpeciesIds] = useState<Set<string>>(new Set());
     const [speciesSearch, setSpeciesSearch] = useState('');
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
     const startScanning = useCallback(async (file: File) => {
         setUploadedFile(file);
         setSheetTitle(file.name.split('.')[0]);
@@ -121,9 +121,9 @@ const WorksheetWizard: React.FC<{
         }
     }, [initialFile, startScanning, step]);
 
-    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            const file = e.target.files[0];
+    const handleFileSelect = async (files: File[]) => {
+        if (files.length > 0) {
+            const file = files[0];
             startScanning(file);
         }
     };
@@ -277,12 +277,15 @@ const WorksheetWizard: React.FC<{
     );
     const renderStep1 = () => (
         <div className="space-y-4 h-[300px] flex flex-col justify-center">
-             <div className="border-2 border-dashed border-slate-300 rounded-2xl p-10 hover:bg-slate-50 hover:border-weflora-teal cursor-pointer transition-colors flex flex-col items-center justify-center text-center bg-white flex-1" onClick={() => fileInputRef.current?.click()}>
-                <div className="p-4 bg-weflora-mint/20 rounded-full mb-4"><UploadIcon className="h-8 w-8 text-weflora-teal" /></div>
-                <div className="font-bold text-slate-700 text-sm">Click to upload document</div>
-                <div className="text-xs text-slate-400 mt-1">PDF, Excel, CSV, or Word</div>
-            </div>
-            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} />
+            <FilePicker accept={FILE_VALIDATION.ACCEPTED_FILE_TYPES} onPick={handleFileSelect}>
+                {({ open }) => (
+                    <div className="border-2 border-dashed border-slate-300 rounded-2xl p-10 hover:bg-slate-50 hover:border-weflora-teal cursor-pointer transition-colors flex flex-col items-center justify-center text-center bg-white flex-1" onClick={open}>
+                        <div className="p-4 bg-weflora-mint/20 rounded-full mb-4"><UploadIcon className="h-8 w-8 text-weflora-teal" /></div>
+                        <div className="font-bold text-slate-700 text-sm">Click to upload document</div>
+                        <div className="text-xs text-slate-400 mt-1">PDF, Excel, CSV, or Word</div>
+                    </div>
+                )}
+            </FilePicker>
         </div>
     );
 

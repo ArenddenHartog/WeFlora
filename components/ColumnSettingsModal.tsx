@@ -3,15 +3,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { MatrixColumn, MatrixColumnType, SkillConfiguration, ProjectFile, ConditionalFormattingRule } from '../types';
 import BaseModal from './BaseModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import FilePicker from './FilePicker';
 import { 
     FileSheetIcon, FilePdfIcon, FileCodeIcon, CheckIcon, 
     SparklesIcon, PlusIcon, XIcon, SearchIcon, UploadIcon, LockClosedIcon,
-    LockClosedIcon,
     AdjustmentsHorizontalIcon,
     ChevronDownIcon,
     ChevronUpIcon
 } from './icons';
 import { SKILL_TEMPLATES, SkillTemplateId, SkillTemplate, getSkillTemplate } from '../services/skillTemplates';
+import { FILE_VALIDATION } from '../services/fileService';
 
 interface ColumnSettingsModalProps {
     column: MatrixColumn;
@@ -94,7 +95,11 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
 
     // File Search State
     const [fileSearch, setFileSearch] = useState('');
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const handleFileUpload = (files: File[]) => {
+        if (files.length > 0 && onUpload) {
+            onUpload(files);
+        }
+    };
 
     useEffect(() => {
         if (skillConfig.templateId) {
@@ -220,11 +225,6 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
         });
     };
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0 && onUpload) {
-            onUpload(Array.from(e.target.files));
-        }
-    };
 
     const handleAddRule = () => {
         if (!newRuleValue.trim()) return;
@@ -461,19 +461,16 @@ const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ column, onSav
                                                 className="w-full pl-7 pr-2 py-1.5 bg-white border border-weflora-teal/30 rounded-lg text-xs outline-none focus:border-weflora-teal"
                                             />
                                         </div>
-                                        <button 
-                                            onClick={() => fileInputRef.current?.click()} 
-                                            className="px-3 py-1.5 bg-weflora-mint/30 text-weflora-dark rounded-lg text-xs font-bold hover:bg-weflora-mint/50 transition-colors flex items-center gap-1"
-                                        >
-                                            <UploadIcon className="h-3 w-3" /> Upload
-                                        </button>
-                                        <input 
-                                            type="file" 
-                                            ref={fileInputRef} 
-                                            className="hidden" 
-                                            multiple
-                                            onChange={handleFileUpload}
-                                        />
+                                        <FilePicker accept={FILE_VALIDATION.ACCEPTED_FILE_TYPES} multiple onPick={handleFileUpload}>
+                                            {({ open }) => (
+                                                <button 
+                                                    onClick={open} 
+                                                    className="px-3 py-1.5 bg-weflora-mint/30 text-weflora-dark rounded-lg text-xs font-bold hover:bg-weflora-mint/50 transition-colors flex items-center gap-1"
+                                                >
+                                                    <UploadIcon className="h-3 w-3" /> Upload
+                                                </button>
+                                            )}
+                                        </FilePicker>
                                     </div>
                                 </div>
                             )}

@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { KnowledgeItem, ProjectFile, PinnedProject } from '../types';
 import { 
     SearchIcon, MenuIcon, UploadIcon, DatabaseIcon, 
@@ -8,6 +8,8 @@ import {
 } from './icons';
 import BaseModal from './BaseModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import FilePicker from './FilePicker';
+import { FILE_VALIDATION } from '../services/fileService';
 
 interface KnowledgeBaseViewProps {
     items: KnowledgeItem[];
@@ -27,8 +29,6 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
     
     // Project Drilling State
     const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Upload Modal State
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -89,14 +89,13 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                item.tags.some((t: string) => t.toLowerCase().includes(search.toLowerCase()));
     });
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            setPendingFiles(Array.from(e.target.files));
+    const handleFileSelect = (files: File[]) => {
+        if (files.length > 0) {
+            setPendingFiles(files);
             // Default to currently selected project if we are in drilling mode
             setTargetProjectId(selectedProjectId || ''); 
             setIsUploadModalOpen(true);
         }
-        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const confirmUpload = () => {
@@ -225,14 +224,17 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                         </div>
                         <h1 className="text-2xl font-bold text-slate-800">Files Hub</h1>
                      </div>
-                     <button 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium shadow-sm transition-colors"
-                     >
-                        <UploadIcon className="h-4 w-4" />
-                        <span className="hidden sm:inline">Upload Files</span>
-                     </button>
-                     <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileSelect} />
+                     <FilePicker accept={FILE_VALIDATION.ACCEPTED_FILE_TYPES} multiple onPick={handleFileSelect}>
+                        {({ open }) => (
+                            <button 
+                                onClick={open}
+                                className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium shadow-sm transition-colors"
+                            >
+                                <UploadIcon className="h-4 w-4" />
+                                <span className="hidden sm:inline">Upload Files</span>
+                            </button>
+                        )}
+                     </FilePicker>
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-6 items-center">

@@ -11,6 +11,8 @@ import { useUI } from '../contexts/UIContext';
 import WorksheetAnalyticsPanel from './WorksheetAnalyticsPanel';
 import { ResizablePanel } from './ResizablePanel';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import FilePicker from './FilePicker';
+import { FILE_VALIDATION } from '../services/fileService';
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -82,7 +84,6 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
     const [editingTabId, setEditingTabId] = useState<string | null>(null);
     const [tabNameInput, setTabNameInput] = useState('');
     const [isImporting, setIsImporting] = useState(false);
-    const importInputRef = useRef<HTMLInputElement>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
     const downloadMenuRef = useRef<HTMLDivElement>(null);
@@ -271,11 +272,11 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
         );
     };
 
-    const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0 && activeMatrix && onAnalyze) {
+    const handleImportFile = async (files: File[]) => {
+        if (files.length > 0 && activeMatrix && onAnalyze) {
             setIsImporting(true);
             try {
-                const file = e.target.files[0];
+                const file = files[0];
                 const result = await onAnalyze([file], "Extract data.", activeMatrix.columns);
                 const newRows = result.rows.map((row, i) => ({ ...row, id: `row-imp-${Date.now()}-${i}` }));
                 handleMatrixUpdate({ ...activeMatrix, rows: [...activeMatrix.rows, ...newRows] });
@@ -285,7 +286,6 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
                 showNotification("Failed to import data.", 'error');
             } finally {
                 setIsImporting(false);
-                if (importInputRef.current) importInputRef.current.value = '';
             }
         }
     };
@@ -370,8 +370,13 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
                             <ChartBarIcon className="h-4 w-4" /> Visualize
                         </button>
                         <div className="h-6 w-px bg-slate-200 mx-2"></div>
-                        <button onClick={() => importInputRef.current?.click()} className={`p-2 rounded-lg transition-colors relative ${isImporting ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Import Data" disabled={isImporting}>{isImporting ? <RefreshIcon className="h-4 w-4 animate-spin" /> : <UploadIcon className="h-4 w-4" />}</button>
-                        <input type="file" ref={importInputRef} className="hidden" accept=".csv,.xlsx,.xls,.pdf,.json" onChange={handleImportFile} />
+                        <FilePicker accept={FILE_VALIDATION.ACCEPTED_FILE_TYPES} onPick={handleImportFile}>
+                            {({ open }) => (
+                                <button onClick={open} className={`p-2 rounded-lg transition-colors relative ${isImporting ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Import Data" disabled={isImporting}>
+                                    {isImporting ? <RefreshIcon className="h-4 w-4 animate-spin" /> : <UploadIcon className="h-4 w-4" />}
+                                </button>
+                            )}
+                        </FilePicker>
                         <button onClick={handleShare} className="p-2 text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10 rounded-lg transition-colors" title="Share Link"><ArrowUpIcon className="h-4 w-4 rotate-45" /></button>
                         <div className="relative" ref={downloadMenuRef}>
                             <button onClick={() => setIsDownloadMenuOpen(!isDownloadMenuOpen)} className={`p-2 rounded-lg transition-colors ${isDownloadMenuOpen ? 'bg-weflora-mint/20 text-weflora-teal' : 'text-slate-400 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Download"><DownloadIcon className="h-4 w-4" /></button>
