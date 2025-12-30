@@ -1,6 +1,9 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { MatrixColumn, DiscoveredStructure, ContextItem, MatrixRow, Matrix, MatrixColumnType, Report, ProjectInsights } from '../types';
 import { SkillOutputType, SkillValidationResult } from './skillTemplates';
+import { buildSystemInstruction } from './skills/systemPolicy';
+import { buildRetryInstruction, getOutputFormatHint } from './skills/outputFormats';
+import { getValidatorForOutputType } from './skills/validators';
 
 // Initialize the SDK
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GOOGLE_API_KEY });
@@ -635,6 +638,60 @@ export class AIService {
     console.log(`WeFlora AI Service Initialized. Mode: Client-Side Gemini SDK`);
   }
 
+  async inferSpeciesColumn(args: {
+    columns: MatrixColumn[];
+    rows: MatrixRow[];
+  }): Promise<string | null> {
+    const { columns, rows } = args;
+    if (columns.length === 0) return null;
+
+    const sampleRows = rows.slice(0, 20).map((row) => {
+      const values: Record<string, string> = {};
+      columns.forEach((col) => {
+        values[col.title] = String(row.cells?.[col.id]?.value ?? "").slice(0, 80);
+      });
+      return values;
+    });
+
+    const schema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        columnTitle: { type: Type.STRING },
+        confidence: { type: Type.STRING, enum: ["High", "Medium", "Low"] }
+      },
+      required: ["columnTitle"]
+    };
+
+    const prompt = [
+      "You are classifying worksheet columns.",
+      "Identify the column title that most likely contains the primary species name (scientific or common).",
+      "If no column fits, return an empty string for columnTitle.",
+      "Return JSON only."
+    ].join("\n");
+
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          { text: prompt },
+          { text: `Columns: ${columns.map((c) => c.title).join(", ")}` },
+          { text: `Sample rows: ${JSON.stringify(sampleRows)}` }
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: schema
+        }
+      });
+
+      const parsed = JSON.parse(response.text || "{}");
+      const columnTitle = String(parsed?.columnTitle || "").trim();
+      return columnTitle.length > 0 ? columnTitle : null;
+    } catch (e) {
+      console.warn("inferSpeciesColumn failed", e);
+      return null;
+    }
+  }
+
   // --- Core Capabilities ---
 
   async generateTitle(content: string, type: 'report' | 'worksheet'): Promise<string> {
@@ -959,11 +1016,16 @@ export class AIService {
   async runSkillCell(args: {
     prompt: string;
     outputType: SkillOutputType;
-    validator: (raw: string) => SkillValidationResult;
+    validator?: (raw: string) => SkillValidationResult;
     contextFiles: File[];
-    globalContext?: string;
     evidenceRequired?: boolean;
     noGuessing?: boolean;
+    allowedEnums?: string[];
+    allowedUnits?: string[];
+    allowedPeriods?: string[];
+    allowedCurrencies?: string[];
+    defaultUnit?: string;
+    defaultPeriod?: string;
   }): Promise<{
     rawText: string;
     displayValue: string;
@@ -975,23 +1037,49 @@ export class AIService {
     model?: string;
     promptHash?: string;
   }> {
-    const { prompt, outputType, validator, contextFiles, globalContext, evidenceRequired, noGuessing } = args;
+    const {
+      prompt,
+      outputType,
+      validator,
+      contextFiles,
+      evidenceRequired,
+      noGuessing,
+      allowedEnums,
+      allowedUnits,
+      allowedPeriods,
+      allowedCurrencies,
+      defaultUnit,
+      defaultPeriod
+    } = args;
     const model = 'gemini-2.5-flash';
     
-    // Construct System Instruction based on policy
-    let systemInstruction = "You are an expert analyst.";
-    if (evidenceRequired) {
-        systemInstruction += " You must cite specific evidence from the provided documents. Do not hallucinate.";
-    }
-    if (noGuessing) {
-        systemInstruction += " If the answer is not explicitly found in the context, state that data is insufficient. Do not guess.";
-    }
+    const outputFormatHint = getOutputFormatHint(outputType, {
+      allowedEnums,
+      allowedUnits,
+      allowedPeriods,
+      allowedCurrencies,
+      defaultUnit,
+      defaultPeriod
+    });
+    const systemInstruction = buildSystemInstruction({
+      outputType,
+      evidenceRequired,
+      noGuessing,
+      outputFormatHint
+    });
+
+    const validate =
+      validator ||
+      getValidatorForOutputType(outputType, {
+        allowedEnums,
+        allowedUnits,
+        allowedPeriods,
+        allowedCurrencies,
+        defaultPeriod
+      });
 
     const runAttempt = async (currentPrompt: string): Promise<string> => {
         const parts: any[] = [];
-        if (globalContext) {
-            parts.push({ text: `Global Project Context:\n${globalContext}\n---\n` });
-        }
         parts.push({ text: currentPrompt });
         
         for (const file of contextFiles) {
@@ -1016,23 +1104,23 @@ export class AIService {
     try {
         // Attempt 1
         let rawText = await runAttempt(prompt);
-        let validation = validator(rawText);
+        let validation = validate(rawText);
 
         // Attempt 2 (Retry) if validation fails
         if (!validation.ok) {
             console.warn(`Skill validation failed (Type: ${outputType}). Retrying with strict format instruction...`);
             
-            // Append explicit format reminder based on error or generic requirement
-            const retryInstruction = `
-            Previous output was invalid: "${validation.error}".
-            CRITICAL: Your output MUST match the format exactly.
-            Include '— reason' at the end.
-            Do NOT include markdown blocks, preambles, or extra text.
-            Just the value and the reason.
-            `;
+            const retryInstruction = buildRetryInstruction(outputType, validation.error || "Invalid format", {
+              allowedEnums,
+              allowedUnits,
+              allowedPeriods,
+              allowedCurrencies,
+              defaultUnit,
+              defaultPeriod
+            });
             
             rawText = await runAttempt(prompt + "\n\n" + retryInstruction);
-            validation = validator(rawText);
+            validation = validate(rawText);
         }
 
         return {
