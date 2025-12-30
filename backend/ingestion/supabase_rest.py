@@ -56,6 +56,7 @@ class SupabaseREST:
         order_column = order.split(".", maxsplit=1)[0] if order else ""
         is_desc = order.endswith(".desc") if order else False
         last_value: Any | None = None
+        previous_last_value: Any | None = None
         remaining = limit
 
         while True:
@@ -85,7 +86,14 @@ class SupabaseREST:
             if use_keyset and order_column:
                 last_value = batch[-1].get(order_column)
                 if last_value is None:
-                    break
+                    use_keyset = False
+                    start = len(all_rows)
+                    continue
+                if last_value == previous_last_value:
+                    use_keyset = False
+                    start = len(all_rows)
+                    continue
+                previous_last_value = last_value
             else:
                 start += page_size
 
