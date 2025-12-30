@@ -34,14 +34,35 @@ class SupabaseREST:
             "Content-Type": "application/json",
         }
 
-    def fetch_rows(self, table: str, select: str = "*", filters: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
+    def fetch_rows(
+        self,
+        table: str,
+        select: str = "*",
+        filters: Mapping[str, str] | None = None,
+        page_size: int = 1000,
+    ) -> list[dict[str, Any]]:
         url = f"{self.config.url}/rest/v1/{table}"
         params = {"select": select}
         if filters:
             params.update(filters)
-        response = requests.get(url, headers=self.headers, params=params, timeout=60)
-        response.raise_for_status()
-        return response.json()
+
+        all_rows: list[dict[str, Any]] = []
+        start = 0
+
+        while True:
+            headers = dict(self.headers)
+            headers["Range"] = f"{start}-{start + page_size - 1}"
+            response = requests.get(url, headers=headers, params=params, timeout=60)
+            response.raise_for_status()
+            batch = response.json()
+            if not batch:
+                break
+            all_rows.extend(batch)
+            if len(batch) < page_size:
+                break
+            start += page_size
+
+        return all_rows
 
     def insert_rows(self, table: str, rows: Iterable[Mapping[str, Any]]) -> None:
         url = f"{self.config.url}/rest/v1/{table}"
