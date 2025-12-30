@@ -5,3 +5,4 @@ google-genai==0.3.0
 pydantic==2.6.0
 pandas==2.2.0
 pymupdf==1.23.22
+requests==2.32.3
