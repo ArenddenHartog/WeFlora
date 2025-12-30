@@ -41,7 +41,7 @@ class SupabaseREST:
         filters: Mapping[str, str] | None = None,
         page_size: int = 1000,
         order: str = "id",
-        use_keyset: bool = True,
+        use_keyset: bool = False,
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
         url = f"{self.config.url}/rest/v1/{table}"
