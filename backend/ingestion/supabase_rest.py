@@ -42,6 +42,7 @@ class SupabaseREST:
         page_size: int = 1000,
         order: str = "id",
         use_keyset: bool = True,
+        limit: int | None = None,
     ) -> list[dict[str, Any]]:
         url = f"{self.config.url}/rest/v1/{table}"
         params = {"select": select}
@@ -55,10 +56,14 @@ class SupabaseREST:
         order_column = order.split(".", maxsplit=1)[0] if order else ""
         is_desc = order.endswith(".desc") if order else False
         last_value: Any | None = None
+        remaining = limit
 
         while True:
             page_params = dict(params)
-            page_params["limit"] = page_size
+            if remaining is None:
+                page_params["limit"] = page_size
+            else:
+                page_params["limit"] = min(page_size, remaining)
             if use_keyset and order_column:
                 if last_value is not None:
                     operator = "lt" if is_desc else "gt"
@@ -71,6 +76,10 @@ class SupabaseREST:
             if not batch:
                 break
             all_rows.extend(batch)
+            if remaining is not None:
+                remaining -= len(batch)
+                if remaining <= 0:
+                    break
             if len(batch) < page_size:
                 break
             if use_keyset and order_column:
