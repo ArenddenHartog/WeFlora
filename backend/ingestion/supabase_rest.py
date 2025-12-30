@@ -64,11 +64,17 @@ class SupabaseREST:
 
         return all_rows
 
-    def insert_rows(self, table: str, rows: Iterable[Mapping[str, Any]]) -> None:
+    def insert_rows(self, table: str, rows: Iterable[Mapping[str, Any]], batch_size: int = 500) -> None:
         url = f"{self.config.url}/rest/v1/{table}"
-        payload = json.dumps(list(rows))
-        response = requests.post(url, headers=self.headers, data=payload, timeout=60)
-        response.raise_for_status()
+        rows_list = list(rows)
+        if not rows_list:
+            return
+
+        for start in range(0, len(rows_list), batch_size):
+            batch = rows_list[start : start + batch_size]
+            payload = json.dumps(batch)
+            response = requests.post(url, headers=self.headers, data=payload, timeout=60)
+            response.raise_for_status()
 
     def download_storage_object(self, bucket: str, path: str) -> bytes:
         url = f"{self.config.url}/storage/v1/object/{bucket}/{path}"
