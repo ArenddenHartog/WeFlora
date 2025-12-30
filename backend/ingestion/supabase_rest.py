@@ -58,6 +58,7 @@ class SupabaseREST:
         last_value: Any | None = None
         previous_last_value: Any | None = None
         remaining = limit
+        total_rows: int | None = None
 
         while True:
             page_params = dict(params)
@@ -71,18 +72,25 @@ class SupabaseREST:
                     page_params[order_column] = f"{operator}.{last_value}"
             else:
                 page_params["offset"] = start
-            response = requests.get(url, headers=self.headers, params=page_params, timeout=60)
+            headers = dict(self.headers)
+            headers.setdefault("Prefer", "count=exact")
+            response = requests.get(url, headers=headers, params=page_params, timeout=60)
             response.raise_for_status()
             batch = response.json()
             if not batch:
                 break
             all_rows.extend(batch)
+            if total_rows is None:
+                content_range = response.headers.get("Content-Range")
+                if content_range and "/" in content_range:
+                    try:
+                        total_rows = int(content_range.split("/", maxsplit=1)[1])
+                    except ValueError:
+                        total_rows = None
             if remaining is not None:
                 remaining -= len(batch)
                 if remaining <= 0:
                     break
-            if len(batch) < page_size:
-                break
             if use_keyset and order_column:
                 last_value = batch[-1].get(order_column)
                 if last_value is None:
@@ -96,6 +104,11 @@ class SupabaseREST:
                 previous_last_value = last_value
             else:
                 start += page_size
+                if total_rows is not None:
+                    if start >= total_rows:
+                        break
+                elif len(batch) < page_size:
+                    break
 
         return all_rows
 
