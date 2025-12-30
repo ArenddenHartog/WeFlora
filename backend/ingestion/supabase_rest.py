@@ -84,7 +84,9 @@ class SupabaseREST:
                 content_range = response.headers.get("Content-Range")
                 if content_range and "/" in content_range:
                     try:
-                        total_rows = int(content_range.split("/", maxsplit=1)[1])
+                        reported_total = int(content_range.split("/", maxsplit=1)[1])
+                        if reported_total > start + len(batch):
+                            total_rows = reported_total
                     except ValueError:
                         total_rows = None
             if remaining is not None:
