@@ -40,11 +40,14 @@ class SupabaseREST:
         select: str = "*",
         filters: Mapping[str, str] | None = None,
         page_size: int = 1000,
+        order: str = "id",
     ) -> list[dict[str, Any]]:
         url = f"{self.config.url}/rest/v1/{table}"
         params = {"select": select}
         if filters:
             params.update(filters)
+        if order:
+            params["order"] = order
 
         all_rows: list[dict[str, Any]] = []
         start = 0
