@@ -448,7 +448,23 @@ const MatrixView: React.FC<MatrixViewProps> = ({
     const handleCellChange = (rowId: string, colId: string, value: string|number) => {
         const currentMatrix = activeMatrixRef.current;
         if (!currentMatrix) return;
-        const newRows = currentMatrix.rows.map(row => row.id === rowId ? { ...row, cells: { ...row.cells, [colId]: { ...row.cells[colId], columnId: colId, value } } } : row);
+        const newRows = currentMatrix.rows.map(row => row.id === rowId ? {
+            ...row,
+            cells: {
+                ...row.cells,
+                [colId]: {
+                    ...row.cells[colId],
+                    columnId: colId,
+                    value,
+                    status: 'idle',
+                    displayValue: undefined,
+                    reasoning: undefined,
+                    normalized: undefined,
+                    outputType: undefined,
+                    provenance: undefined
+                }
+            }
+        } : row);
         onUpdateMatrix({ ...currentMatrix, rows: newRows });
         setEditingCell(null);
     };
@@ -974,7 +990,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                                                 )}
                                                 {isEditing ? (
                                                     <MatrixInput 
-                                                        value={cell?.value ?? ''} 
+                                                        value={cell?.value ?? cell?.displayValue ?? ''} 
                                                         type={col.type} 
                                                         onSave={(val) => handleCellChange(row.id, col.id, val)} 
                                                         onCancel={() => setEditingCell(null)} 
