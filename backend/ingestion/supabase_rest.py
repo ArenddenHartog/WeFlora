@@ -41,6 +41,7 @@ class SupabaseREST:
         filters: Mapping[str, str] | None = None,
         page_size: int = 1000,
         order: str = "id",
+        use_keyset: bool = True,
     ) -> list[dict[str, Any]]:
         url = f"{self.config.url}/rest/v1/{table}"
         params = {"select": select}
@@ -51,11 +52,19 @@ class SupabaseREST:
 
         all_rows: list[dict[str, Any]] = []
         start = 0
+        order_column = order.split(".", maxsplit=1)[0] if order else ""
+        is_desc = order.endswith(".desc") if order else False
+        last_value: Any | None = None
 
         while True:
             page_params = dict(params)
             page_params["limit"] = page_size
-            page_params["offset"] = start
+            if use_keyset and order_column:
+                if last_value is not None:
+                    operator = "lt" if is_desc else "gt"
+                    page_params[order_column] = f"{operator}.{last_value}"
+            else:
+                page_params["offset"] = start
             response = requests.get(url, headers=self.headers, params=page_params, timeout=60)
             response.raise_for_status()
             batch = response.json()
@@ -64,7 +73,12 @@ class SupabaseREST:
             all_rows.extend(batch)
             if len(batch) < page_size:
                 break
-            start += page_size
+            if use_keyset and order_column:
+                last_value = batch[-1].get(order_column)
+                if last_value is None:
+                    break
+            else:
+                start += page_size
 
         return all_rows
 
