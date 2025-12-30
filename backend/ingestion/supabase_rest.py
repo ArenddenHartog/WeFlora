@@ -50,9 +50,10 @@ class SupabaseREST:
         start = 0
 
         while True:
-            headers = dict(self.headers)
-            headers["Range"] = f"{start}-{start + page_size - 1}"
-            response = requests.get(url, headers=headers, params=params, timeout=60)
+            page_params = dict(params)
+            page_params["limit"] = page_size
+            page_params["offset"] = start
+            response = requests.get(url, headers=self.headers, params=page_params, timeout=60)
             response.raise_for_status()
             batch = response.json()
             if not batch:
