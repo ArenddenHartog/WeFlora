@@ -93,14 +93,34 @@ assert.equal(citedNone.length, 0);
 
 const referenced = extractReferencedSourceIds({
   schemaVersion: 'v0.1',
-  meta: { schema_version: 'v0.1', sources_used: [{ source_id: 'doc-meta' }] },
+  meta: { schema_version: 'v0.1' },
   mode: 'suitability_scoring',
   responseType: 'answer',
   data: {
-    results: [{ citations: [{ source_id: 'doc-3' }] }]
+    results: [{ citations: ['doc-3'] }]
   }
 } as any);
-assert.deepEqual(referenced.sort(), ['doc-3', 'doc-meta']);
+assert.deepEqual(referenced.sort(), ['doc-3']);
+
+const generalRefs = extractReferencedSourceIds({
+  schemaVersion: 'v0.1',
+  meta: { schema_version: 'v0.1' },
+  mode: 'general_research',
+  responseType: 'answer',
+  data: { summary: 'Summary.' }
+} as any);
+assert.deepEqual(generalRefs, []);
+
+const invalidRefs = extractReferencedSourceIds({
+  schemaVersion: 'v0.1',
+  meta: { schema_version: 'v0.1' },
+  mode: 'suitability_scoring',
+  responseType: 'answer',
+  data: {
+    results: [{ citations: [{ source_id: 'doc-4' }] }]
+  }
+} as any);
+assert.deepEqual(invalidRefs, []);
 
 const selectedDocs = mapSelectedDocs([
   { id: 'ctx-1', itemId: 'file-1', name: 'Policy Manual', source: 'project', projectId: 'project-1' },

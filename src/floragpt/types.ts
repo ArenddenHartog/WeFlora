@@ -1,4 +1,4 @@
-import type { ContextItem, FloraGPTMode } from '../../types';
+import type { ContextItem, FloraGPTMode, FloraGPTResponseEnvelope } from '../../types';
 
 export type WorkOrderViewContext = 'chat' | 'worksheet' | 'report';
 
@@ -45,6 +45,8 @@ export interface EvidencePack {
   projectHits: EvidenceHit[];
   policyHits: EvidenceHit[];
 }
+
+export type { FloraGPTResponseEnvelope };
 
 export interface FloraGPTContext {
   contextItems: ContextItem[];

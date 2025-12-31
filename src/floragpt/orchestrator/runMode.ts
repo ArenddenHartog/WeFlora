@@ -45,12 +45,8 @@ export type FloraGPTRunResult = {
   schemaVersionReceived?: string | null;
 };
 
-const normalizeIds = (items: any[] | undefined): string[] => {
-  if (!items) return [];
-  return items
-    .map((item) => (typeof item === 'string' ? item : item?.source_id))
-    .filter((id): id is string => Boolean(id));
-};
+const isStringArray = (items: unknown): items is string[] =>
+  Array.isArray(items) && items.every((item) => typeof item === 'string');
 
 const buildCitationErrors = (payload: FloraGPTResponseEnvelope, evidencePack: EvidencePack): string[] => {
   const errors: string[] = [];
@@ -62,47 +58,49 @@ const buildCitationErrors = (payload: FloraGPTResponseEnvelope, evidencePack: Ev
   );
 
   if (payload.mode === 'general_research') {
-    const sourcesUsed = normalizeIds((payload.meta as any)?.sources_used);
-    if (sourcesUsed.length === 0) {
-      errors.push('general_research requires sources_used when evidence exists');
-    }
-    sourcesUsed.forEach((id) => {
-      if (!sourceIds.has(id)) errors.push(`unknown source_id: ${id}`);
-    });
+    return errors;
   }
 
   if (payload.mode === 'suitability_scoring') {
     const results = payload.data?.results || [];
     results.forEach((result: any, idx: number) => {
-      const citations = normalizeIds(result.citations);
-      if (citations.length === 0) {
+      if (!isStringArray(result.citations) || result.citations.length === 0) {
         errors.push(`results[${idx}] requires citations`);
+        return;
       }
-      citations.forEach((id) => {
+      result.citations.forEach((id: string) => {
         if (!sourceIds.has(id)) errors.push(`unknown source_id: ${id}`);
       });
     });
   }
 
   if (payload.mode === 'spec_writer') {
-    const citations = normalizeIds(payload.data?.citations);
-    if (citations.length === 0) {
+    if (!isStringArray(payload.data?.citations) || payload.data.citations.length === 0) {
       errors.push('spec_writer requires citations when evidence exists');
+      return errors;
     }
-    citations.forEach((id) => {
+    payload.data.citations.forEach((id: string) => {
       if (!sourceIds.has(id)) errors.push(`unknown source_id: ${id}`);
     });
   }
 
   if (payload.mode === 'policy_compliance') {
+    if (payload.data?.citations && !isStringArray(payload.data.citations)) {
+      errors.push('policy_compliance data.citations must be string[]');
+    }
+    if (isStringArray(payload.data?.citations)) {
+      payload.data.citations.forEach((id: string) => {
+        if (!sourceIds.has(id)) errors.push(`unknown source_id: ${id}`);
+      });
+    }
     if (evidencePack.policyHits.length > 0) {
       const issues = payload.data?.issues || [];
       issues.forEach((issue: any, idx: number) => {
-        const citations = normalizeIds(issue.citations);
-        if (citations.length === 0) {
+        if (!isStringArray(issue.citations) || issue.citations.length === 0) {
           errors.push(`issues[${idx}] requires citations`);
+          return;
         }
-        citations.forEach((id) => {
+        issue.citations.forEach((id: string) => {
           if (!sourceIds.has(id)) errors.push(`unknown source_id: ${id}`);
         });
       });
