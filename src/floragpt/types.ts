@@ -13,7 +13,7 @@ export interface WorkOrder {
   viewContext: WorkOrderViewContext;
   uiAction?: string | null;
   worksheetSelection?: { sheetId: string; rangeA1: string } | null;
-  selectedDocs?: { sourceId: string; type: 'upload' | 'policy_manual' | 'global_kb' | 'project' }[];
+  selectedDocs?: { sourceId: string; sourceType: 'upload' | 'policy_manual' | 'global_kb' | 'project' | 'worksheet' | 'report'; scope: string; title?: string };
   evidencePolicy?: {
     includeProjectEnvelope: boolean;
     includeGlobalKB: boolean;

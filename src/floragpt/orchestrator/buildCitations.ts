@@ -9,13 +9,17 @@ const hitTypeToCitationType = (hit: EvidenceHit): Citation['type'] => {
   return 'project_file';
 };
 
-export const buildCitationsFromEvidencePack = (pack: EvidencePack): Citation[] => {
+export const buildCitationsFromEvidencePack = (pack: EvidencePack, referencedSourceIds: string[]): Citation[] => {
   const hits = [...pack.globalHits, ...pack.projectHits, ...pack.policyHits];
-  return hits.map((hit) => ({
+  const hitById = new Map(hits.map((hit) => [hit.sourceId, hit]));
+  return referencedSourceIds
+    .map((id) => hitById.get(id))
+    .filter((hit): hit is EvidenceHit => Boolean(hit))
+    .map((hit) => ({
     source: hit.title,
     text: buildCitationText(hit),
     type: hitTypeToCitationType(hit),
     sourceId: hit.sourceId,
     locationHint: hit.locationHint ?? null
-  }));
+    }));
 };

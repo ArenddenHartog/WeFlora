@@ -9,7 +9,7 @@ export const buildEvidencePack = async (args: {
   projectId: string;
   query: string;
   contextItems: ContextItem[];
-  selectedDocs?: { sourceId: string; type: string }[];
+  selectedDocs?: { sourceId: string; sourceType: string }[];
   evidencePolicy?: {
     includeProjectEnvelope: boolean;
     includeGlobalKB: boolean;
@@ -17,7 +17,7 @@ export const buildEvidencePack = async (args: {
   };
 }): Promise<EvidencePack> => {
   const { mode, projectId, query, contextItems, selectedDocs, evidencePolicy } = args;
-  const hasPolicySelection = Boolean(selectedDocs?.some((doc) => doc.type === 'policy_manual'));
+  const hasPolicySelection = Boolean(selectedDocs?.some((doc) => doc.sourceType === 'policy_manual'));
   const includePolicy = evidencePolicy?.includePolicyDocs === true ||
     (evidencePolicy?.includePolicyDocs === 'only_if_selected' && hasPolicySelection);
   const includeGlobal = evidencePolicy?.includeGlobalKB ?? true;

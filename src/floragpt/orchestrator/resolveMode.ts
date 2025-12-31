@@ -7,7 +7,7 @@ const COMPLIANCE_KEYWORDS = /\b(allowed|compliant|compliance|policy|afstand|rich
 export const resolveMode = (args: {
   uiAction?: string | null;
   userQuery: string;
-  selectedDocs?: { type: string }[];
+  selectedDocs?: { sourceType: string }[];
 }): FloraGPTMode => {
   const { uiAction, userQuery, selectedDocs } = args;
 
@@ -23,7 +23,7 @@ export const resolveMode = (args: {
     }
   }
 
-  const hasPolicyDocs = Boolean(selectedDocs?.some((doc) => doc.type === 'policy_manual'));
+  const hasPolicyDocs = Boolean(selectedDocs?.some((doc) => doc.sourceType === 'policy_manual'));
   if (hasPolicyDocs && COMPLIANCE_KEYWORDS.test(userQuery)) {
     return 'policy_compliance';
   }

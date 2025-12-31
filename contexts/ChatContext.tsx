@@ -16,6 +16,8 @@ import { buildEvidencePack } from '../src/floragpt/orchestrator/buildEvidencePac
 import { runMode } from '../src/floragpt/orchestrator/runMode';
 import { buildCitationsFromEvidencePack } from '../src/floragpt/orchestrator/buildCitations';
 import { logFloraGPTSchemaAttempt } from '../src/floragpt/utils/logFloraGPT';
+import { mapSelectedDocs } from '../src/floragpt/utils/mapSelectedDocs';
+import { extractReferencedSourceIds } from '../src/floragpt/utils/extractReferencedSourceIds';
 
 interface ChatContextType {
     chats: { [projectId: string]: Chat[] };
@@ -301,48 +303,80 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const effectiveInstructions = [instructions, memoryInstruction].filter(Boolean).join('\n\n');
 
             if (FEATURES.floragpt_modes_v0) {
-                const mode = resolveMode({
-                    userQuery: text,
-                    selectedDocs: hydratedContext.map((item) => ({
-                        type: item.name.toLowerCase().includes('policy') ? 'policy_manual' : item.source
-                    }))
-                });
+                let schemaAttempted = false;
+                try {
+                    const inferredProjectId = hydratedContext.find((item) => item.projectId)?.projectId || 'project';
+                    const selectedDocs = mapSelectedDocs(hydratedContext, inferredProjectId);
+                    const mode = resolveMode({
+                        userQuery: text,
+                        selectedDocs
+                    });
 
-                const workOrder = buildWorkOrder({
-                    mode,
-                    userQuery: text,
-                    contextItems: hydratedContext
-                });
+                    const workOrder = buildWorkOrder({
+                        mode,
+                        userQuery: text,
+                        contextItems: hydratedContext,
+                        selectedDocs
+                    });
 
-                const evidencePack = await buildEvidencePack({
-                    mode,
-                    projectId: workOrder.projectId,
-                    query: text,
-                    contextItems: hydratedContext,
-                    selectedDocs: workOrder.selectedDocs,
-                    evidencePolicy: workOrder.evidencePolicy
-                });
+                    const evidencePack = await buildEvidencePack({
+                        mode,
+                        projectId: workOrder.projectId,
+                        query: text,
+                        contextItems: hydratedContext,
+                        selectedDocs: workOrder.selectedDocs,
+                        evidencePolicy: workOrder.evidencePolicy
+                    });
 
-                const floraResult = await runMode({
-                    workOrder,
-                    evidencePack,
-                    aiService
-                });
+                    schemaAttempted = true;
+                    const floraResult = await runMode({
+                        workOrder,
+                        evidencePack,
+                        aiService
+                    });
 
-                if (floraResult.ok && floraResult.payload) {
-                    const aiMsgId = `ai-${Date.now()}`;
-                    const summary = summarizeFloraGPTPayload(floraResult.payload);
-                    const citations = floraResult.payload.responseType === 'clarifying_questions'
-                        ? []
-                        : buildCitationsFromEvidencePack(evidencePack);
-                    const aiMessage: ChatMessage = {
-                        id: aiMsgId,
-                        sender: 'ai',
-                        text: summary,
-                        floraGPT: floraResult.payload,
-                        citations,
-                        createdAt: new Date().toISOString()
-                    };
+                    if (floraResult.ok && floraResult.payload) {
+                        const aiMsgId = `ai-${Date.now()}`;
+                        const summary = summarizeFloraGPTPayload(floraResult.payload);
+                        const referencedIds = extractReferencedSourceIds(floraResult.payload);
+                        const citations = floraResult.payload.responseType === 'clarifying_questions'
+                            ? []
+                            : buildCitationsFromEvidencePack(evidencePack, referencedIds);
+                        const aiMessage: ChatMessage = {
+                            id: aiMsgId,
+                            sender: 'ai',
+                            text: summary,
+                            floraGPT: floraResult.payload,
+                            citations,
+                            createdAt: new Date().toISOString()
+                        };
+                        logFloraGPTSchemaAttempt({
+                            projectId: workOrder.projectId,
+                            mode,
+                            schemaVersionExpected: workOrder.schemaVersion,
+                            schemaVersionReceived: floraResult.schemaVersionReceived ?? null,
+                            evidenceCounts: {
+                                global: evidencePack.globalHits.length,
+                                project: evidencePack.projectHits.length,
+                                policy: evidencePack.policyHits.length
+                            },
+                            citationsCount: citations.length,
+                            validationPassed: true,
+                            repairAttempted: floraResult.repairAttempted,
+                            fallbackUsed: false,
+                            failureReason: floraResult.failureReason ?? null
+                        });
+                        setMessages(prev => [...prev, aiMessage]);
+                        if (currentThreadId) {
+                            await addMessageToThread(currentThreadId, aiMessage);
+                            if (userId && memoryPolicy) {
+                                await maybeSummarizeThread({ userId, threadId: currentThreadId, policy: memoryPolicy });
+                            }
+                        }
+                        setIsGenerating(false);
+                        return;
+                    }
+
                     logFloraGPTSchemaAttempt({
                         projectId: workOrder.projectId,
                         mode,
@@ -353,39 +387,17 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             project: evidencePack.projectHits.length,
                             policy: evidencePack.policyHits.length
                         },
-                        citationsCount: citations.length,
-                        validationPassed: true,
+                        citationsCount: 0,
+                        validationPassed: false,
                         repairAttempted: floraResult.repairAttempted,
-                        fallbackUsed: false,
-                        failureReason: floraResult.failureReason ?? null
+                        fallbackUsed: true,
+                        failureReason: floraResult.failureReason ?? 'schema-pipeline-failed'
                     });
-                    setMessages(prev => [...prev, aiMessage]);
-                    if (currentThreadId) {
-                        await addMessageToThread(currentThreadId, aiMessage);
-                        if (userId && memoryPolicy) {
-                            await maybeSummarizeThread({ userId, threadId: currentThreadId, policy: memoryPolicy });
-                        }
+                } catch (error) {
+                    if (schemaAttempted) {
+                        console.error('[floragpt:error]', error);
                     }
-                    setIsGenerating(false);
-                    return;
                 }
-
-                logFloraGPTSchemaAttempt({
-                    projectId: workOrder.projectId,
-                    mode,
-                    schemaVersionExpected: workOrder.schemaVersion,
-                    schemaVersionReceived: floraResult.schemaVersionReceived ?? null,
-                    evidenceCounts: {
-                        global: evidencePack.globalHits.length,
-                        project: evidencePack.projectHits.length,
-                        policy: evidencePack.policyHits.length
-                    },
-                    citationsCount: 0,
-                    validationPassed: false,
-                    repairAttempted: floraResult.repairAttempted,
-                    fallbackUsed: true,
-                    failureReason: floraResult.failureReason ?? 'schema-pipeline-failed'
-                });
             }
 
             // 6. Stream Response (fallback / default)
