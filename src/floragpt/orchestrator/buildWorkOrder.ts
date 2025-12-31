@@ -34,5 +34,10 @@ export const buildWorkOrder = (args: {
     viewContext: 'chat',
     uiAction: uiAction ?? null,
     selectedDocs,
+    evidencePolicy: {
+      includeProjectEnvelope: true,
+      includeGlobalKB: true,
+      includePolicyDocs: 'only_if_selected'
+    }
   };
 };

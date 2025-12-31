@@ -11,7 +11,9 @@ const isStringArray = (value: unknown): value is string[] =>
 const validateCommon = (payload: FloraGPTResponseEnvelope, mode: FloraGPTMode): string[] => {
   const errors: string[] = [];
   if (payload.schemaVersion !== 'v0.1') errors.push('schemaVersion must be v0.1');
-  if (payload.meta && payload.meta.schema_version !== 'v0.1') {
+  if (!payload.meta?.schema_version) {
+    errors.push('meta.schema_version is required');
+  } else if (payload.meta.schema_version !== 'v0.1') {
     errors.push('meta.schema_version must be v0.1');
   }
   if (payload.mode !== mode) errors.push('mode mismatch');

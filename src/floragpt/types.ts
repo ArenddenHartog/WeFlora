@@ -14,6 +14,11 @@ export interface WorkOrder {
   uiAction?: string | null;
   worksheetSelection?: { sheetId: string; rangeA1: string } | null;
   selectedDocs?: { sourceId: string; type: 'upload' | 'policy_manual' | 'global_kb' | 'project' }[];
+  evidencePolicy?: {
+    includeProjectEnvelope: boolean;
+    includeGlobalKB: boolean;
+    includePolicyDocs: 'only_if_selected' | boolean;
+  };
   siteContext?: {
     jurisdiction?: string | null;
     siteType?: string | null;

@@ -10,6 +10,8 @@ import { validateFloraGPTPayload } from '../schemas/validate';
 import { buildRepairPrompt } from '../schemas/repairPrompt';
 import type { AIService } from '../../../services/aiService';
 import { ensureContext } from './ensureContext';
+import { extractFirstJson } from '../utils/extractJson';
+import type { EvidencePack } from '../types';
 import generalResearchSchema from '../schemas/general_research.v0_1.json';
 import suitabilityScoringSchema from '../schemas/suitability_scoring.v0_1.json';
 import specWriterSchema from '../schemas/spec_writer.v0_1.json';
@@ -30,8 +32,7 @@ const modeSchemaMap: Record<FloraGPTMode, object> = {
 };
 
 const parseJsonSafe = (text: string): unknown => {
-  const clean = text.replace(/```json\n?|```/g, '').trim();
-  return JSON.parse(clean);
+  return JSON.parse(text);
 };
 
 export type FloraGPTRunResult = {
@@ -39,6 +40,81 @@ export type FloraGPTRunResult = {
   payload?: FloraGPTResponseEnvelope;
   rawText?: string;
   errors?: string[];
+  repairAttempted: boolean;
+  failureReason?: string | null;
+  schemaVersionReceived?: string | null;
+};
+
+const buildCitationErrors = (payload: FloraGPTResponseEnvelope, evidencePack: EvidencePack): string[] => {
+  const errors: string[] = [];
+  const totalEvidence = evidencePack.globalHits.length + evidencePack.projectHits.length + evidencePack.policyHits.length;
+  if (totalEvidence === 0) return errors;
+
+  const sourceIds = new Set(
+    [...evidencePack.globalHits, ...evidencePack.projectHits, ...evidencePack.policyHits].map((hit) => hit.sourceId)
+  );
+
+  if (payload.mode === 'general_research') {
+    const sourcesUsed = payload.data?.sources_used;
+    if (!Array.isArray(sourcesUsed) || sourcesUsed.length === 0) {
+      errors.push('general_research requires sources_used when evidence exists');
+    }
+    sourcesUsed?.forEach((id: string) => {
+      if (!sourceIds.has(id)) errors.push(`unknown source_id: ${id}`);
+    });
+  }
+
+  if (payload.mode === 'suitability_scoring') {
+    const results = payload.data?.results || [];
+    results.forEach((result: any, idx: number) => {
+      const citations = result.citations;
+      if (!Array.isArray(citations) || citations.length === 0) {
+        errors.push(`results[${idx}] requires citations`);
+      }
+      citations?.forEach((id: string) => {
+        if (!sourceIds.has(id)) errors.push(`unknown source_id: ${id}`);
+      });
+    });
+  }
+
+  if (payload.mode === 'spec_writer') {
+    const citations = payload.data?.citations;
+    if (!Array.isArray(citations) || citations.length === 0) {
+      errors.push('spec_writer requires citations when evidence exists');
+    }
+    citations?.forEach((id: string) => {
+      if (!sourceIds.has(id)) errors.push(`unknown source_id: ${id}`);
+    });
+  }
+
+  if (payload.mode === 'policy_compliance') {
+    if (evidencePack.policyHits.length > 0) {
+      const issues = payload.data?.issues || [];
+      issues.forEach((issue: any, idx: number) => {
+        const citations = issue.citations;
+        if (!Array.isArray(citations) || citations.length === 0) {
+          errors.push(`issues[${idx}] requires citations`);
+        }
+        citations?.forEach((id: string) => {
+          if (!sourceIds.has(id)) errors.push(`unknown source_id: ${id}`);
+        });
+      });
+    }
+  }
+
+  return errors;
+};
+
+const buildCitationRepairPrompt = (errors: string[], evidencePack: EvidencePack) => {
+  const sourceIds = [...evidencePack.globalHits, ...evidencePack.projectHits, ...evidencePack.policyHits].map(
+    (hit) => hit.sourceId
+  );
+  return `
+${buildRepairPrompt(errors)}
+Available source_ids:
+- ${sourceIds.join('\n- ')}
+Add citations referencing only these source_ids.
+`.trim();
 };
 
 export const runMode = async (args: {
@@ -69,13 +145,108 @@ export const runMode = async (args: {
   });
 
   try {
-    const parsed = parseJsonSafe(rawText) as FloraGPTResponseEnvelope;
-    if (parsed.meta?.schema_version && parsed.meta.schema_version !== workOrder.schemaVersion) {
-      return { ok: false, rawText, errors: ['meta.schema_version mismatch'] };
+    const extracted = extractFirstJson(rawText);
+    if (!extracted.jsonText) {
+      return {
+        ok: false,
+        rawText,
+        errors: [extracted.reason || 'No JSON found'],
+        repairAttempted: false,
+        failureReason: 'json-extraction-failed',
+        schemaVersionReceived: null
+      };
     }
+
+    const parsed = parseJsonSafe(extracted.jsonText) as FloraGPTResponseEnvelope;
+    const schemaVersionReceived = parsed.meta?.schema_version ?? null;
+    if (schemaVersionReceived !== workOrder.schemaVersion) {
+      const repairSystem = [
+        FLORAGPT_BASE_SYSTEM,
+        modeSystem,
+        buildJsonContract(schema),
+        buildRepairPrompt(['SchemaVersionMismatch: meta.schema_version must be v0.1'])
+      ].join('\n\n');
+
+      const repairedRaw = await aiService.generateFloraGPTResponse({
+        systemInstruction: repairSystem,
+        userPayload: { previousOutput: rawText, errors: ['SchemaVersionMismatch'] }
+      });
+
+      const repairedExtracted = extractFirstJson(repairedRaw);
+      if (!repairedExtracted.jsonText) {
+        return {
+          ok: false,
+          rawText,
+          errors: ['SchemaVersionMismatch'],
+          repairAttempted: true,
+          failureReason: 'schema-version-mismatch',
+          schemaVersionReceived
+        };
+      }
+
+      const repairedParsed = parseJsonSafe(repairedExtracted.jsonText) as FloraGPTResponseEnvelope;
+      const repairedValidation = validateFloraGPTPayload(workOrder.mode, repairedParsed);
+      if (!repairedValidation.ok) {
+        return {
+          ok: false,
+          rawText,
+          errors: repairedValidation.errors,
+          repairAttempted: true,
+          failureReason: 'schema-version-mismatch',
+          schemaVersionReceived
+        };
+      }
+      return { ok: true, payload: repairedParsed, rawText: repairedRaw, repairAttempted: true, schemaVersionReceived: repairedParsed.meta?.schema_version ?? null };
+    }
+
     const validation = validateFloraGPTPayload(workOrder.mode, parsed);
     if (validation.ok) {
-      return { ok: true, payload: parsed, rawText };
+      const citationErrors = buildCitationErrors(parsed, evidencePack);
+      if (citationErrors.length > 0) {
+        const repairSystem = [
+          FLORAGPT_BASE_SYSTEM,
+          modeSystem,
+          buildJsonContract(schema),
+          buildCitationRepairPrompt(citationErrors, evidencePack)
+        ].join('\n\n');
+
+        const repairedRaw = await aiService.generateFloraGPTResponse({
+          systemInstruction: repairSystem,
+          userPayload: { previousOutput: rawText, errors: citationErrors }
+        });
+        const repairedExtracted = extractFirstJson(repairedRaw);
+        if (!repairedExtracted.jsonText) {
+          return {
+            ok: false,
+            rawText,
+            errors: citationErrors,
+            repairAttempted: true,
+            failureReason: 'citation-validation-failed',
+            schemaVersionReceived
+          };
+        }
+        const repairedParsed = parseJsonSafe(repairedExtracted.jsonText) as FloraGPTResponseEnvelope;
+        const repairedValidation = validateFloraGPTPayload(workOrder.mode, repairedParsed);
+        const repairedCitationErrors = buildCitationErrors(repairedParsed, evidencePack);
+        if (!repairedValidation.ok || repairedCitationErrors.length > 0) {
+          return {
+            ok: false,
+            rawText,
+            errors: [...(repairedValidation.errors || []), ...repairedCitationErrors],
+            repairAttempted: true,
+            failureReason: 'citation-validation-failed',
+            schemaVersionReceived
+          };
+        }
+        return { ok: true, payload: repairedParsed, rawText: repairedRaw, repairAttempted: true, schemaVersionReceived: repairedParsed.meta?.schema_version ?? null };
+      }
+      return {
+        ok: true,
+        payload: parsed,
+        rawText,
+        repairAttempted: false,
+        schemaVersionReceived
+      };
     }
 
     const repairSystem = [
@@ -90,14 +261,46 @@ export const runMode = async (args: {
       userPayload: { previousOutput: rawText, errors: validation.errors }
     });
 
-    const repairedParsed = parseJsonSafe(repairedRaw) as FloraGPTResponseEnvelope;
+    const repairedExtracted = extractFirstJson(repairedRaw);
+    if (!repairedExtracted.jsonText) {
+      return {
+        ok: false,
+        rawText,
+        errors: validation.errors,
+        repairAttempted: true,
+        failureReason: 'schema-validation-failed',
+        schemaVersionReceived
+      };
+    }
+    const repairedParsed = parseJsonSafe(repairedExtracted.jsonText) as FloraGPTResponseEnvelope;
     const repairedValidation = validateFloraGPTPayload(workOrder.mode, repairedParsed);
-    if (repairedValidation.ok) {
-      return { ok: true, payload: repairedParsed, rawText: repairedRaw };
+    const repairedCitationErrors = buildCitationErrors(repairedParsed, evidencePack);
+    if (repairedValidation.ok && repairedCitationErrors.length === 0) {
+      return {
+        ok: true,
+        payload: repairedParsed,
+        rawText: repairedRaw,
+        repairAttempted: true,
+        schemaVersionReceived: repairedParsed.meta?.schema_version ?? null
+      };
     }
 
-    return { ok: false, rawText, errors: repairedValidation.errors };
+    return {
+      ok: false,
+      rawText,
+      errors: [...(repairedValidation.errors || []), ...repairedCitationErrors],
+      repairAttempted: true,
+      failureReason: 'schema-validation-failed',
+      schemaVersionReceived
+    };
   } catch (error) {
-    return { ok: false, rawText, errors: ['Failed to parse JSON output.'] };
+    return {
+      ok: false,
+      rawText,
+      errors: ['Failed to parse JSON output.'],
+      repairAttempted: false,
+      failureReason: 'json-parse-error',
+      schemaVersionReceived: null
+    };
   }
 };

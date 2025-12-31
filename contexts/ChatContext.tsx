@@ -15,6 +15,7 @@ import { buildWorkOrder } from '../src/floragpt/orchestrator/buildWorkOrder';
 import { buildEvidencePack } from '../src/floragpt/orchestrator/buildEvidencePack';
 import { runMode } from '../src/floragpt/orchestrator/runMode';
 import { buildCitationsFromEvidencePack } from '../src/floragpt/orchestrator/buildCitations';
+import { logFloraGPTSchemaAttempt } from '../src/floragpt/utils/logFloraGPT';
 
 interface ChatContextType {
     chats: { [projectId: string]: Chat[] };
@@ -317,7 +318,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     mode,
                     projectId: workOrder.projectId,
                     query: text,
-                    contextItems: hydratedContext
+                    contextItems: hydratedContext,
+                    selectedDocs: workOrder.selectedDocs,
+                    evidencePolicy: workOrder.evidencePolicy
                 });
 
                 const floraResult = await runMode({
@@ -340,17 +343,21 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         citations,
                         createdAt: new Date().toISOString()
                     };
-                    console.info('[floragpt:debug]', {
+                    logFloraGPTSchemaAttempt({
+                        projectId: workOrder.projectId,
                         mode,
-                        schema_version: workOrder.schemaVersion,
-                        validation_passed: true,
-                        fallback_used: false,
-                        evidence_counts: {
+                        schemaVersionExpected: workOrder.schemaVersion,
+                        schemaVersionReceived: floraResult.schemaVersionReceived ?? null,
+                        evidenceCounts: {
                             global: evidencePack.globalHits.length,
                             project: evidencePack.projectHits.length,
                             policy: evidencePack.policyHits.length
                         },
-                        citations_count: citations.length
+                        citationsCount: citations.length,
+                        validationPassed: true,
+                        repairAttempted: floraResult.repairAttempted,
+                        fallbackUsed: false,
+                        failureReason: floraResult.failureReason ?? null
                     });
                     setMessages(prev => [...prev, aiMessage]);
                     if (currentThreadId) {
@@ -363,17 +370,21 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     return;
                 }
 
-                console.info('[floragpt:debug]', {
+                logFloraGPTSchemaAttempt({
+                    projectId: workOrder.projectId,
                     mode,
-                    schema_version: workOrder.schemaVersion,
-                    validation_passed: false,
-                    fallback_used: true,
-                    evidence_counts: {
+                    schemaVersionExpected: workOrder.schemaVersion,
+                    schemaVersionReceived: floraResult.schemaVersionReceived ?? null,
+                    evidenceCounts: {
                         global: evidencePack.globalHits.length,
                         project: evidencePack.projectHits.length,
                         policy: evidencePack.policyHits.length
                     },
-                    citations_count: 0
+                    citationsCount: 0,
+                    validationPassed: false,
+                    repairAttempted: floraResult.repairAttempted,
+                    fallbackUsed: true,
+                    failureReason: floraResult.failureReason ?? 'schema-pipeline-failed'
                 });
             }
 

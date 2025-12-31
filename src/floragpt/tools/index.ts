@@ -1,7 +1,7 @@
-import { ingestUpload, ingestUrl } from './ingestion';
-import { retrieveGlobal, retrieveProject, retrievePolicy } from './retrieval';
-import { rerank } from './rerank';
-import { compress } from './compress';
+import { ingestUpload, ingestUrl } from './ingestion.ts';
+import { retrieveGlobal, retrieveProject, retrievePolicy } from './retrieval.ts';
+import { rerank } from './rerank.ts';
+import { compress } from './compress.ts';
 
 export const floragptTools = {
   ingest: {

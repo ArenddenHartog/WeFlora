@@ -52,5 +52,14 @@ export const retrievePolicy = async (args: {
 };
 
 export const retrieveGlobal = async (_args: { query: string }): Promise<EvidenceHit[]> => {
-  return [];
+  return [
+    {
+      sourceId: 'global-kb:v0',
+      sourceType: 'global_kb',
+      title: 'WeFlora Global Knowledge (v0)',
+      locationHint: 'global',
+      snippet: 'Global KB placeholder: horticulture, urban forestry, planting standards.',
+      scope: 'global'
+    }
+  ];
 };

@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "FloraGPT policy_compliance v0.1",
   "type": "object",
-  "required": ["schemaVersion", "mode", "responseType", "data"],
+  "required": ["schemaVersion", "meta", "mode", "responseType", "data"],
   "additionalProperties": false,
   "properties": {
     "schemaVersion": { "type": "string", "const": "v0.1" },
