@@ -11,6 +11,8 @@
 - Citations are derived only from schema-defined string[] locations.
 - Evidence is scoped to `project:<id>` or `global`; cross-project items are dropped.
 - Schema pinning requires `meta.schema_version === "v0.1"` for schema-path success.
+ - Enforced in: `extractReferencedSourceIds.ts`, `buildCitationsFromEvidencePack` (whitelist), and ChatContext FloraGPT message assembly.
+ - Note: `general_research` does not surface “Verified” in v0.1 because the schema defines no citation fields (expected).
 
 ## Not supported in v0.1 (by schema)
 - `general_research` citations: no citations fields exist in v0.1 schemas.
