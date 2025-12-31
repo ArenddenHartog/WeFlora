@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FloraGPT policy_compliance v0.1",
+  "type": "object",
+  "required": ["schemaVersion", "mode", "responseType", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "v0.1" },
+    "meta": { "$ref": "commonEnvelope.v0_1.json#/properties/meta" },
+    "mode": { "type": "string", "const": "policy_compliance" },
+    "responseType": {
+      "type": "string",
+      "enum": ["answer", "clarifying_questions", "error"]
+    },
+    "data": { "type": "object" },
+    "tables": { "$ref": "commonEnvelope.v0_1.json#/properties/tables" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "responseType": { "const": "clarifying_questions" } } },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["questions"],
+            "additionalProperties": false,
+            "properties": {
+              "questions": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 3 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "responseType": { "const": "answer" } } },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["status"],
+            "additionalProperties": false,
+            "properties": {
+              "status": { "type": "string", "enum": ["Compliant", "Non-compliant", "Unknown"] },
+              "message": { "type": "string" },
+              "issues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["issue"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "issue": { "type": "string" },
+                    "severity": { "type": "string" },
+                    "citations": { "type": "array", "items": { "type": "string" } }
+                  }
+                }
+              },
+              "citations": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

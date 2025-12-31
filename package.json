@@ -12,6 +12,7 @@
     "guard:temp-ids": "bash scripts/guard-temp-ids.sh",
     "guard:toast-icons": "bash scripts/guard-toast-icons.sh",
     "test:skill-prompts": "node --experimental-strip-types scripts/test-skill-prompts.ts",
+    "test:floragpt": "node --experimental-strip-types scripts/test-floragpt.ts",
     "check": "npm run lint && npm run guard:temp-ids && npm run guard:toast-icons && npm run build"
   },
   "dependencies": {

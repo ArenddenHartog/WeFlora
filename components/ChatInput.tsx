@@ -296,7 +296,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 name: file.name,
                 source: 'upload',
                 itemId: file.id,
-                file: file.file
+                file: file.file,
+                projectId: contextProjectId || null
             }));
 
         if (validFiles.length > 0) {
@@ -311,7 +312,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
             id: `ctx-${item.id}`,
             itemId: item.id,
             name: 'name' in item ? item.name : item.title,
-            source: type
+            source: type,
+            projectId: contextProjectId || null
         };
         setSelectedContextItems(prev => [...prev, newItem]);
         setIsContextPickerOpen(false);
@@ -324,7 +326,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
             id: `ctx-rep-${report.id}`,
             itemId: report.id,
             name: report.title,
-            source: 'report'
+            source: 'report',
+            projectId: contextProjectId || report.projectId || null
         };
         setSelectedContextItems(prev => [...prev, newItem]);
         setIsContextPickerOpen(false);
@@ -337,7 +340,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
             id: `ctx-mtx-${matrix.id}`,
             itemId: matrix.id,
             name: matrix.title,
-            source: 'worksheet'
+            source: 'worksheet',
+            projectId: contextProjectId || matrix.projectId || null
         };
         setSelectedContextItems(prev => [...prev, newItem]);
         setIsContextPickerOpen(false);

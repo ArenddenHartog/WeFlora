@@ -110,6 +110,7 @@ export interface ContextItem {
     file?: File; // Raw file if upload
     content?: string; // NEW: Raw text content for internal assets (Reports/Worksheets)
     description?: string; // Metadata or snippet
+    projectId?: string | null;
 }
 
 export interface MemoryPolicy {
@@ -221,6 +222,30 @@ export interface Citation {
   source: string;
   text: string;
   type: 'research' | 'project_file';
+  sourceId?: string;
+  locationHint?: string | null;
+}
+
+export type FloraGPTMode =
+  | 'general_research'
+  | 'suitability_scoring'
+  | 'spec_writer'
+  | 'policy_compliance';
+
+export type FloraGPTResponseType = 'answer' | 'clarifying_questions' | 'error';
+
+export interface FloraGPTTable {
+  title?: string;
+  columns: string[];
+  rows: string[][];
+}
+
+export interface FloraGPTResponseEnvelope {
+  schemaVersion: 'v0.1';
+  mode: FloraGPTMode;
+  responseType: FloraGPTResponseType;
+  data: Record<string, any>;
+  tables?: FloraGPTTable[];
 }
 
 export interface WebSource {
@@ -256,6 +281,7 @@ export interface ChatMessage {
     contextSnapshot?: ContextItem[]; // Traceability: What context was active when this message was sent?
     reasoningSteps?: ReasoningStep[]; // For Deep Research visualization
     suggestedActions?: Array<{ label: string, action: string, icon?: string }>; // "Convert to Worksheet"
+    floraGPT?: FloraGPTResponseEnvelope;
     createdAt?: string;
 }
 
