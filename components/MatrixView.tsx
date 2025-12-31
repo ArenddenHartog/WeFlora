@@ -448,7 +448,23 @@ const MatrixView: React.FC<MatrixViewProps> = ({
     const handleCellChange = (rowId: string, colId: string, value: string|number) => {
         const currentMatrix = activeMatrixRef.current;
         if (!currentMatrix) return;
-        const newRows = currentMatrix.rows.map(row => row.id === rowId ? { ...row, cells: { ...row.cells, [colId]: { ...row.cells[colId], columnId: colId, value } } } : row);
+        const newRows = currentMatrix.rows.map(row => row.id === rowId ? {
+            ...row,
+            cells: {
+                ...row.cells,
+                [colId]: {
+                    ...row.cells[colId],
+                    columnId: colId,
+                    value,
+                    status: 'idle',
+                    displayValue: undefined,
+                    reasoning: undefined,
+                    normalized: undefined,
+                    outputType: undefined,
+                    provenance: undefined
+                }
+            }
+        } : row);
         onUpdateMatrix({ ...currentMatrix, rows: newRows });
         setEditingCell(null);
     };
@@ -462,12 +478,22 @@ const MatrixView: React.FC<MatrixViewProps> = ({
              ...r,
              cells: { 
                 ...r.cells, 
-                [colId]: { 
-                    ...r.cells[colId], 
-                    columnId: colId, 
-                    status,
-                    ...cellData
-                } 
+                [colId]: (() => {
+                    const prevCell = r.cells[colId];
+                    const nextValue =
+                        cellData?.value !== undefined ? cellData.value : prevCell?.value;
+                    const mergedValue =
+                        nextValue !== undefined && String(nextValue).trim() !== ''
+                            ? nextValue
+                            : cellData?.displayValue ?? prevCell?.displayValue ?? '';
+                    return {
+                        ...prevCell,
+                        columnId: colId,
+                        status,
+                        ...cellData,
+                        value: mergedValue
+                    };
+                })()
              }
          } : r);
          onUpdateMatrix({ ...currentMatrix, rows: newRows });
@@ -485,15 +511,23 @@ const MatrixView: React.FC<MatrixViewProps> = ({
         }
         
         if (baseRow) {
+            const prevCell = baseRow.cells[colId];
+            const nextValue =
+                cellData?.value !== undefined ? cellData.value : prevCell?.value;
+            const mergedValue =
+                nextValue !== undefined && String(nextValue).trim() !== ''
+                    ? nextValue
+                    : cellData?.displayValue ?? prevCell?.displayValue ?? '';
             const updatedRow = {
                 ...baseRow,
                 cells: {
                     ...baseRow.cells,
                     [colId]: {
-                        ...baseRow.cells[colId],
+                        ...prevCell,
                         columnId: colId,
                         status,
-                        ...cellData
+                        ...cellData,
+                        value: mergedValue
                     }
                 }
             };
@@ -619,7 +653,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                 return {
                     ok: true,
                     data: {
-                        value: result.rawText,
+                        value: result.rawText || result.displayValue,
                         displayValue: result.displayValue,
                         reasoning: result.reasoning,
                         normalized: result.normalized,
@@ -956,7 +990,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                                                 )}
                                                 {isEditing ? (
                                                     <MatrixInput 
-                                                        value={cell?.value ?? ''} 
+                                                        value={cell?.value ?? cell?.displayValue ?? ''} 
                                                         type={col.type} 
                                                         onSave={(val) => handleCellChange(row.id, col.id, val)} 
                                                         onCancel={() => setEditingCell(null)} 
@@ -966,7 +1000,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                                                     />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center">
-                                                        {col.type === 'ai' && !cell?.value && !isProcessing ? (
+                                                        {col.type === 'ai' && !cell?.value && !cell?.displayValue && !isProcessing ? (
                                                             <button onClick={() => handleRunAICell(row.id, col.id)} className="mx-2 px-2 py-0.5 bg-weflora-mint/20 text-weflora-dark rounded text-[10px] font-bold flex items-center gap-1"><SparklesIcon className="h-3 w-3"/> Run FloraGPT</button>
                                                         ) : (
                                                             <RichCellRenderer 
