@@ -386,6 +386,18 @@ export interface Matrix {
     order?: number; // NEW: Order in the tab list
 }
 
+export interface WorksheetSelectionSnapshot {
+    matrixId: string;
+    matrixTitle: string;
+    rowId?: string;
+    columnId?: string;
+    rowIndex?: number;
+    columnIndex?: number;
+    rowName?: string;
+    columnTitle?: string;
+    cellValue?: string | number;
+}
+
 export interface DiscoveredStructure {
     id: string;
     title: string;
