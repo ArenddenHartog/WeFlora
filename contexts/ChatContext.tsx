@@ -9,6 +9,15 @@ import { aiService } from '../services/aiService';
 import { serializeMatrix, serializeReport } from '../utils/serializers';
 import { FileSheetIcon } from '../components/icons';
 import { buildMemoryInstruction, buildPromptWithHistory, fetchRecentThreadMessages, fetchTopMemoryItems, getOrCreateMemoryPolicy, maybeSummarizeThread, runMemoryQaChecks } from '../services/memoryService';
+import { FEATURES } from '../src/config/features';
+import { resolveMode } from '../src/floragpt/orchestrator/resolveMode';
+import { buildWorkOrder } from '../src/floragpt/orchestrator/buildWorkOrder';
+import { buildEvidencePack } from '../src/floragpt/orchestrator/buildEvidencePack';
+import { runMode } from '../src/floragpt/orchestrator/runMode';
+import { buildCitationsFromEvidencePack } from '../src/floragpt/orchestrator/buildCitations';
+import { logFloraGPTSchemaAttempt } from '../src/floragpt/utils/logFloraGPT';
+import { mapSelectedDocs } from '../src/floragpt/utils/mapSelectedDocs';
+import { extractReferencedSourceIds } from '../src/floragpt/utils/extractReferencedSourceIds';
 
 interface ChatContextType {
     chats: { [projectId: string]: Chat[] };
@@ -34,6 +43,30 @@ interface ChatContextType {
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
+
+const summarizeFloraGPTPayload = (payload: { responseType: string; data: Record<string, any> }) => {
+    if (payload.responseType === 'clarifying_questions') {
+        const questions = payload.data.questions as string[] | undefined;
+        return questions?.join('\n') || 'Clarification required.';
+    }
+    return payload.data.summary || payload.data.message || 'FloraGPT response ready.';
+};
+
+const buildCitationsFromGrounding = (grounding?: { webSources?: { uri?: string; title?: string }[]; mapSources?: { uri?: string; title?: string }[] }) => {
+    const citations = [
+        ...(grounding?.webSources || []).map((source) => ({
+            source: source.title || source.uri || 'Web source',
+            text: source.uri || source.title || 'Web source',
+            type: 'research' as const
+        })),
+        ...(grounding?.mapSources || []).map((source) => ({
+            source: source.title || source.uri || 'Map source',
+            text: source.uri || source.title || 'Map source',
+            type: 'research' as const
+        }))
+    ];
+    return citations;
+};
 
 export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { user } = useAuth();
@@ -266,16 +299,114 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             }
 
-            // 6. Stream Response
+            const promptWithHistory = buildPromptWithHistory(text, recentMessages);
+            const effectiveInstructions = [instructions, memoryInstruction].filter(Boolean).join('\n\n');
+
+            if (FEATURES.floragpt_modes_v0) {
+                let schemaAttempted = false;
+                try {
+                    const inferredProjectId = hydratedContext.find((item) => item.projectId)?.projectId || 'project';
+                    const selectedDocs = mapSelectedDocs(hydratedContext, inferredProjectId);
+                    const mode = resolveMode({
+                        userQuery: text,
+                        selectedDocs
+                    });
+
+                    const workOrder = buildWorkOrder({
+                        mode,
+                        userQuery: text,
+                        contextItems: hydratedContext,
+                        selectedDocs
+                    });
+
+                    const evidencePack = await buildEvidencePack({
+                        mode,
+                        projectId: workOrder.projectId,
+                        query: text,
+                        contextItems: hydratedContext,
+                        selectedDocs: workOrder.selectedDocs,
+                        evidencePolicy: workOrder.evidencePolicy
+                    });
+
+                    schemaAttempted = true;
+                    const floraResult = await runMode({
+                        workOrder,
+                        evidencePack,
+                        aiService
+                    });
+
+                    if (floraResult.ok && floraResult.payload) {
+                        const aiMsgId = `ai-${Date.now()}`;
+                        const summary = summarizeFloraGPTPayload(floraResult.payload);
+                        const referencedIds = extractReferencedSourceIds(floraResult.payload);
+                        const citations = floraResult.payload.responseType === 'clarifying_questions'
+                            ? []
+                            : buildCitationsFromEvidencePack(evidencePack, referencedIds);
+                        const aiMessage: ChatMessage = {
+                            id: aiMsgId,
+                            sender: 'ai',
+                            text: summary,
+                            floraGPT: floraResult.payload,
+                            citations,
+                            createdAt: new Date().toISOString()
+                        };
+                        logFloraGPTSchemaAttempt({
+                            projectId: workOrder.projectId,
+                            mode,
+                            schemaVersionExpected: workOrder.schemaVersion,
+                            schemaVersionReceived: floraResult.schemaVersionReceived ?? null,
+                            evidenceCounts: {
+                                global: evidencePack.globalHits.length,
+                                project: evidencePack.projectHits.length,
+                                policy: evidencePack.policyHits.length
+                            },
+                            citationsCount: citations.length,
+                            validationPassed: true,
+                            repairAttempted: floraResult.repairAttempted,
+                            fallbackUsed: false,
+                            failureReason: floraResult.failureReason ?? null
+                        });
+                        setMessages(prev => [...prev, aiMessage]);
+                        if (currentThreadId) {
+                            await addMessageToThread(currentThreadId, aiMessage);
+                            if (userId && memoryPolicy) {
+                                await maybeSummarizeThread({ userId, threadId: currentThreadId, policy: memoryPolicy });
+                            }
+                        }
+                        setIsGenerating(false);
+                        return;
+                    }
+
+                    logFloraGPTSchemaAttempt({
+                        projectId: workOrder.projectId,
+                        mode,
+                        schemaVersionExpected: workOrder.schemaVersion,
+                        schemaVersionReceived: floraResult.schemaVersionReceived ?? null,
+                        evidenceCounts: {
+                            global: evidencePack.globalHits.length,
+                            project: evidencePack.projectHits.length,
+                            policy: evidencePack.policyHits.length
+                        },
+                        citationsCount: 0,
+                        validationPassed: false,
+                        repairAttempted: floraResult.repairAttempted,
+                        fallbackUsed: true,
+                        failureReason: floraResult.failureReason ?? 'schema-pipeline-failed'
+                    });
+                } catch (error) {
+                    if (schemaAttempted) {
+                        console.error('[floragpt:error]', error);
+                    }
+                }
+            }
+
+            // 6. Stream Response (fallback / default)
             const aiMsgId = `ai-${Date.now()}`;
             const initialAiMsg: ChatMessage = { id: aiMsgId, sender: 'ai', text: '', grounding: undefined, createdAt: new Date().toISOString() };
             setMessages(prev => [...prev, initialAiMsg]);
 
             let accumulatedText = "";
             let finalGrounding = undefined;
-
-            const promptWithHistory = buildPromptWithHistory(text, recentMessages);
-            const effectiveInstructions = [instructions, memoryInstruction].filter(Boolean).join('\n\n');
 
             const stream = aiService.generateChatStream(promptWithHistory, allFilesForAI, effectiveInstructions, model, hydratedContext, enableThinking);
 
@@ -286,8 +417,18 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: accumulatedText, grounding: finalGrounding } : m));
             }
 
+            const groundingCitations = buildCitationsFromGrounding(finalGrounding);
+            setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, citations: groundingCitations } : m));
+
             if (currentThreadId) {
-                await addMessageToThread(currentThreadId, { id: aiMsgId, sender: 'ai', text: accumulatedText, grounding: finalGrounding, createdAt: new Date().toISOString() });
+                await addMessageToThread(currentThreadId, {
+                    id: aiMsgId,
+                    sender: 'ai',
+                    text: accumulatedText,
+                    grounding: finalGrounding,
+                    citations: groundingCitations,
+                    createdAt: new Date().toISOString()
+                });
                 if (userId && memoryPolicy) {
                     await maybeSummarizeThread({ userId, threadId: currentThreadId, policy: memoryPolicy });
                 }

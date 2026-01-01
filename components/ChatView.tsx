@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { Chat, ChatMessage, ContextItem } from '../types';
 import ChatInput from './ChatInput';
 import { MessageRenderer, EvidenceChip } from './MessageRenderer';
+import { FloraGPTJsonRenderer } from './FloraGPTJsonRenderer';
 import CitationsSidebar from './CitationsSidebar';
 import { 
     MenuIcon, ArrowUpIcon, RefreshIcon, CopyIcon, 
@@ -144,7 +145,9 @@ const ChatView: React.FC<ChatViewProps> = ({
                                                     <EvidenceChip citations={msg.citations} label="Assistant answer" />
                                                 </div>
                                             )}
-                                            <MessageRenderer text={msg.text} />
+                                            {msg.sender === 'ai' && msg.floraGPT
+                                                ? <FloraGPTJsonRenderer payload={msg.floraGPT} />
+                                                : <MessageRenderer text={msg.text} />}
                                         </div>
                                         
                                         {/* Footer / Actions for AI Message */}
