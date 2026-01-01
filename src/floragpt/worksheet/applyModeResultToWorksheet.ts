@@ -6,6 +6,12 @@ const MAX_CELL_CHARS = 2000;
 const truncateCell = (value: string) =>
   value.length > MAX_CELL_CHARS ? `${value.slice(0, MAX_CELL_CHARS)}… [truncated]` : value;
 
+const normalizeTitle = (value: string) =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '');
+
 const slugify = (value: string) => {
   const slug = value
     .toLowerCase()
@@ -26,7 +32,8 @@ const buildStableColumnId = (columns: Matrix['columns'], title: string) => {
 };
 
 const ensureColumn = (matrix: Matrix, title: string) => {
-  const existing = matrix.columns.find((col) => col.title === title);
+  const targetKey = normalizeTitle(title);
+  const existing = matrix.columns.find((col) => normalizeTitle(col.title) === targetKey);
   if (existing) return existing;
   const newCol = {
     id: buildStableColumnId(matrix.columns, title),
