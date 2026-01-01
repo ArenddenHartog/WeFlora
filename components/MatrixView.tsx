@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import type { Matrix, MatrixRow, MatrixColumn, MatrixColumnType, Species, ProjectFile, SkillConfiguration, ConditionalFormattingRule, MatrixCell } from '../types';
+import type { Matrix, MatrixRow, MatrixColumn, MatrixColumnType, Species, ProjectFile, SkillConfiguration, ConditionalFormattingRule, MatrixCell, WorksheetSelectionSnapshot } from '../types';
 import { 
     PlusIcon, SparklesIcon, TableIcon, XIcon, RefreshIcon, 
     CheckCircleIcon, MoreHorizontalIcon, 
@@ -38,6 +38,7 @@ interface MatrixViewProps {
     projectContext?: string; // New prop for global context awareness
     onUpload?: (files: File[]) => void;
     onResolveFile?: (fileId: string) => Promise<File | null>; // NEW: File resolver
+    onSelectionSnapshotChange?: (snapshot: WorksheetSelectionSnapshot | null) => void;
 }
 
 // --- Constants ---
@@ -366,12 +367,14 @@ const MatrixView: React.FC<MatrixViewProps> = ({
     matrices, activeId, onActiveIdChange, 
     onUpdateMatrix, onCreateMatrix, onDeleteMatrix, onInspectEntity, 
     onRunAICell, onAnalyze, onOpenWizard, onClose, onOpenManage, hideToolbar,
-    speciesList = [], projectFiles = [], projectContext, onUpload, onResolveFile
+    speciesList = [], projectFiles = [], projectContext, onUpload, onResolveFile,
+    onSelectionSnapshotChange
 }) => {
     const { openEvidencePanel } = useUI();
     const activeMatrix = matrices.find(m => m.id === activeId);
     const activeMatrixRef = useRef(activeMatrix);
     useEffect(() => { activeMatrixRef.current = activeMatrix; }, [activeMatrix]);
+    const selectionSnapshotKeyRef = useRef<string | null>(null);
 
     const [editingCell, setEditingCell] = useState<{ rowId: string, colId: string } | null>(null);
     const [editingColumnSettings, setEditingColumnSettings] = useState<MatrixColumn | null>(null);
@@ -385,6 +388,61 @@ const MatrixView: React.FC<MatrixViewProps> = ({
     const [batchProgress, setBatchProgress] = useState<{ current: number, total: number } | null>(null);
     const stopBatchRef = useRef(false);
     const importInputRef = useRef<HTMLInputElement>(null);
+    const activeMatrixId = activeMatrix?.id;
+    const activeMatrixTitle = activeMatrix?.title;
+    const activeMatrixRows = activeMatrix?.rows;
+    const activeMatrixColumns = activeMatrix?.columns;
+    const editingRowId = editingCell?.rowId;
+    const editingColumnId = editingCell?.colId;
+
+    useEffect(() => {
+        if (!onSelectionSnapshotChange) return;
+        if (!activeMatrixId || !activeMatrixTitle || !activeMatrixRows || !activeMatrixColumns) {
+            if (selectionSnapshotKeyRef.current !== null) {
+                selectionSnapshotKeyRef.current = null;
+                onSelectionSnapshotChange(null);
+            }
+            return;
+        }
+
+        const snapshotKey = `${activeMatrixId}:${editingRowId ?? ''}:${editingColumnId ?? ''}`;
+        if (selectionSnapshotKeyRef.current === snapshotKey) return;
+        selectionSnapshotKeyRef.current = snapshotKey;
+
+        if (!editingRowId || !editingColumnId) {
+            onSelectionSnapshotChange({
+                matrixId: activeMatrixId,
+                matrixTitle: activeMatrixTitle
+            });
+            return;
+        }
+
+        const rowIndex = activeMatrixRows.findIndex(row => row.id === editingRowId);
+        const columnIndex = activeMatrixColumns.findIndex(column => column.id === editingColumnId);
+        const row = rowIndex >= 0 ? activeMatrixRows[rowIndex] : undefined;
+        const column = columnIndex >= 0 ? activeMatrixColumns[columnIndex] : undefined;
+        const cell = row?.cells?.[editingColumnId];
+
+        onSelectionSnapshotChange({
+            matrixId: activeMatrixId,
+            matrixTitle: activeMatrixTitle,
+            rowId: editingRowId,
+            columnId: editingColumnId,
+            rowIndex: rowIndex >= 0 ? rowIndex : undefined,
+            columnIndex: columnIndex >= 0 ? columnIndex : undefined,
+            rowName: row?.entityName,
+            columnTitle: column?.title,
+            cellValue: cell?.displayValue ?? cell?.value
+        });
+    }, [
+        activeMatrixId,
+        activeMatrixTitle,
+        activeMatrixRows,
+        activeMatrixColumns,
+        editingRowId,
+        editingColumnId,
+        onSelectionSnapshotChange
+    ]);
     
     // Batch Updates Logic
     const pendingUpdates = useRef<Map<string, MatrixRow>>(new Map());
