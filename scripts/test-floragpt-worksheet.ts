@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import type { Matrix } from '../types';
 import { buildWorksheetContextPack } from '../src/floragpt/worksheet/buildWorksheetContextPack.ts';
 import type { WorksheetSelectionSnapshot } from '../src/floragpt/worksheet/types.ts';
+import { buildEvidencePack } from '../src/floragpt/orchestrator/buildEvidencePack.ts';
 
 const makeMatrix = (rowsCount: number, colsCount: number): Matrix => {
   const columns = Array.from({ length: colsCount }, (_, idx) => ({
@@ -43,5 +44,16 @@ assert.ok(parsed.sampledRows.length <= 20);
 
 const cellValue = parsed.sampledRows[0].cells['Column 0'];
 assert.ok(String(cellValue).includes('truncated'));
+
+const evidencePack = await buildEvidencePack({
+  mode: 'suitability_scoring',
+  projectId: 'project-1',
+  query: 'worksheet context',
+  contextItems: [],
+  selectedDocs: [],
+  evidencePolicy: { includeGlobalKB: false, includeProjectEnvelope: false, includePolicyDocs: 'only_if_selected' },
+  worksheetContextHit: pack
+});
+assert.equal(evidencePack.projectHits[0].sourceId, 'worksheet:matrix-1');
 
 console.log('FloraGPT worksheet context pack tests passed.');

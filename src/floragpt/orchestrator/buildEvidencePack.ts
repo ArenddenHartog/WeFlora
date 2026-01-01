@@ -10,13 +10,21 @@ export const buildEvidencePack = async (args: {
   query: string;
   contextItems: ContextItem[];
   selectedDocs?: { sourceId: string; sourceType: string }[];
+  worksheetContextHit?: {
+    sourceId: string;
+    scope: string;
+    sourceType: 'worksheet';
+    title: string;
+    locationHint: string;
+    snippet: string;
+  } | null;
   evidencePolicy?: {
     includeProjectEnvelope: boolean;
     includeGlobalKB: boolean;
     includePolicyDocs: 'only_if_selected' | boolean;
   };
 }): Promise<EvidencePack> => {
-  const { mode, projectId, query, contextItems, selectedDocs, evidencePolicy } = args;
+  const { mode, projectId, query, contextItems, selectedDocs, evidencePolicy, worksheetContextHit } = args;
   const hasPolicySelection = Boolean(selectedDocs?.some((doc) => doc.sourceType === 'policy_manual'));
   const includePolicy = evidencePolicy?.includePolicyDocs === true ||
     (evidencePolicy?.includePolicyDocs === 'only_if_selected' && hasPolicySelection);
@@ -44,6 +52,17 @@ export const buildEvidencePack = async (args: {
   const scopedGlobal = compressedGlobal.filter((hit) => hit.scope === 'global');
   const scopedPolicy = compressedPolicy.filter((hit) => hit.scope === scopeProject);
 
+  const worksheetHit = worksheetContextHit && worksheetContextHit.scope === scopeProject
+    ? [{
+      sourceId: worksheetContextHit.sourceId,
+      sourceType: worksheetContextHit.sourceType,
+      title: worksheetContextHit.title,
+      locationHint: worksheetContextHit.locationHint,
+      snippet: worksheetContextHit.snippet,
+      scope: worksheetContextHit.scope
+    }]
+    : [];
+
   const dropped = compressedProject.length + compressedGlobal.length + compressedPolicy.length
     - (scopedProject.length + scopedGlobal.length + scopedPolicy.length);
   if (dropped > 0) {
@@ -55,7 +74,7 @@ export const buildEvidencePack = async (args: {
 
   return {
     globalHits: scopedGlobal,
-    projectHits: scopedProject,
+    projectHits: [...worksheetHit, ...scopedProject],
     policyHits: scopedPolicy
   };
 };

@@ -15,6 +15,10 @@ import FilePicker from './FilePicker';
 import { FILE_VALIDATION } from '../services/fileService';
 import { FEATURES } from '../src/config/features';
 import type { WorksheetSelectionSnapshot } from '../src/floragpt/worksheet/types';
+import { mapSelectedDocs } from '../src/floragpt/utils/mapSelectedDocs';
+import { buildWorksheetContextPack } from '../src/floragpt/worksheet/buildWorksheetContextPack';
+import { buildWorksheetWorkOrder } from '../src/floragpt/worksheet/buildWorksheetWorkOrder';
+import { buildEvidencePack } from '../src/floragpt/orchestrator/buildEvidencePack';
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -367,12 +371,36 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
                     <div className="flex items-center gap-1 mr-4">
                         {FEATURES.floragpt_worksheet_v0 && (
                             <button
-                                onClick={() => {
-                                    if (selectionSnapshot) {
-                                        console.debug('[floragpt:worksheet] selection snapshot ready', selectionSnapshot);
-                                    } else {
-                                        console.debug('[floragpt:worksheet] no selection snapshot');
-                                    }
+                                onClick={async () => {
+                                    if (!activeMatrix) return;
+                                    const projectId = worksheetDoc.projectId || 'project';
+                                    const selectedDocs = mapSelectedDocs(
+                                        [{ id: `ctx-${activeMatrix.id}`, name: activeMatrix.title, source: 'worksheet', projectId }],
+                                        projectId
+                                    );
+                                    const workOrder = buildWorksheetWorkOrder({
+                                        actionType: 'score_suitability',
+                                        projectId,
+                                        worksheetId: activeMatrix.id,
+                                        selection: selectionSnapshot,
+                                        selectedDocs
+                                    });
+                                    const worksheetHit = buildWorksheetContextPack({
+                                        matrix: activeMatrix,
+                                        selection: selectionSnapshot,
+                                        projectId
+                                    });
+                                    const evidencePack = await buildEvidencePack({
+                                        mode: workOrder.mode,
+                                        projectId,
+                                        query: workOrder.userQuery,
+                                        contextItems: [],
+                                        selectedDocs,
+                                        evidencePolicy: workOrder.evidencePolicy,
+                                        worksheetContextHit: worksheetHit
+                                    });
+                                    console.debug('[floragpt:worksheet] workorder ready', workOrder);
+                                    console.debug('[floragpt:worksheet] evidence pack ready', evidencePack);
                                 }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border bg-white border-transparent text-slate-500 hover:bg-slate-50"
                                 title="FloraGPT actions (coming soon)"
