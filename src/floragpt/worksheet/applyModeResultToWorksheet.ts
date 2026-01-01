@@ -141,3 +141,9 @@ export const applyModeResultToWorksheet = (args: {
 
   return { ...matrix, columns, rows };
 };
+
+export const __test__ = {
+  normalizeTitle,
+  slugify,
+  buildStableColumnId
+};
