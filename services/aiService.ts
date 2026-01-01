@@ -1020,6 +1020,27 @@ ${history}
       return { text: fullText, grounding: lastGrounding };
   }
 
+  async generateFloraGPTResponse(args: {
+      systemInstruction: string;
+      userPayload: unknown;
+      model?: string;
+  }): Promise<string> {
+      const { systemInstruction, userPayload, model = 'gemini-2.5-flash' } = args;
+      try {
+          const response = await ai.models.generateContent({
+              model,
+              contents: {
+                  parts: [{ text: JSON.stringify(userPayload) }]
+              },
+              config: { systemInstruction }
+          });
+          return response.text?.trim() || '';
+      } catch (e) {
+          console.error("FloraGPT generation failed:", e);
+          return '';
+      }
+  }
+
   async runAICell(prompt: string, contextFiles: File[] = [], globalContext?: string): Promise<string> {
        try {
            const parts: any[] = [];
