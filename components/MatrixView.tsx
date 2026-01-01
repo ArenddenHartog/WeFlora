@@ -17,6 +17,7 @@ import { MessageRenderer } from './MessageRenderer';
 import { useUI } from '../contexts/UIContext';
 import { SKILL_TEMPLATES } from '../services/skillTemplates';
 import type { SkillRowContext } from '../services/skills/types';
+import type { WorksheetSelectionSnapshot } from '../src/floragpt/worksheet/types';
 
 interface MatrixViewProps {
     matrices: Matrix[];
@@ -38,6 +39,7 @@ interface MatrixViewProps {
     projectContext?: string; // New prop for global context awareness
     onUpload?: (files: File[]) => void;
     onResolveFile?: (fileId: string) => Promise<File | null>; // NEW: File resolver
+    onSelectionSnapshotChange?: (snapshot: WorksheetSelectionSnapshot) => void;
 }
 
 // --- Constants ---
@@ -366,7 +368,8 @@ const MatrixView: React.FC<MatrixViewProps> = ({
     matrices, activeId, onActiveIdChange, 
     onUpdateMatrix, onCreateMatrix, onDeleteMatrix, onInspectEntity, 
     onRunAICell, onAnalyze, onOpenWizard, onClose, onOpenManage, hideToolbar,
-    speciesList = [], projectFiles = [], projectContext, onUpload, onResolveFile
+    speciesList = [], projectFiles = [], projectContext, onUpload, onResolveFile,
+    onSelectionSnapshotChange
 }) => {
     const { openEvidencePanel } = useUI();
     const activeMatrix = matrices.find(m => m.id === activeId);
@@ -388,6 +391,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
     
     // Batch Updates Logic
     const pendingUpdates = useRef<Map<string, MatrixRow>>(new Map());
+    const selectionSnapshotKeyRef = useRef<string | null>(null);
     
     // Flush queued updates to the main state (simple debounce/batching)
     const flushUpdates = useCallback(() => {
@@ -420,6 +424,20 @@ const MatrixView: React.FC<MatrixViewProps> = ({
             return () => resizeObserver.disconnect();
         }
     }, []);
+
+    useEffect(() => {
+        if (!onSelectionSnapshotChange || !activeMatrix) return;
+        const snapshot: WorksheetSelectionSnapshot = {
+            matrixId: activeMatrix.id,
+            selectedRowIds: [],
+            selectedColumnIds: [],
+            activeCell: editingCell ? { rowId: editingCell.rowId, columnId: editingCell.colId } : undefined
+        };
+        const nextKey = JSON.stringify(snapshot);
+        if (selectionSnapshotKeyRef.current === nextKey) return;
+        selectionSnapshotKeyRef.current = nextKey;
+        onSelectionSnapshotChange(snapshot);
+    }, [onSelectionSnapshotChange, activeMatrix?.id, editingCell?.rowId, editingCell?.colId]);
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => { setScrollTop(e.currentTarget.scrollTop); };
     

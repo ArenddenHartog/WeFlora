@@ -13,6 +13,8 @@ import { ResizablePanel } from './ResizablePanel';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import FilePicker from './FilePicker';
 import { FILE_VALIDATION } from '../services/fileService';
+import { FEATURES } from '../src/config/features';
+import type { WorksheetSelectionSnapshot } from '../src/floragpt/worksheet/types';
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -95,6 +97,7 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
     // UI State for toggles
     const [isBookmarked, setIsBookmarked] = useState(false);
     const [pendingDeleteTabId, setPendingDeleteTabId] = useState<string | null>(null);
+    const [selectionSnapshot, setSelectionSnapshot] = useState<WorksheetSelectionSnapshot | null>(null);
 
     useEffect(() => {
         onActiveTabChange?.(activeTabId);
@@ -362,6 +365,21 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
 
                 <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1 mr-4">
+                        {FEATURES.floragpt_worksheet_v0 && (
+                            <button
+                                onClick={() => {
+                                    if (selectionSnapshot) {
+                                        console.debug('[floragpt:worksheet] selection snapshot ready', selectionSnapshot);
+                                    } else {
+                                        console.debug('[floragpt:worksheet] no selection snapshot');
+                                    }
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border bg-white border-transparent text-slate-500 hover:bg-slate-50"
+                                title="FloraGPT actions (coming soon)"
+                            >
+                                <SparklesIcon className="h-4 w-4" /> FloraGPT
+                            </button>
+                        )}
                         <button 
                             onClick={() => setIsAnalyticsOpen(!isAnalyticsOpen)} 
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${isAnalyticsOpen ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark' : 'bg-white border-transparent text-slate-500 hover:bg-slate-50'}`}
@@ -427,6 +445,7 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
                     projectContext={projectContext}
                     onResolveFile={onResolveFile}
                     onInspectEntity={onInspectEntity}
+                    onSelectionSnapshotChange={FEATURES.floragpt_worksheet_v0 ? setSelectionSnapshot : undefined}
                 />
             </div>
 
