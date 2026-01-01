@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import type { 
     PinnedProject, Chat, ProjectFile, Matrix, Report, 
-    ChatMessage, DiscoveredStructure, MatrixColumn
+    ChatMessage, DiscoveredStructure, FloraGPTResponseEnvelope
 } from '../types';
 import GlobalWorkspace from './GlobalWorkspace';
 import ProjectWorkspace from './ProjectWorkspace';
@@ -90,6 +90,132 @@ const MainContent: React.FC<MainContentProps> = ({
         return await createReport(reportWithProject);
     };
 
+    const buildMatrixFromFloraGPT = (payload: FloraGPTResponseEnvelope, citationsText: string): Matrix | null => {
+        if (payload.responseType !== 'answer') return null;
+
+        const now = Date.now();
+        const makeColumns = (titles: string[]) =>
+            titles.map((title, idx) => ({
+                id: `col-flora-${idx}-${now}`,
+                title,
+                type: 'text' as const,
+                width: idx === 0 ? 220 : 180,
+                isPrimaryKey: idx === 0
+            }));
+
+        if (payload.mode === 'general_research') {
+            if (payload.tables && payload.tables.length > 0) {
+                const table = payload.tables[0];
+                const columns = makeColumns(table.columns);
+                const rows = table.rows.map((row, idx) => {
+                    const cells: Record<string, { columnId: string; value: string }> = {};
+                    columns.forEach((col, colIdx) => {
+                        cells[col.id] = { columnId: col.id, value: row[colIdx] ?? '' };
+                    });
+                    return { id: `row-flora-${now}-${idx}`, cells };
+                });
+                return {
+                    id: `mtx-chat-${now}`,
+                    title: 'FloraGPT Research',
+                    description: 'Generated from FloraGPT',
+                    columns,
+                    rows
+                };
+            }
+
+            const columns = makeColumns(['Summary', 'Highlights', 'Citations']);
+            const highlights = Array.isArray(payload.data.highlights) ? payload.data.highlights.join('; ') : '';
+            const rows = [
+                {
+                    id: `row-flora-${now}-0`,
+                    cells: {
+                        [columns[0].id]: { columnId: columns[0].id, value: payload.data.summary || '' },
+                        [columns[1].id]: { columnId: columns[1].id, value: highlights },
+                        [columns[2].id]: { columnId: columns[2].id, value: citationsText }
+                    }
+                }
+            ];
+            return {
+                id: `mtx-chat-${now}`,
+                title: 'FloraGPT Research',
+                description: 'Generated from FloraGPT',
+                columns,
+                rows
+            };
+        }
+
+        if (payload.mode === 'suitability_scoring') {
+            const columns = makeColumns(['Name', 'Suitability_Score', 'Risk_Flags', 'Rationale', 'Citations']);
+            const results = Array.isArray(payload.data.results) ? payload.data.results : [];
+            const rows = results.map((result: any, idx: number) => ({
+                id: `row-flora-${now}-${idx}`,
+                cells: {
+                    [columns[0].id]: { columnId: columns[0].id, value: result.name ?? '' },
+                    [columns[1].id]: { columnId: columns[1].id, value: String(result.score ?? '') },
+                    [columns[2].id]: { columnId: columns[2].id, value: Array.isArray(result.riskFlags) ? result.riskFlags.join('; ') : '' },
+                    [columns[3].id]: { columnId: columns[3].id, value: result.rationale ?? '' },
+                    [columns[4].id]: { columnId: columns[4].id, value: Array.isArray(result.citations) && result.citations.length > 0 ? result.citations.join('; ') : citationsText }
+                }
+            }));
+            return {
+                id: `mtx-chat-${now}`,
+                title: 'FloraGPT Suitability',
+                description: 'Generated from FloraGPT',
+                columns,
+                rows
+            };
+        }
+
+        if (payload.mode === 'spec_writer') {
+            const columns = makeColumns(['Spec_Title', 'Field', 'Value', 'Assumptions', 'Citations']);
+            const assumptions = Array.isArray(payload.data.assumptions) ? payload.data.assumptions.join('; ') : '';
+            const fields = Array.isArray(payload.data.specFields) ? payload.data.specFields : [];
+            const rows = fields.map((field: any, idx: number) => ({
+                id: `row-flora-${now}-${idx}`,
+                cells: {
+                    [columns[0].id]: { columnId: columns[0].id, value: payload.data.specTitle ?? '' },
+                    [columns[1].id]: { columnId: columns[1].id, value: field.label ?? '' },
+                    [columns[2].id]: { columnId: columns[2].id, value: field.value ?? '' },
+                    [columns[3].id]: { columnId: columns[3].id, value: assumptions },
+                    [columns[4].id]: { columnId: columns[4].id, value: Array.isArray(payload.data.citations) && payload.data.citations.length > 0 ? payload.data.citations.join('; ') : citationsText }
+                }
+            }));
+            return {
+                id: `mtx-chat-${now}`,
+                title: payload.data.specTitle || 'FloraGPT Spec',
+                description: 'Generated from FloraGPT',
+                columns,
+                rows
+            };
+        }
+
+        if (payload.mode === 'policy_compliance') {
+            const columns = makeColumns(['Compliance_Status', 'Issues', 'Citations']);
+            const issues = Array.isArray(payload.data.issues)
+                ? payload.data.issues.map((issue: any) => issue.issue).filter(Boolean).join('; ')
+                : '';
+            const rows = [
+                {
+                    id: `row-flora-${now}-0`,
+                    cells: {
+                        [columns[0].id]: { columnId: columns[0].id, value: payload.data.status ?? '' },
+                        [columns[1].id]: { columnId: columns[1].id, value: issues },
+                        [columns[2].id]: { columnId: columns[2].id, value: Array.isArray(payload.data.citations) && payload.data.citations.length > 0 ? payload.data.citations.join('; ') : citationsText }
+                    }
+                }
+            ];
+            return {
+                id: `mtx-chat-${now}`,
+                title: 'FloraGPT Compliance',
+                description: 'Generated from FloraGPT',
+                columns,
+                rows
+            };
+        }
+
+        return null;
+    };
+
     // --- Modal Logic (using UI Context state) ---
     
     const [destMode, setDestMode] = useState<'general' | 'project' | 'new'>('general');
@@ -172,7 +298,11 @@ const MainContent: React.FC<MainContentProps> = ({
         } else {
             setIsExtracting(true);
             try {
-                const result = await aiService.structureTextAsMatrix(message.text, { runSpeciesCorrectionPass });
+                const citationsText = Array.isArray(message.citations) && message.citations.length > 0
+                    ? message.citations.map(c => c.sourceId || c.source).join('; ')
+                    : '';
+                const floraMatrix = message.floraGPT ? buildMatrixFromFloraGPT(message.floraGPT, citationsText) : null;
+                const result = floraMatrix ?? await aiService.structureTextAsMatrix(message.text, { runSpeciesCorrectionPass });
 
                 // Append mode: only when in standalone worksheet editor AND the user chose General Library.
                 if (appendTargetMatrixId && destination.type === 'standalone') {

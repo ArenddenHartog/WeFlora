@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import type { WorksheetDocument, Matrix, MatrixColumn, Species, ProjectFile, MatrixCell } from '../types';
+import type { WorksheetDocument, Matrix, MatrixColumn, Species, ProjectFile, MatrixCell, ContextItem } from '../types';
 import MatrixView from './MatrixView';
 import { 
     TableIcon, PlusIcon, PencilIcon, CheckIcon, XIcon, MoreHorizontalIcon,
@@ -13,6 +13,17 @@ import { ResizablePanel } from './ResizablePanel';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import FilePicker from './FilePicker';
 import { FILE_VALIDATION } from '../services/fileService';
+import { FEATURES } from '../src/config/features';
+import type { WorksheetSelectionSnapshot } from '../src/floragpt/worksheet/types';
+import { mapSelectedDocs } from '../src/floragpt/utils/mapSelectedDocs';
+import { buildWorksheetContextPack } from '../src/floragpt/worksheet/buildWorksheetContextPack';
+import { buildWorksheetWorkOrder } from '../src/floragpt/worksheet/buildWorksheetWorkOrder';
+import { buildEvidencePack } from '../src/floragpt/orchestrator/buildEvidencePack';
+import { runMode } from '../src/floragpt/orchestrator/runMode';
+import { aiService } from '../services/aiService';
+import { applyModeResultToWorksheet } from '../src/floragpt/worksheet/applyModeResultToWorksheet';
+import { logFloraGPTSchemaAttempt } from '../src/floragpt/utils/logFloraGPT';
+import { extractReferencedSourceIds } from '../src/floragpt/utils/extractReferencedSourceIds';
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -95,6 +106,9 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
     // UI State for toggles
     const [isBookmarked, setIsBookmarked] = useState(false);
     const [pendingDeleteTabId, setPendingDeleteTabId] = useState<string | null>(null);
+    const [selectionSnapshot, setSelectionSnapshot] = useState<WorksheetSelectionSnapshot | null>(null);
+    const [isFloraMenuOpen, setIsFloraMenuOpen] = useState(false);
+    const [isFloraRunning, setIsFloraRunning] = useState(false);
 
     useEffect(() => {
         onActiveTabChange?.(activeTabId);
@@ -339,6 +353,120 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
         setIsDownloadMenuOpen(false);
     };
 
+    const runWorksheetAction = async (actionType: 'score_suitability' | 'write_spec' | 'check_policy') => {
+        if (!activeMatrix) return;
+        if (isFloraRunning) return;
+
+        const projectId = worksheetDoc.projectId || 'project';
+        const selection = selectionSnapshot && selectionSnapshot.matrixId === activeMatrix.id
+            ? selectionSnapshot
+            : null;
+        const targetRowIds = selection?.selectedRowIds?.length
+            ? activeMatrix.rows.filter((row) => selection.selectedRowIds.includes(row.id)).map((row) => row.id)
+            : selection?.activeCell?.rowId
+                ? [selection.activeCell.rowId]
+                : activeMatrix.rows.map((row) => row.id);
+
+        if (targetRowIds.length === 0) {
+            showNotification('No rows available to update.', 'error');
+            return;
+        }
+
+        setIsFloraRunning(true);
+        setIsFloraMenuOpen(false);
+
+        try {
+            const contextItems: ContextItem[] = [];
+            const selectedDocs = mapSelectedDocs(contextItems, projectId);
+            const workOrder = buildWorksheetWorkOrder({
+                actionType,
+                projectId,
+                worksheetId: activeMatrix.id,
+                selection,
+                selectedDocs
+            });
+
+            const worksheetContextHit = buildWorksheetContextPack({
+                matrix: activeMatrix,
+                selection,
+                projectId
+            });
+
+            const evidencePack = await buildEvidencePack({
+                mode: workOrder.mode,
+                projectId: workOrder.projectId,
+                query: workOrder.userQuery,
+                contextItems,
+                selectedDocs: workOrder.selectedDocs,
+                evidencePolicy: workOrder.evidencePolicy,
+                worksheetContextHit
+            });
+
+            const floraResult = await runMode({
+                workOrder,
+                evidencePack,
+                aiService
+            });
+
+            if (!floraResult.ok || !floraResult.payload) {
+                logFloraGPTSchemaAttempt({
+                    projectId: workOrder.projectId,
+                    mode: workOrder.mode,
+                    schemaVersionExpected: workOrder.schemaVersion,
+                    schemaVersionReceived: floraResult.schemaVersionReceived ?? null,
+                    evidenceCounts: {
+                        global: evidencePack.globalHits.length,
+                        project: evidencePack.projectHits.length,
+                        policy: evidencePack.policyHits.length
+                    },
+                    citationsCount: 0,
+                    validationPassed: false,
+                    repairAttempted: floraResult.repairAttempted,
+                    fallbackUsed: true,
+                    failureReason: floraResult.failureReason ?? 'schema-pipeline-failed'
+                });
+                showNotification('FloraGPT action failed. Try again.', 'error');
+                return;
+            }
+
+            const referencedIds = extractReferencedSourceIds(floraResult.payload);
+            logFloraGPTSchemaAttempt({
+                projectId: workOrder.projectId,
+                mode: workOrder.mode,
+                schemaVersionExpected: workOrder.schemaVersion,
+                schemaVersionReceived: floraResult.schemaVersionReceived ?? null,
+                evidenceCounts: {
+                    global: evidencePack.globalHits.length,
+                    project: evidencePack.projectHits.length,
+                    policy: evidencePack.policyHits.length
+                },
+                citationsCount: referencedIds.length,
+                validationPassed: true,
+                repairAttempted: floraResult.repairAttempted,
+                fallbackUsed: false,
+                failureReason: floraResult.failureReason ?? null
+            });
+
+            if (floraResult.payload.responseType !== 'answer') {
+                showNotification('FloraGPT needs more detail before updating the worksheet.', 'error');
+                return;
+            }
+
+            const updatedMatrix = applyModeResultToWorksheet({
+                matrix: activeMatrix,
+                targetRowIds,
+                payload: floraResult.payload
+            });
+            handleMatrixUpdate(updatedMatrix);
+            showNotification('Worksheet updated with FloraGPT results.');
+        } catch (error) {
+            console.error('[floragpt:worksheet]', error);
+            showNotification('FloraGPT action failed. Try again.', 'error');
+        } finally {
+            setIsFloraRunning(false);
+        }
+    };
+
     if (!activeMatrix) return <div className="p-10 text-center text-slate-400">No sheets available.</div>;
 
     return (
@@ -362,6 +490,43 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
 
                 <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1 mr-4">
+                        {FEATURES.floragpt_worksheet_v0 && (
+                            <div className="relative">
+                                <button
+                                    onClick={() => setIsFloraMenuOpen((prev) => !prev)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border bg-white border-transparent text-slate-500 hover:bg-slate-50"
+                                    title="FloraGPT actions"
+                                    disabled={isFloraRunning}
+                                >
+                                    <SparklesIcon className="h-4 w-4" /> FloraGPT
+                                </button>
+                                {isFloraMenuOpen && (
+                                    <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 z-[100] animate-fadeIn overflow-hidden">
+                                        <button
+                                            className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                                            onClick={() => runWorksheetAction('score_suitability')}
+                                            disabled={isFloraRunning}
+                                        >
+                                            Score Suitability
+                                        </button>
+                                        <button
+                                            className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                                            onClick={() => runWorksheetAction('write_spec')}
+                                            disabled={isFloraRunning}
+                                        >
+                                            Write Spec
+                                        </button>
+                                        <button
+                                            className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50"
+                                            onClick={() => runWorksheetAction('check_policy')}
+                                            disabled={isFloraRunning}
+                                        >
+                                            Check Policy
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         <button 
                             onClick={() => setIsAnalyticsOpen(!isAnalyticsOpen)} 
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${isAnalyticsOpen ? 'bg-weflora-mint/20 border-weflora-teal text-weflora-dark' : 'bg-white border-transparent text-slate-500 hover:bg-slate-50'}`}
@@ -427,6 +592,7 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
                     projectContext={projectContext}
                     onResolveFile={onResolveFile}
                     onInspectEntity={onInspectEntity}
+                    onSelectionSnapshotChange={FEATURES.floragpt_worksheet_v0 ? setSelectionSnapshot : undefined}
                 />
             </div>
 
