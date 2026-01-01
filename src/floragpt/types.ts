@@ -4,11 +4,11 @@ export type WorkOrderViewContext = 'chat' | 'worksheet' | 'report';
 
 export interface WorkOrder {
   mode: FloraGPTMode;
-  schemaVersion: 'v0.1';
+  schemaVersion: 'v0.1' | 'v0.2';
   projectId: string;
   privateEnvelopeId: string | null;
   userQuery: string;
-  userLanguage: 'auto';
+  userLanguage: 'auto' | 'en' | 'nl';
   responseMode: 'short' | 'enriched';
   viewContext: WorkOrderViewContext;
   uiAction?: string | null;

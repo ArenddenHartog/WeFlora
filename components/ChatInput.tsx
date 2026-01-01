@@ -16,10 +16,11 @@ import { FILE_VALIDATION } from '../services/fileService';
 
 interface ChatInputProps {
     // Logic Props
-    onSend?: (text: string, files?: File[], instructions?: string, model?: string, contextItems?: ContextItem[], enableThinking?: boolean) => void;
+    onSend?: (text: string, files?: File[], instructions?: string, model?: string, contextItems?: ContextItem[], enableThinking?: boolean, outputLanguage?: 'auto' | 'en' | 'nl') => void;
     isLoading?: boolean;
     draftKey?: string;
     initialContextItems?: ContextItem[];
+    languageKey?: string;
     
     // Scoping Prop
     contextProjectId?: string; // If provided, limits context to this project. If null, global.
@@ -33,7 +34,7 @@ interface ChatInputProps {
 type ResponseMode = 'chat' | 'table' | 'report';
 
 const ChatInput: React.FC<ChatInputProps> = ({ 
-    onSend, isLoading, onFileClick, onRemoveContextFile, draftKey, initialContextItems, contextProjectId 
+    onSend, isLoading, onFileClick, onRemoveContextFile, draftKey, initialContextItems, contextProjectId, languageKey
 }) => {
     // -- Data Access via Hooks (Dependency Injection) --
     const { files: allFiles, matrices: allMatrices, reports: allReports, uploadProjectFile } = useProject();
@@ -74,6 +75,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     const [responseMode, setResponseMode] = useState<ResponseMode>('chat');
     const [userHasSelectedMode, setUserHasSelectedMode] = useState(false);
     const [autoSwitched, setAutoSwitched] = useState(false);
+    const [outputLanguage, setOutputLanguage] = useState<'auto' | 'en' | 'nl'>('auto');
     
     const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
 
@@ -103,6 +105,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
         }
     }, [draftKey]);
 
+    useEffect(() => {
+        if (!languageKey) return;
+        const saved = localStorage.getItem(languageKey);
+        if (saved === 'auto' || saved === 'en' || saved === 'nl') {
+            setOutputLanguage(saved);
+        }
+    }, [languageKey]);
+
     // Allow external prefill (e.g. GlobalTopBar escalation) without remount/reload.
     useEffect(() => {
         if (!draftKey) return;
@@ -123,6 +133,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
     useEffect(() => {
         if (draftKey) localStorage.setItem(draftKey, text);
     }, [text, draftKey]);
+
+    useEffect(() => {
+        if (!languageKey) return;
+        localStorage.setItem(languageKey, outputLanguage);
+    }, [languageKey, outputLanguage]);
 
     // Clear system instruction if text is cleared manually
     useEffect(() => {
@@ -259,7 +274,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 finalInstructions += `\n\n${outputFormatInstruction}`;
             }
 
-            onSend(text, files.length > 0 ? files : undefined, finalInstructions, undefined, activeContext, isReasoningEnabled);
+            onSend(text, files.length > 0 ? files : undefined, finalInstructions, undefined, activeContext, isReasoningEnabled, outputLanguage);
             
             if (draftKey) localStorage.removeItem(draftKey);
             setText('');
@@ -433,6 +448,20 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     <div className="w-px h-4 bg-slate-300 mx-1"></div>
                     <button onClick={() => setIsDeepResearchEnabled(!isDeepResearchEnabled)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isDeepResearchEnabled ? 'bg-weflora-mint/20 text-weflora-dark' : 'text-slate-500 hover:bg-weflora-mint/10 hover:text-weflora-teal'}`} title="Enable Web Search"><GlobeIcon className="h-3.5 w-3.5" /> Research</button>
                     <button onClick={() => setIsReasoningEnabled(!isReasoningEnabled)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isReasoningEnabled ? 'bg-weflora-teal/20 text-weflora-dark' : 'text-slate-500 hover:bg-weflora-teal/10 hover:text-weflora-dark'}`} title="Enable Complex Reasoning"><SparklesIcon className="h-3.5 w-3.5" /> Think</button>
+                    <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                        <span className="hidden sm:inline">Output</span>
+                        <select
+                            value={outputLanguage}
+                            onChange={(e) => setOutputLanguage(e.target.value as 'auto' | 'en' | 'nl')}
+                            className="text-xs font-bold px-2 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-weflora-teal/30"
+                            title="Output language"
+                        >
+                            <option value="auto">Auto</option>
+                            <option value="en">English</option>
+                            <option value="nl">Dutch</option>
+                        </select>
+                    </div>
                     <div className="w-px h-4 bg-slate-300 mx-1"></div>
                     <button ref={templateButtonRef} onClick={() => setIsTemplatePickerOpen(!isTemplatePickerOpen)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isTemplatePickerOpen ? 'bg-weflora-mint/20 text-weflora-dark' : 'text-slate-500 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Prompts"><ChatBubbleIcon className="h-3.5 w-3.5" /> Prompts</button>
                 </div>

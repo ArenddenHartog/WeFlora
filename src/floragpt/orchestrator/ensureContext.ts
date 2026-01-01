@@ -7,34 +7,58 @@ const MOISTURE_RE = /\b(wet|moist|dry|drainage)\b/i;
 const PLANT_TYPE_RE = /\b(tree|shrub|perennial|grass|groundcover|hedge)\b/i;
 
 export const ensureContext = (workOrder: WorkOrder): FloraGPTResponseEnvelope | null => {
-  const { mode, userQuery, selectedDocs } = workOrder;
+  const { mode, userQuery, selectedDocs, userLanguage, schemaVersion } = workOrder;
+  const meta = { schema_version: schemaVersion };
+  const language = userLanguage === 'nl' ? 'nl' : 'en';
 
   if (mode === 'policy_compliance') {
     const hasPolicyDocs = Boolean(selectedDocs?.some((doc) => doc.type === 'policy_manual'));
     if (!hasPolicyDocs) {
       return {
-        schemaVersion: 'v0.1',
+        schemaVersion,
+        meta,
         mode,
         responseType: 'answer',
         data: {
           status: 'Unknown',
-          message: 'No policy documents selected. Please attach a policy manual to evaluate compliance.'
+          message: language === 'nl'
+            ? 'Geen beleidsdocumenten geselecteerd. Voeg een beleidsdocument toe om naleving te beoordelen.'
+            : 'No policy documents selected. Please attach a policy manual to evaluate compliance.'
         }
       };
     }
   }
 
   if (mode === 'general_research') {
-    if (userQuery.trim().length < 5) {
+    const needsSite = !SITE_TYPE_RE.test(userQuery);
+    const needsGoal = !/\b(biodiversity|biodiversiteit|drought|droogte|shade|schaduw|storm|street|straat|cooling|koeling|habitat|pollinator|water)\b/i.test(userQuery);
+    const needsConstraints = !/\b(soil|ground|bodem|sun|zon|shade|schaduw|space|ruimte|moisture|vocht|drainage|root)\b/i.test(userQuery);
+    const questions: string[] = [];
+
+    if (needsSite) {
+      questions.push(language === 'nl'
+        ? 'Welke locatiecontext geldt (bijv. straat, park, plein, binnenhof)?'
+        : 'Which site context applies (e.g., street, park, square, courtyard)?');
+    }
+    if (needsGoal) {
+      questions.push(language === 'nl'
+        ? 'Wat is het doel (bijv. biodiversiteit, droogtetolerantie, schaduw, stadskoeling)?'
+        : 'What is the primary goal (e.g., biodiversity, drought tolerance, shade, cooling)?');
+    }
+    if (needsConstraints) {
+      questions.push(language === 'nl'
+        ? 'Zijn er beperkingen zoals bodemtype, licht, ruimte of vocht?'
+        : 'Any constraints like soil type, light, space, or moisture?');
+    }
+
+    if (questions.length > 0) {
       return {
-        schemaVersion: 'v0.1',
+        schemaVersion,
+        meta,
         mode,
         responseType: 'clarifying_questions',
         data: {
-          questions: [
-            'Which plant species or category should I focus on?',
-            'What site context should I assume (e.g., street, park, courtyard)?'
-          ]
+          questions: questions.slice(0, 3)
         }
       };
     }
@@ -46,14 +70,20 @@ export const ensureContext = (workOrder: WorkOrder): FloraGPTResponseEnvelope | 
     const hasSoil = SOIL_RE.test(userQuery) || MOISTURE_RE.test(userQuery);
     if (!hasSite || !hasSoil) {
       return {
-        schemaVersion: 'v0.1',
+        schemaVersion,
+        meta,
         mode,
         responseType: 'clarifying_questions',
         data: {
-          questions: [
-            'What is the site type (e.g., street, park, courtyard)?',
-            'What are the soil or moisture conditions?'
-          ]
+          questions: language === 'nl'
+            ? [
+                'Wat is het type locatie (bijv. straat, park, binnenhof)?',
+                'Wat zijn de bodem- of vochtcondities?'
+              ]
+            : [
+                'What is the site type (e.g., street, park, courtyard)?',
+                'What are the soil or moisture conditions?'
+              ]
         }
       };
     }
@@ -64,14 +94,20 @@ export const ensureContext = (workOrder: WorkOrder): FloraGPTResponseEnvelope | 
     const hasSite = SITE_TYPE_RE.test(userQuery);
     if (!hasPlantType || !hasSite) {
       return {
-        schemaVersion: 'v0.1',
+        schemaVersion,
+        meta,
         mode,
         responseType: 'clarifying_questions',
         data: {
-          questions: [
-            'What plant type or species should the specification cover?',
-            'What site context should the specification assume?'
-          ]
+          questions: language === 'nl'
+            ? [
+                'Welke plantsoort of soort moet de specificatie omvatten?',
+                'Welke locatiecontext geldt voor de specificatie?'
+              ]
+            : [
+                'What plant type or species should the specification cover?',
+                'What site context should the specification assume?'
+              ]
         }
       };
     }

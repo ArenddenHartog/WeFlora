@@ -241,7 +241,11 @@ export interface FloraGPTTable {
 }
 
 export interface FloraGPTResponseEnvelope {
-  schemaVersion: 'v0.1';
+  schemaVersion: 'v0.1' | 'v0.2';
+  meta?: {
+    schema_version: 'v0.1' | 'v0.2';
+    sources_used?: Array<{ source_id: string }>;
+  };
   mode: FloraGPTMode;
   responseType: FloraGPTResponseType;
   data: Record<string, any>;

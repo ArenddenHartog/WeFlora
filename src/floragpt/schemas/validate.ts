@@ -8,13 +8,17 @@ export type ValidationResult = {
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 
-const validateCommon = (payload: FloraGPTResponseEnvelope, mode: FloraGPTMode): string[] => {
+const validateCommon = (
+  payload: FloraGPTResponseEnvelope,
+  mode: FloraGPTMode,
+  schemaVersion: 'v0.1' | 'v0.2'
+): string[] => {
   const errors: string[] = [];
-  if (payload.schemaVersion !== 'v0.1') errors.push('schemaVersion must be v0.1');
+  if (payload.schemaVersion !== schemaVersion) errors.push(`schemaVersion must be ${schemaVersion}`);
   if (!payload.meta?.schema_version) {
     errors.push('meta.schema_version is required');
-  } else if (payload.meta.schema_version !== 'v0.1') {
-    errors.push('meta.schema_version must be v0.1');
+  } else if (payload.meta.schema_version !== schemaVersion) {
+    errors.push(`meta.schema_version must be ${schemaVersion}`);
   }
   if (payload.mode !== mode) errors.push('mode mismatch');
   if (!['answer', 'clarifying_questions', 'error'].includes(payload.responseType)) {
@@ -30,7 +34,8 @@ export const validateFloraGPTPayload = (mode: FloraGPTMode, payload: unknown): V
   }
 
   const envelope = payload as FloraGPTResponseEnvelope;
-  const errors = validateCommon(envelope, mode);
+  const schemaVersion = envelope.schemaVersion === 'v0.2' && mode === 'general_research' ? 'v0.2' : 'v0.1';
+  const errors = validateCommon(envelope, mode, schemaVersion);
 
   if (envelope.responseType === 'clarifying_questions') {
     if (!isStringArray(envelope.data?.questions) || envelope.data.questions.length === 0) {
@@ -41,6 +46,12 @@ export const validateFloraGPTPayload = (mode: FloraGPTMode, payload: unknown): V
   if (envelope.responseType === 'answer') {
     if (mode === 'general_research') {
       if (typeof envelope.data?.summary !== 'string') errors.push('summary is required');
+      if (schemaVersion === 'v0.2') {
+        const reasoning = envelope.data?.reasoning_summary;
+        if (!Array.isArray(reasoning?.approach) || reasoning.approach.length === 0) {
+          errors.push('reasoning_summary.approach is required');
+        }
+      }
     }
     if (mode === 'suitability_scoring') {
       const results = envelope.data?.results;

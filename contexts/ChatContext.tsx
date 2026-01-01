@@ -18,6 +18,7 @@ import { buildCitationsFromEvidencePack } from '../src/floragpt/orchestrator/bui
 import { logFloraGPTSchemaAttempt } from '../src/floragpt/utils/logFloraGPT';
 import { mapSelectedDocs } from '../src/floragpt/utils/mapSelectedDocs';
 import { extractReferencedSourceIds } from '../src/floragpt/utils/extractReferencedSourceIds';
+import { detectOutputLanguage } from '../src/floragpt/utils/detectLanguage';
 
 interface ChatContextType {
     chats: { [projectId: string]: Chat[] };
@@ -33,7 +34,7 @@ interface ChatContextType {
     // Main Chat Actions
     createThread: (initialMessage: string, contextSnapshot?: ContextItem[]) => Promise<string>;
     addMessageToThread: (threadId: string, message: ChatMessage) => void;
-    sendMessage: (text: string, files?: File[], instructions?: string, model?: string, contextItems?: ContextItem[], viewMode?: string, enableThinking?: boolean, forceNewChat?: boolean) => Promise<void>;
+    sendMessage: (text: string, files?: File[], instructions?: string, model?: string, contextItems?: ContextItem[], viewMode?: string, enableThinking?: boolean, forceNewChat?: boolean, outputLanguage?: 'auto' | 'en' | 'nl') => Promise<void>;
     togglePinThread: (threadId: string) => void;
     deleteThread: (threadId: string) => void;
 
@@ -218,7 +219,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         contextItems?: ContextItem[], 
         viewMode?: string, 
         enableThinking?: boolean,
-        forceNewChat?: boolean
+        forceNewChat?: boolean,
+        outputLanguage: 'auto' | 'en' | 'nl' = 'auto'
     ) => {
         // 1. INSTANT FEEDBACK: Set loading immediately so UI switches view
         setIsGenerating(true);
@@ -312,11 +314,21 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         selectedDocs
                     });
 
+                    const effectiveLanguage = outputLanguage === 'auto'
+                        ? detectOutputLanguage(text)
+                        : outputLanguage;
+
+                    const schemaVersion = FEATURES.floragpt_research_ux_v0 && mode === 'general_research'
+                        ? 'v0.2'
+                        : 'v0.1';
+
                     const workOrder = buildWorkOrder({
                         mode,
                         userQuery: text,
                         contextItems: hydratedContext,
-                        selectedDocs
+                        selectedDocs,
+                        userLanguage: effectiveLanguage,
+                        schemaVersion
                     });
 
                     const evidencePack = await buildEvidencePack({

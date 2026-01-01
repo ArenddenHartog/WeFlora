@@ -5,6 +5,7 @@ import ChatInput from './ChatInput';
 import { MessageRenderer, EvidenceChip } from './MessageRenderer';
 import { FloraGPTJsonRenderer } from './FloraGPTJsonRenderer';
 import CitationsSidebar from './CitationsSidebar';
+import { FEATURES } from '../src/config/features';
 import { 
     MenuIcon, ArrowUpIcon, RefreshIcon, CopyIcon, 
     FileTextIcon, TableIcon, CheckCircleIcon, CircleIcon,
@@ -15,7 +16,7 @@ interface ChatViewProps {
     chat: Chat;
     messages: ChatMessage[];
     onBack: () => void;
-    onSendMessage: (text: string, files?: File[], instructions?: string, model?: string, contextItems?: ContextItem[]) => void;
+    onSendMessage: (text: string, files?: File[], instructions?: string, model?: string, contextItems?: ContextItem[], viewMode?: string, enableThinking?: boolean, forceNewChat?: boolean, outputLanguage?: 'auto' | 'en' | 'nl') => void;
     isGenerating: boolean;
     // Removed onProjectFileCitationClick
     onRegenerateMessage: (id: string) => void;
@@ -140,7 +141,7 @@ const ChatView: React.FC<ChatViewProps> = ({
 
                                     <div className={`flex-1 min-w-0 max-w-[85%] ${msg.sender === 'user' ? 'text-right' : ''}`}>
                                         <div className={`prose prose-sm max-w-none text-slate-700 leading-relaxed ${msg.sender === 'user' ? 'bg-white border border-slate-200 p-3 rounded-2xl rounded-tr-none shadow-sm text-left inline-block' : ''}`}>
-                                            {msg.sender === 'ai' && (
+                                            {msg.sender === 'ai' && (!FEATURES.floragpt_research_ux_v0 || !msg.floraGPT) && (
                                                 <div className="flex justify-end mb-2">
                                                     <EvidenceChip citations={msg.citations} label="Assistant answer" />
                                                 </div>
@@ -162,7 +163,12 @@ const ChatView: React.FC<ChatViewProps> = ({
                                                 {onContinueInWorksheet && (
                                                     <button 
                                                         onClick={() => onContinueInWorksheet(msg)} 
-                                                        className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors hover:bg-weflora-mint/20 hover:text-weflora-dark text-slate-400`}
+                                                        disabled={FEATURES.floragpt_research_ux_v0 && msg.floraGPT && (msg.floraGPT.responseType !== 'answer' || !(msg.floraGPT?.tables?.length))}
+                                                        className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                                                            FEATURES.floragpt_research_ux_v0 && msg.floraGPT && (msg.floraGPT.responseType !== 'answer' || !(msg.floraGPT?.tables?.length))
+                                                                ? 'text-slate-300 cursor-not-allowed'
+                                                                : 'hover:bg-weflora-mint/20 hover:text-weflora-dark text-slate-400'
+                                                        }`}
                                                         title="Extract Data to Worksheet"
                                                     >
                                                         <TableIcon className="h-3.5 w-3.5" />
@@ -211,11 +217,14 @@ const ChatView: React.FC<ChatViewProps> = ({
                     <div className="p-4 bg-white border-t border-slate-200">
                         <div className="max-w-3xl mx-auto">
                             <ChatInput 
-                                onSend={onSendMessage} 
+                                onSend={(text, files, instructions, model, contextItems, enableThinking, outputLanguage) =>
+                                    onSendMessage(text, files, instructions, model, contextItems, 'full', enableThinking, false, outputLanguage)
+                                }
                                 isLoading={isGenerating}
                                 highlightedFileName={highlightedFileName}
                                 contextProjectId={contextProjectId}
                                 draftKey={draftKey}
+                                languageKey={chat.id ? `weflora:lang:${chat.id}` : undefined}
                             />
                         </div>
                     </div>
@@ -223,7 +232,7 @@ const ChatView: React.FC<ChatViewProps> = ({
             </div>
 
             {/* Citations Sidebar (Responsive, maybe hidden on small screens or toggleable) */}
-            {variant === 'full' && messages.some(m => m.citations && m.citations.length > 0) && (
+            {variant === 'full' && (FEATURES.floragpt_research_ux_v0 || messages.some(m => m.citations && m.citations.length > 0)) && (
                 <CitationsSidebar 
                     messages={messages} 
                     highlightedFileName={highlightedFileName}

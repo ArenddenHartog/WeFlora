@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FloraGPT general_research v0.2",
+  "type": "object",
+  "required": ["schemaVersion", "meta", "mode", "responseType", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "v0.2" },
+    "meta": { "$ref": "commonEnvelope.v0_2.json#/properties/meta" },
+    "mode": { "type": "string", "const": "general_research" },
+    "responseType": {
+      "type": "string",
+      "enum": ["answer", "clarifying_questions", "error"]
+    },
+    "data": { "type": "object" },
+    "tables": { "$ref": "commonEnvelope.v0_2.json#/properties/tables" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "responseType": { "const": "clarifying_questions" } } },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["questions"],
+            "additionalProperties": false,
+            "properties": {
+              "questions": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 3 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "responseType": { "const": "answer" } } },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["summary", "reasoning_summary"],
+            "additionalProperties": false,
+            "properties": {
+              "summary": { "type": "string" },
+              "highlights": { "type": "array", "items": { "type": "string" } },
+              "reasoning_summary": {
+                "type": "object",
+                "required": ["approach"],
+                "additionalProperties": false,
+                "properties": {
+                  "approach": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 3 },
+                  "assumptions": { "type": "array", "items": { "type": "string" } },
+                  "risks": { "type": "array", "items": { "type": "string" } }
+                }
+              },
+              "tables_required": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

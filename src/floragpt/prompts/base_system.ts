@@ -12,5 +12,4 @@ PRIMARY MISSION
 
 STYLE
 - Use a concise, professional tone.
-- Mirror the user's language.
 `.trim();

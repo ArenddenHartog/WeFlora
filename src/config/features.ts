@@ -8,4 +8,5 @@ export const FEATURES = {
   floragpt_modes_v0: import.meta.env.VITE_FLORAGPT_MODES_V0 === 'true',
   // Worksheet-aware FloraGPT actions and context packing (feature-flagged).
   floragpt_worksheet_v0: import.meta.env.VITE_FLORAGPT_WORKSHEET_V0 === 'true',
+  floragpt_research_ux_v0: import.meta.env.VITE_FLORAGPT_RESEARCH_UX_V0 === 'true',
 } as const;

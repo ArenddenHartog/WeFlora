@@ -15,15 +15,16 @@ export const buildWorksheetWorkOrder = (args: {
   worksheetId: string;
   selection: WorksheetSelectionSnapshot | null;
   selectedDocs: WorkOrder['selectedDocs'];
+  userLanguage?: WorkOrder['userLanguage'];
 }): WorkOrder => {
-  const { actionType, projectId, worksheetId, selection, selectedDocs } = args;
+  const { actionType, projectId, worksheetId, selection, selectedDocs, userLanguage } = args;
   return {
     mode: modeByAction[actionType],
     schemaVersion: 'v0.1',
     projectId,
     privateEnvelopeId: null,
     userQuery: `Worksheet action: ${actionType} for ${worksheetId}`,
-    userLanguage: 'auto',
+    userLanguage: userLanguage ?? 'auto',
     responseMode: 'short',
     viewContext: 'worksheet',
     worksheetSelection: selection

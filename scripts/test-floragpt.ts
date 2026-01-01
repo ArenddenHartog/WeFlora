@@ -7,6 +7,7 @@ import { extractFirstJson } from '../src/floragpt/utils/extractJson.ts';
 import { buildEvidencePack } from '../src/floragpt/orchestrator/buildEvidencePack.ts';
 import { extractReferencedSourceIds } from '../src/floragpt/utils/extractReferencedSourceIds.ts';
 import { mapSelectedDocs } from '../src/floragpt/utils/mapSelectedDocs.ts';
+import { detectOutputLanguage } from '../src/floragpt/utils/detectLanguage.ts';
 import type { WorkOrder } from '../src/floragpt/types.ts';
 
 const workOrderBase: WorkOrder = {
@@ -45,6 +46,19 @@ const validPayload = {
 };
 const validation = validateFloraGPTPayload('general_research', validPayload);
 assert.ok(validation.ok);
+
+const validPayloadV2 = {
+  schemaVersion: 'v0.2',
+  meta: { schema_version: 'v0.2', sources_used: [{ source_id: 'doc-1' }] },
+  mode: 'general_research',
+  responseType: 'answer',
+  data: {
+    summary: 'Summary.',
+    reasoning_summary: { approach: ['Step 1'], assumptions: ['Assume A'], risks: ['Risk A'] }
+  },
+  tables: [{ columns: ['Species'], rows: [['Quercus robur']] }]
+};
+assert.ok(validateFloraGPTPayload('general_research', validPayloadV2).ok);
 
 const suitabilityPayload = {
   schemaVersion: 'v0.1',
@@ -182,6 +196,18 @@ const generalRefs = extractReferencedSourceIds({
 } as any);
 assert.deepEqual(generalRefs, []);
 
+const generalRefsV2 = extractReferencedSourceIds({
+  schemaVersion: 'v0.2',
+  meta: { schema_version: 'v0.2', sources_used: [{ source_id: 'doc-2' }] },
+  mode: 'general_research',
+  responseType: 'answer',
+  data: {
+    summary: 'Summary.',
+    reasoning_summary: { approach: ['Step 1'] }
+  }
+} as any);
+assert.deepEqual(generalRefsV2, ['doc-2']);
+
 const invalidRefs = extractReferencedSourceIds({
   schemaVersion: 'v0.1',
   meta: { schema_version: 'v0.1' },
@@ -219,6 +245,9 @@ const scopedEvidencePack = await buildEvidencePack({
 });
 assert.ok(scopedEvidencePack.globalHits.length > 0);
 assert.equal(scopedEvidencePack.projectHits.every((hit) => hit.scope === 'project:project-1'), true);
+
+assert.equal(detectOutputLanguage('Ik wil een boom en een park'), 'nl');
+assert.equal(detectOutputLanguage('Please suggest street trees for sandy soil'), 'en');
 
 console.log('Covers: schema validation (all modes), json extraction, citation whitelist, project boundary.');
 console.log('FloraGPT tests passed.');
