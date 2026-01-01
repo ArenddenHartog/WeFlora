@@ -8,6 +8,8 @@ import {
     ArrowUpIcon, TrendingUpIcon, ChevronRightIcon
 } from './icons'; 
 import { MessageRenderer, EvidenceChip } from './MessageRenderer';
+import { FloraGPTJsonRenderer } from './FloraGPTJsonRenderer';
+import { FEATURES } from '../src/config/features';
 
 interface HomeViewProps {
     pinnedProjects: PinnedProject[];
@@ -16,7 +18,7 @@ interface HomeViewProps {
     activeThreadId: string | null;
     threads: Thread[];
     onSelectProject: (id: string) => void;
-    onSendQuery: (text: string, files?: File[], instructions?: string, model?: string, contextItems?: ContextItem[], enableThinking?: boolean) => void;
+    onSendQuery: (text: string, files?: File[], instructions?: string, model?: string, contextItems?: ContextItem[], enableThinking?: boolean, outputLanguage?: 'auto' | 'en' | 'nl') => void;
     onOpenMenu: () => void;
     onOpenCreateWorksheet: () => void;
     onOpenCreateProject: () => void;
@@ -75,6 +77,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                             <ChatInput 
                                 onSend={onSendQuery} 
                                 draftKey="weflora-home-draft"
+                                languageKey="weflora-home-lang"
                             />
                         </div>
                     </div>
@@ -188,12 +191,15 @@ const HomeView: React.FC<HomeViewProps> = ({
                                     <div className={`prose prose-sm max-w-none text-slate-700 leading-relaxed ${
                                         msg.sender === 'user' ? 'bg-slate-50 p-4 rounded-2xl rounded-tr-none text-left inline-block' : ''
                                     }`}>
-                                        {msg.sender === 'ai' && (
+                                        {msg.sender === 'ai' && (!FEATURES.floragpt_research_ux_v0 || !msg.floraGPT) && (
                                             <div className="flex justify-end mb-2">
                                                 <EvidenceChip citations={msg.citations} label="Assistant answer" />
                                             </div>
                                         )}
-                                        <MessageRenderer text={msg.text} />
+                                        {FEATURES.floragpt_research_ux_v0 && msg.floraGPT
+                                            ? <FloraGPTJsonRenderer payload={msg.floraGPT} />
+                                            : <MessageRenderer text={msg.text} />
+                                        }
                                     </div>
 
                                     {/* AI Footer Actions */}
@@ -215,7 +221,12 @@ const HomeView: React.FC<HomeViewProps> = ({
                                             </button>
                                             <button 
                                                 onClick={() => onCopyContentToWorksheet(msg)}
-                                                className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-weflora-teal hover:bg-weflora-mint/10 px-2 py-1 rounded transition-colors"
+                                                disabled={FEATURES.floragpt_research_ux_v0 && msg.floraGPT && (msg.floraGPT.responseType !== 'answer' || !(msg.floraGPT?.tables?.length))}
+                                                className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded transition-colors ${
+                                                    FEATURES.floragpt_research_ux_v0 && msg.floraGPT && (msg.floraGPT.responseType !== 'answer' || !(msg.floraGPT?.tables?.length))
+                                                        ? 'text-slate-300 cursor-not-allowed'
+                                                        : 'text-slate-500 hover:text-weflora-teal hover:bg-weflora-mint/10'
+                                                }`}
                                             >
                                                 <TableIcon className="h-3.5 w-3.5" />
                                                 Copy to Worksheet
@@ -251,6 +262,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                         isLoading={isGenerating}
                         initialContextItems={activeThread?.contextSnapshot}
                         draftKey={activeThreadId ? `thread-${activeThreadId}-draft` : undefined}
+                        languageKey={activeThreadId ? `thread-${activeThreadId}-lang` : undefined}
                     />
                 </div>
             </div>

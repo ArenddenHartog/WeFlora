@@ -1,7 +1,7 @@
 import type { FloraGPTMode, FloraGPTResponseEnvelope } from '../../../types';
 import type { EvidencePack, WorkOrder } from '../types';
 import { FLORAGPT_BASE_SYSTEM } from '../prompts/base_system';
-import { GENERAL_RESEARCH_SYSTEM } from '../prompts/modes/general_research_system';
+import { GENERAL_RESEARCH_SYSTEM, GENERAL_RESEARCH_SYSTEM_V0_2 } from '../prompts/modes/general_research_system';
 import { SUITABILITY_SCORING_SYSTEM } from '../prompts/modes/suitability_scoring_system';
 import { SPEC_WRITER_SYSTEM } from '../prompts/modes/spec_writer_system';
 import { POLICY_COMPLIANCE_SYSTEM } from '../prompts/modes/policy_compliance_system';
@@ -11,8 +11,8 @@ import { buildRepairPrompt } from '../schemas/repairPrompt';
 import type { AIService } from '../../../services/aiService';
 import { ensureContext } from './ensureContext';
 import { extractFirstJson } from '../utils/extractJson';
-import type { EvidencePack } from '../types';
 import generalResearchSchema from '../schemas/general_research.v0_1.json';
+import generalResearchSchemaV2 from '../schemas/general_research.v0_2.json';
 import suitabilityScoringSchema from '../schemas/suitability_scoring.v0_1.json';
 import specWriterSchema from '../schemas/spec_writer.v0_1.json';
 import policyComplianceSchema from '../schemas/policy_compliance.v0_1.json';
@@ -29,6 +29,20 @@ const modeSchemaMap: Record<FloraGPTMode, object> = {
   suitability_scoring: suitabilityScoringSchema,
   spec_writer: specWriterSchema,
   policy_compliance: policyComplianceSchema,
+};
+
+const getModeSystem = (mode: FloraGPTMode, schemaVersion: WorkOrder['schemaVersion']) => {
+  if (mode === 'general_research' && schemaVersion === 'v0.2') {
+    return GENERAL_RESEARCH_SYSTEM_V0_2;
+  }
+  return modeSystemMap[mode];
+};
+
+const getModeSchema = (mode: FloraGPTMode, schemaVersion: WorkOrder['schemaVersion']) => {
+  if (mode === 'general_research' && schemaVersion === 'v0.2') {
+    return generalResearchSchemaV2;
+  }
+  return modeSchemaMap[mode];
 };
 
 const parseJsonSafe = (text: string): unknown => {
@@ -58,6 +72,18 @@ const buildCitationErrors = (payload: FloraGPTResponseEnvelope, evidencePack: Ev
   );
 
   if (payload.mode === 'general_research') {
+    if (payload.schemaVersion === 'v0.2') {
+      const sourcesUsed = payload.meta?.sources_used;
+      if (!Array.isArray(sourcesUsed) || sourcesUsed.length === 0) {
+        errors.push('general_research requires meta.sources_used when evidence exists');
+        return errors;
+      }
+      sourcesUsed.forEach((entry: any) => {
+        if (!entry || typeof entry.source_id !== 'string' || !sourceIds.has(entry.source_id)) {
+          errors.push(`unknown source_id: ${entry?.source_id ?? 'invalid'}`);
+        }
+      });
+    }
     return errors;
   }
 
@@ -122,6 +148,12 @@ Add citations referencing only these source_ids.
 `.trim();
 };
 
+const requiresTableSummary = (text: string) =>
+  /\b(compare|comparison|compareer|vergelijk|shortlist|short-list|suggest|aanbeveel|recommend|options|opties)\b/i.test(text);
+
+const hasUsableTables = (payload: FloraGPTResponseEnvelope) =>
+  Array.isArray(payload.tables) && payload.tables.some((table) => Array.isArray(table.rows) && table.rows.length > 0);
+
 export const runMode = async (args: {
   workOrder: WorkOrder;
   evidencePack: EvidencePack;
@@ -134,12 +166,14 @@ export const runMode = async (args: {
     return { ok: true, payload: contextGate };
   }
 
-  const modeSystem = modeSystemMap[workOrder.mode];
-  const schema = modeSchemaMap[workOrder.mode];
+  const responseLanguage = workOrder.userLanguage === 'auto' ? 'en' : workOrder.userLanguage;
+  const modeSystem = getModeSystem(workOrder.mode, workOrder.schemaVersion);
+  const schema = getModeSchema(workOrder.mode, workOrder.schemaVersion);
   const systemInstruction = [
     FLORAGPT_BASE_SYSTEM,
     modeSystem,
-    buildJsonContract(schema)
+    `Respond in: ${responseLanguage}. Do not respond in any other language.`,
+    buildJsonContract(schema, workOrder.schemaVersion)
   ].join('\n\n');
 
   const userPayload = { workOrder, evidencePack };
@@ -168,8 +202,9 @@ export const runMode = async (args: {
       const repairSystem = [
         FLORAGPT_BASE_SYSTEM,
         modeSystem,
-        buildJsonContract(schema),
-        buildRepairPrompt(['SchemaVersionMismatch: meta.schema_version must be v0.1'])
+        `Respond in: ${responseLanguage}. Do not respond in any other language.`,
+        buildJsonContract(schema, workOrder.schemaVersion),
+        buildRepairPrompt([`SchemaVersionMismatch: meta.schema_version must be ${workOrder.schemaVersion}`])
       ].join('\n\n');
 
       const repairedRaw = await aiService.generateFloraGPTResponse({
@@ -211,7 +246,8 @@ export const runMode = async (args: {
         const repairSystem = [
           FLORAGPT_BASE_SYSTEM,
           modeSystem,
-          buildJsonContract(schema),
+          `Respond in: ${responseLanguage}. Do not respond in any other language.`,
+          buildJsonContract(schema, workOrder.schemaVersion),
           buildCitationRepairPrompt(citationErrors, evidencePack)
         ].join('\n\n');
 
@@ -245,6 +281,41 @@ export const runMode = async (args: {
         }
         return { ok: true, payload: repairedParsed, rawText: repairedRaw, repairAttempted: true, schemaVersionReceived: repairedParsed.meta?.schema_version ?? null };
       }
+      if (
+        workOrder.mode === 'general_research' &&
+        workOrder.schemaVersion === 'v0.2' &&
+        parsed.responseType === 'answer' &&
+        requiresTableSummary(workOrder.userQuery) &&
+        !hasUsableTables(parsed)
+      ) {
+        const repairSystem = [
+          FLORAGPT_BASE_SYSTEM,
+          modeSystem,
+          `Respond in: ${responseLanguage}. Do not respond in any other language.`,
+          buildJsonContract(schema, workOrder.schemaVersion),
+          buildRepairPrompt(['tables[] required for suggest/compare/shortlist intents'])
+        ].join('\n\n');
+
+        const repairedRaw = await aiService.generateFloraGPTResponse({
+          systemInstruction: repairSystem,
+          userPayload: { previousOutput: rawText, errors: ['MissingTableSummary'] }
+        });
+
+        const repairedExtracted = extractFirstJson(repairedRaw);
+        if (repairedExtracted.jsonText) {
+          const repairedParsed = parseJsonSafe(repairedExtracted.jsonText) as FloraGPTResponseEnvelope;
+          const repairedValidation = validateFloraGPTPayload(workOrder.mode, repairedParsed);
+          if (repairedValidation.ok && hasUsableTables(repairedParsed)) {
+            return {
+              ok: true,
+              payload: repairedParsed,
+              rawText: repairedRaw,
+              repairAttempted: true,
+              schemaVersionReceived: repairedParsed.meta?.schema_version ?? null
+            };
+          }
+        }
+      }
       return {
         ok: true,
         payload: parsed,
@@ -257,7 +328,8 @@ export const runMode = async (args: {
     const repairSystem = [
       FLORAGPT_BASE_SYSTEM,
       modeSystem,
-      buildJsonContract(schema),
+      `Respond in: ${responseLanguage}. Do not respond in any other language.`,
+      buildJsonContract(schema, workOrder.schemaVersion),
       buildRepairPrompt(validation.errors || [])
     ].join('\n\n');
 

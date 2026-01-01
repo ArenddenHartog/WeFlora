@@ -82,12 +82,12 @@ const CitationsSidebar: React.FC<CitationsSidebarProps> = ({ messages, onCitatio
     };
 
     return (
-        <aside className="w-80 flex-shrink-0 border-l border-slate-200 bg-slate-50 h-full overflow-y-auto">
+        <aside id="citations-sidebar" className="w-80 flex-shrink-0 border-l border-slate-200 bg-slate-50 h-full overflow-y-auto">
             <div className="p-4">
-                <h2 className="text-lg font-semibold text-slate-800 mb-4 sticky top-0 bg-slate-50 py-2 -mt-4 z-10 border-b border-slate-200 -mx-4 px-4">References</h2>
+                <h2 className="text-lg font-semibold text-slate-800 mb-4 sticky top-0 bg-slate-50 py-2 -mt-4 z-10 border-b border-slate-200 -mx-4 px-4">Citations</h2>
                 
                 {allCitations.length === 0 && webSources.length === 0 && mapSources.length === 0 ? (
-                    <p className="text-sm text-slate-500 text-center py-8">No citations found in this conversation.</p>
+                    <p className="text-sm text-slate-500 text-center py-8">No citations available.</p>
                 ) : (
                     <>
                         {/* External Sources Section */}

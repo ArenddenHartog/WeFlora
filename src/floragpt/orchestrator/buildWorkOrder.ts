@@ -6,20 +6,22 @@ export const buildWorkOrder = (args: {
   userQuery: string;
   contextItems: ContextItem[];
   uiAction?: string | null;
+  schemaVersion?: WorkOrder['schemaVersion'];
+  userLanguage?: WorkOrder['userLanguage'];
   selectedDocs?: { sourceId: string; sourceType: string; scope: string; title?: string }[];
 }): WorkOrder => {
-  const { mode, userQuery, contextItems, uiAction, selectedDocs } = args;
+  const { mode, userQuery, contextItems, uiAction, selectedDocs, schemaVersion, userLanguage } = args;
   const projectId =
     contextItems.find((item) => item.projectId)?.projectId ||
     'global';
 
   return {
     mode,
-    schemaVersion: 'v0.1',
+    schemaVersion: schemaVersion ?? 'v0.1',
     projectId,
     privateEnvelopeId: null,
     userQuery,
-    userLanguage: 'auto',
+    userLanguage: userLanguage ?? 'auto',
     responseMode: 'short',
     viewContext: 'chat',
     uiAction: uiAction ?? null,

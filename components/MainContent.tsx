@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import type { 
     PinnedProject, Chat, ProjectFile, Matrix, Report, 
-    ChatMessage, DiscoveredStructure, FloraGPTResponseEnvelope
+    ChatMessage, DiscoveredStructure, FloraGPTResponseEnvelope, FloraGPTTable
 } from '../types';
 import GlobalWorkspace from './GlobalWorkspace';
 import ProjectWorkspace from './ProjectWorkspace';
@@ -17,6 +17,7 @@ import { useProject } from '../contexts/ProjectContext';
 import { useData } from '../contexts/DataContext';
 import { useUI } from '../contexts/UIContext';
 import { navigateToCreatedEntity } from '../utils/navigation';
+import { FEATURES } from '../src/config/features';
 
 // Props reduced to minimal handlers if any
 interface MainContentProps {
@@ -223,6 +224,9 @@ const MainContent: React.FC<MainContentProps> = ({
     const [newDestProjectName, setNewDestProjectName] = useState('');
     const [isExtracting, setIsExtracting] = useState(false);
     const [runSpeciesCorrectionPass, setRunSpeciesCorrectionPass] = useState(false);
+    const [previewTable, setPreviewTable] = useState<FloraGPTTable | null>(null);
+    const [includeCitationsColumn, setIncludeCitationsColumn] = useState(false);
+    const [applyGlobalCitationsToRows, setApplyGlobalCitationsToRows] = useState(false);
 
     // Effect to reset state when modal opens
     useEffect(() => {
@@ -232,12 +236,108 @@ const MainContent: React.FC<MainContentProps> = ({
             setNewDestProjectName('');
             setIsExtracting(false);
             setRunSpeciesCorrectionPass(false);
+            setIncludeCitationsColumn(false);
+            setApplyGlobalCitationsToRows(false);
+            if (FEATURES.floragpt_research_ux_v0 && destinationModal.type === 'worksheet') {
+                const table = destinationModal.message?.floraGPT?.tables?.[0] ?? null;
+                setPreviewTable(table ? {
+                    title: table.title,
+                    columns: [...table.columns],
+                    rows: table.rows.map((row) => [...row])
+                } : null);
+            } else {
+                setPreviewTable(null);
+            }
         }
-    }, [destinationModal.isOpen]);
+    }, [destinationModal.isOpen, destinationModal.type, destinationModal.message]);
+
+    useEffect(() => {
+        if (!includeCitationsColumn) {
+            setApplyGlobalCitationsToRows(false);
+        }
+    }, [includeCitationsColumn]);
+
+    const stripMarkdown = (value: string) => value
+        .replace(/\*\*/g, '')
+        .replace(/__/g, '')
+        .replace(/`/g, '')
+        .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+        .trim();
+
+    const buildMatrixFromTable = (table: FloraGPTTable, citations: string[], applyCitations: boolean) => {
+        const now = Date.now();
+        const columns = table.columns.map((title, idx) => ({
+            id: `col-flora-${idx}-${now}`,
+            title: stripMarkdown(title),
+            type: 'text' as const,
+            width: idx === 0 ? 220 : 180,
+            isPrimaryKey: idx === 0
+        }));
+        let columnsWithCitations = columns;
+        if (includeCitationsColumn) {
+            columnsWithCitations = [
+                ...columns,
+                {
+                    id: `col-flora-citations-${now}`,
+                    title: 'Citations',
+                    type: 'text' as const,
+                    width: 220,
+                    isPrimaryKey: false
+                }
+            ];
+        }
+        const rows = table.rows.map((row, idx) => {
+            const cells: Record<string, { columnId: string; value: string }> = {};
+            columns.forEach((col, colIdx) => {
+                cells[col.id] = { columnId: col.id, value: stripMarkdown(row[colIdx] ?? '') };
+            });
+            if (includeCitationsColumn) {
+                const citationsValue = applyCitations ? citations.join('; ') : '';
+                const citationsCol = columnsWithCitations[columnsWithCitations.length - 1];
+                cells[citationsCol.id] = { columnId: citationsCol.id, value: citationsValue };
+            }
+            return { id: `row-flora-${now}-${idx}`, cells };
+        });
+        return { columns: columnsWithCitations, rows };
+    };
+
+    const updatePreviewCell = (rowIndex: number, colIndex: number, value: string) => {
+        setPreviewTable((prev) => {
+            if (!prev) return prev;
+            const rows = prev.rows.map((row, idx) => (
+                idx === rowIndex ? row.map((cell, cIdx) => (cIdx === colIndex ? value : cell)) : row
+            ));
+            return { ...prev, rows };
+        });
+    };
+
+    const updatePreviewHeader = (colIndex: number, value: string) => {
+        setPreviewTable((prev) => {
+            if (!prev) return prev;
+            const columns = prev.columns.map((col, idx) => (idx === colIndex ? value : col));
+            return { ...prev, columns };
+        });
+    };
 
     const handleOpenDestinationModal = (type: 'report' | 'worksheet', message: ChatMessage) => {
         openDestinationModal(type, message);
     };
+
+    const previewCitations = Array.isArray(destinationModal.message?.citations)
+        ? destinationModal.message?.citations.map(c => c.sourceId || c.source).filter(Boolean)
+        : [];
+    const previewTableWithCitations = previewTable
+        ? {
+            title: previewTable.title,
+            columns: includeCitationsColumn ? [...previewTable.columns, 'Citations'] : previewTable.columns,
+            rows: includeCitationsColumn
+                ? previewTable.rows.map((row) => [
+                    ...row,
+                    applyGlobalCitationsToRows ? previewCitations.join('; ') : ''
+                ])
+                : previewTable.rows
+        }
+        : null;
 
     const handleConfirmDest = async () => {
         const { type, message } = destinationModal;
@@ -298,11 +398,29 @@ const MainContent: React.FC<MainContentProps> = ({
         } else {
             setIsExtracting(true);
             try {
-                const citationsText = Array.isArray(message.citations) && message.citations.length > 0
-                    ? message.citations.map(c => c.sourceId || c.source).join('; ')
-                    : '';
-                const floraMatrix = message.floraGPT ? buildMatrixFromFloraGPT(message.floraGPT, citationsText) : null;
-                const result = floraMatrix ?? await aiService.structureTextAsMatrix(message.text, { runSpeciesCorrectionPass });
+                const citationsList = Array.isArray(message.citations) && message.citations.length > 0
+                    ? message.citations.map(c => c.sourceId || c.source).filter(Boolean)
+                    : [];
+                const useStructuredTables = FEATURES.floragpt_research_ux_v0 && Boolean(message.floraGPT);
+                const hasStructuredTable = Boolean(message.floraGPT?.tables && message.floraGPT.tables.length > 0);
+
+                if (useStructuredTables && !hasStructuredTable) {
+                    showNotification('No structured table to export yet.', 'error');
+                    return;
+                }
+
+                let result: { columns: Matrix['columns']; rows: Matrix['rows'] };
+                if (useStructuredTables && previewTable) {
+                    result = buildMatrixFromTable(previewTable, citationsList, applyGlobalCitationsToRows);
+                } else {
+                    const citationsText = citationsList.join('; ');
+                    const floraMatrix = !useStructuredTables && message.floraGPT
+                        ? buildMatrixFromFloraGPT(message.floraGPT, citationsText)
+                        : null;
+                    result = floraMatrix
+                        ? { columns: floraMatrix.columns, rows: floraMatrix.rows }
+                        : await aiService.structureTextAsMatrix(message.text, { runSpeciesCorrectionPass });
+                }
 
                 // Append mode: only when in standalone worksheet editor AND the user chose General Library.
                 if (appendTargetMatrixId && destination.type === 'standalone') {
@@ -614,7 +732,7 @@ const MainContent: React.FC<MainContentProps> = ({
                         </button>
                         <button 
                             onClick={handleConfirmDest}
-                            disabled={isExtracting}
+                            disabled={isExtracting || (destinationModal.type === 'worksheet' && FEATURES.floragpt_research_ux_v0 && !previewTable)}
                             className="px-6 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-bold text-sm shadow-sm transition-colors flex items-center gap-2 disabled:opacity-70"
                         >
                             {isExtracting ? (
@@ -623,7 +741,13 @@ const MainContent: React.FC<MainContentProps> = ({
                                     Extracting...
                                 </>
                             ) : (
-                                <span>{destinationModal.type === 'worksheet' ? 'Extract & Save' : 'Save Content'}</span>
+                                <span>
+                                    {destinationModal.type === 'worksheet' && FEATURES.floragpt_research_ux_v0
+                                        ? 'Apply to Worksheet'
+                                        : destinationModal.type === 'worksheet'
+                                            ? 'Extract & Save'
+                                            : 'Save Content'}
+                                </span>
                             )}
                         </button>
                     </>
@@ -640,8 +764,93 @@ const MainContent: React.FC<MainContentProps> = ({
                         <>
                             <p className="text-sm text-slate-500">
                                 Choose where you want to save this content.
-                                {destinationModal.type === 'worksheet' && " FloraGPT will intelligently extract and structure tabular data for you."}
+                                {destinationModal.type === 'worksheet' && FEATURES.floragpt_research_ux_v0
+                                    ? ' Export the structured table preview into a worksheet.'
+                                    : destinationModal.type === 'worksheet'
+                                        ? ' FloraGPT will intelligently extract and structure tabular data for you.'
+                                        : ''}
                             </p>
+
+                            {destinationModal.type === 'worksheet' && FEATURES.floragpt_research_ux_v0 && (
+                                <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-xs font-bold text-slate-600 uppercase">Preview export</div>
+                                        {!previewTable && (
+                                            <span className="text-[10px] font-semibold text-slate-400">No structured table</span>
+                                        )}
+                                    </div>
+                                    {previewTableWithCitations ? (
+                                        <>
+                                            <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                                                <table className="w-full text-xs text-left">
+                                                    <thead className="bg-slate-50 border-b border-slate-200">
+                                                        <tr>
+                                                            {previewTableWithCitations.columns.map((col, idx) => (
+                                                                <th key={idx} className="p-2 border-r border-slate-200 last:border-0">
+                                                                    {idx < previewTable.columns.length ? (
+                                                                        <input
+                                                                            value={previewTable.columns[idx]}
+                                                                            onChange={(e) => updatePreviewHeader(idx, e.target.value)}
+                                                                            className="w-full bg-transparent text-xs font-semibold text-slate-700 focus:outline-none"
+                                                                        />
+                                                                    ) : (
+                                                                        <span className="text-xs font-semibold text-slate-600">{col}</span>
+                                                                    )}
+                                                                </th>
+                                                            ))}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {previewTableWithCitations.rows.map((row, rIdx) => (
+                                                            <tr key={rIdx}>
+                                                                {row.map((cell, cIdx) => (
+                                                                    <td key={cIdx} className="p-2 border-r border-slate-100 last:border-0">
+                                                                        {cIdx < previewTable.columns.length ? (
+                                                                            <input
+                                                                                value={previewTable.rows[rIdx]?.[cIdx] ?? ''}
+                                                                                onChange={(e) => updatePreviewCell(rIdx, cIdx, e.target.value)}
+                                                                                className="w-full bg-transparent text-xs text-slate-600 focus:outline-none"
+                                                                            />
+                                                                        ) : (
+                                                                            <span className="text-xs text-slate-500">{cell}</span>
+                                                                        )}
+                                                                    </td>
+                                                                ))}
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div className="flex flex-col gap-2 text-xs text-slate-600">
+                                                <label className="flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={includeCitationsColumn}
+                                                        onChange={(e) => setIncludeCitationsColumn(e.target.checked)}
+                                                        className="h-4 w-4 rounded border-slate-300 text-weflora-teal focus:ring-weflora-teal/30"
+                                                    />
+                                                    Include citations column
+                                                </label>
+                                                {includeCitationsColumn && (
+                                                    <label className="flex items-center gap-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={applyGlobalCitationsToRows}
+                                                            onChange={(e) => setApplyGlobalCitationsToRows(e.target.checked)}
+                                                            className="h-4 w-4 rounded border-slate-300 text-weflora-teal focus:ring-weflora-teal/30"
+                                                        />
+                                                        Apply global citations to all rows
+                                                    </label>
+                                                )}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="text-xs text-slate-500">
+                                            No structured table to export yet. Ask FloraGPT for a comparison table first.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="space-y-3">
                                 <label className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-all ${destMode === 'general' ? 'border-weflora-teal bg-weflora-mint/10' : 'border-slate-200 hover:bg-slate-50'}`}>
@@ -711,7 +920,7 @@ const MainContent: React.FC<MainContentProps> = ({
                                 </label>
                             </div>
 
-                            {destinationModal.type === 'worksheet' && (
+                            {destinationModal.type === 'worksheet' && (!FEATURES.floragpt_research_ux_v0 || !previewTable) && (
                                 <div className="pt-2">
                                     <label className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg bg-white">
                                         <input

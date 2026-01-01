@@ -20,6 +20,15 @@ export const extractReferencedSourceIds = (payload: FloraGPTResponseEnvelope): s
   if (payload.responseType !== 'answer') return [];
   const ids = new Set<string>();
 
+  if (payload.schemaVersion === 'v0.2' && Array.isArray(payload.meta?.sources_used)) {
+    payload.meta.sources_used.forEach((source) => {
+      if (source && typeof source.source_id === 'string') {
+        ids.add(source.source_id);
+      }
+    });
+    return Array.from(ids);
+  }
+
   if (payload.mode === 'general_research') {
     // v0.1 has no citations for general_research.
     return [];
