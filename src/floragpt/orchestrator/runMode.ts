@@ -12,7 +12,7 @@ import type { AIService } from '../../../services/aiService';
 import { ensureContext } from './ensureContext';
 import { extractFirstJson } from '../utils/extractJson';
 import type { EvidencePack } from '../types';
-import generalResearchSchema from '../schemas/general_research.v0_1.json';
+import generalResearchSchema from '../schemas/general_research.v0_2.json';
 import suitabilityScoringSchema from '../schemas/suitability_scoring.v0_1.json';
 import specWriterSchema from '../schemas/spec_writer.v0_1.json';
 import policyComplianceSchema from '../schemas/policy_compliance.v0_1.json';
@@ -48,7 +48,11 @@ export type FloraGPTRunResult = {
 const isStringArray = (items: unknown): items is string[] =>
   Array.isArray(items) && items.every((item) => typeof item === 'string');
 
-const buildCitationErrors = (payload: FloraGPTResponseEnvelope, evidencePack: EvidencePack): string[] => {
+const buildCitationErrors = (
+  payload: FloraGPTResponseEnvelope,
+  evidencePack: EvidencePack,
+  workOrder: WorkOrder
+): string[] => {
   const errors: string[] = [];
   const totalEvidence = evidencePack.globalHits.length + evidencePack.projectHits.length + evidencePack.policyHits.length;
   if (totalEvidence === 0) return errors;
@@ -58,6 +62,24 @@ const buildCitationErrors = (payload: FloraGPTResponseEnvelope, evidencePack: Ev
   );
 
   if (payload.mode === 'general_research') {
+    const selectedDocs = workOrder.selectedDocs || [];
+    const hasProjectDocs = selectedDocs.some((doc) =>
+      ['project', 'upload', 'worksheet', 'report', 'policy_manual'].includes(doc.sourceType)
+    );
+    if (payload.responseType === 'answer' && hasProjectDocs) {
+      const sourcesUsed = payload.meta?.sources_used || [];
+      if (!Array.isArray(sourcesUsed) || sourcesUsed.length === 0) {
+        errors.push('meta.sources_used must include at least one source_id when project documents are selected');
+        return errors;
+      }
+      sourcesUsed.forEach((entry: any) => {
+        if (!entry?.source_id || typeof entry.source_id !== 'string') {
+          errors.push('meta.sources_used entries must include source_id');
+          return;
+        }
+        if (!sourceIds.has(entry.source_id)) errors.push(`unknown source_id: ${entry.source_id}`);
+      });
+    }
     return errors;
   }
 
@@ -118,7 +140,7 @@ const buildCitationRepairPrompt = (errors: string[], evidencePack: EvidencePack)
 ${buildRepairPrompt(errors)}
 Available source_ids:
 - ${sourceIds.join('\n- ')}
-Add citations referencing only these source_ids.
+Add citations referencing only these source_ids. For general_research, populate meta.sources_used with objects shaped like {"source_id": "..."}.
 `.trim();
 };
 
@@ -136,10 +158,12 @@ export const runMode = async (args: {
 
   const modeSystem = modeSystemMap[workOrder.mode];
   const schema = modeSchemaMap[workOrder.mode];
+  const languageInstruction = `Respond only in ${workOrder.userLanguage} regardless of source language.`;
   const systemInstruction = [
     FLORAGPT_BASE_SYSTEM,
+    languageInstruction,
     modeSystem,
-    buildJsonContract(schema)
+    buildJsonContract(schema, workOrder.schemaVersion)
   ].join('\n\n');
 
   const userPayload = { workOrder, evidencePack };
@@ -167,9 +191,10 @@ export const runMode = async (args: {
     if (schemaVersionReceived !== workOrder.schemaVersion) {
       const repairSystem = [
         FLORAGPT_BASE_SYSTEM,
+        languageInstruction,
         modeSystem,
-        buildJsonContract(schema),
-        buildRepairPrompt(['SchemaVersionMismatch: meta.schema_version must be v0.1'])
+        buildJsonContract(schema, workOrder.schemaVersion),
+        buildRepairPrompt([`SchemaVersionMismatch: meta.schema_version must be ${workOrder.schemaVersion}`])
       ].join('\n\n');
 
       const repairedRaw = await aiService.generateFloraGPTResponse({
@@ -206,12 +231,13 @@ export const runMode = async (args: {
 
     const validation = validateFloraGPTPayload(workOrder.mode, parsed);
     if (validation.ok) {
-      const citationErrors = buildCitationErrors(parsed, evidencePack);
+      const citationErrors = buildCitationErrors(parsed, evidencePack, workOrder);
       if (citationErrors.length > 0) {
         const repairSystem = [
           FLORAGPT_BASE_SYSTEM,
+          languageInstruction,
           modeSystem,
-          buildJsonContract(schema),
+          buildJsonContract(schema, workOrder.schemaVersion),
           buildCitationRepairPrompt(citationErrors, evidencePack)
         ].join('\n\n');
 
@@ -232,7 +258,7 @@ export const runMode = async (args: {
         }
         const repairedParsed = parseJsonSafe(repairedExtracted.jsonText) as FloraGPTResponseEnvelope;
         const repairedValidation = validateFloraGPTPayload(workOrder.mode, repairedParsed);
-        const repairedCitationErrors = buildCitationErrors(repairedParsed, evidencePack);
+        const repairedCitationErrors = buildCitationErrors(repairedParsed, evidencePack, workOrder);
         if (!repairedValidation.ok || repairedCitationErrors.length > 0) {
           return {
             ok: false,
@@ -256,8 +282,9 @@ export const runMode = async (args: {
 
     const repairSystem = [
       FLORAGPT_BASE_SYSTEM,
+      languageInstruction,
       modeSystem,
-      buildJsonContract(schema),
+      buildJsonContract(schema, workOrder.schemaVersion),
       buildRepairPrompt(validation.errors || [])
     ].join('\n\n');
 
@@ -279,7 +306,7 @@ export const runMode = async (args: {
     }
     const repairedParsed = parseJsonSafe(repairedExtracted.jsonText) as FloraGPTResponseEnvelope;
     const repairedValidation = validateFloraGPTPayload(workOrder.mode, repairedParsed);
-    const repairedCitationErrors = buildCitationErrors(repairedParsed, evidencePack);
+    const repairedCitationErrors = buildCitationErrors(repairedParsed, evidencePack, workOrder);
     if (repairedValidation.ok && repairedCitationErrors.length === 0) {
       return {
         ok: true,

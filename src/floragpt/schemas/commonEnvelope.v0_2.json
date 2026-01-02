@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FloraGPT Common Envelope v0.2",
+  "type": "object",
+  "required": ["schemaVersion", "meta", "mode", "responseType", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "v0.2" },
+    "meta": {
+      "type": "object",
+      "required": ["schema_version", "sources_used"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": { "type": "string", "const": "v0.2" },
+        "sources_used": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["source_id"],
+            "additionalProperties": false,
+            "properties": {
+              "source_id": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["general_research", "suitability_scoring", "spec_writer", "policy_compliance"]
+    },
+    "responseType": {
+      "type": "string",
+      "enum": ["answer", "clarifying_questions", "error"]
+    },
+    "data": { "type": "object" },
+    "tables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["columns", "rows"],
+        "additionalProperties": false,
+        "properties": {
+          "title": { "type": "string" },
+          "columns": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "citations": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

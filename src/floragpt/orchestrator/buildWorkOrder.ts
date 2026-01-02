@@ -1,5 +1,6 @@
 import type { ContextItem, FloraGPTMode } from '../../../types';
 import type { WorkOrder } from '../types';
+import { detectUserLanguage } from '../utils/detectUserLanguage';
 
 export const buildWorkOrder = (args: {
   mode: FloraGPTMode;
@@ -15,11 +16,11 @@ export const buildWorkOrder = (args: {
 
   return {
     mode,
-    schemaVersion: 'v0.1',
+    schemaVersion: mode === 'general_research' ? 'v0.2' : 'v0.1',
     projectId,
     privateEnvelopeId: null,
     userQuery,
-    userLanguage: 'auto',
+    userLanguage: detectUserLanguage(userQuery),
     responseMode: 'short',
     viewContext: 'chat',
     uiAction: uiAction ?? null,

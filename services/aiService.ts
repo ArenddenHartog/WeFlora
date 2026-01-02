@@ -939,8 +939,7 @@ ${history}
       files: File[] = [], 
       systemInstruction: string, 
       model: string = 'gemini-2.5-flash',
-      contextItems: ContextItem[] = [],
-      enableThinking: boolean = false
+      contextItems: ContextItem[] = []
   ): AsyncGenerator<{ text?: string, grounding?: any }, void, unknown> {
       
       try {
@@ -976,10 +975,6 @@ ${history}
             systemInstruction: systemInstruction,
             tools: contextItems.some(i => i.source === 'web') ? [{ googleSearch: {} }] : undefined
         };
-
-        if (enableThinking) {
-            config.thinkingConfig = { thinkingBudget: 2048 }; 
-        }
 
         const stream = await ai.models.generateContentStream({
             model: model,

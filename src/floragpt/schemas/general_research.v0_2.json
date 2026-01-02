@@ -1,19 +1,19 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "FloraGPT general_research v0.1",
+  "title": "FloraGPT general_research v0.2",
   "type": "object",
   "required": ["schemaVersion", "meta", "mode", "responseType", "data"],
   "additionalProperties": false,
   "properties": {
-    "schemaVersion": { "type": "string", "const": "v0.1" },
-    "meta": { "$ref": "commonEnvelope.v0_1.json#/properties/meta" },
+    "schemaVersion": { "type": "string", "const": "v0.2" },
+    "meta": { "$ref": "commonEnvelope.v0_2.json#/properties/meta" },
     "mode": { "type": "string", "const": "general_research" },
     "responseType": {
       "type": "string",
       "enum": ["answer", "clarifying_questions", "error"]
     },
     "data": { "type": "object" },
-    "tables": { "$ref": "commonEnvelope.v0_1.json#/properties/tables" }
+    "tables": { "$ref": "commonEnvelope.v0_2.json#/properties/tables" }
   },
   "allOf": [
     {
@@ -37,11 +37,23 @@
         "properties": {
           "data": {
             "type": "object",
-            "required": ["summary"],
+            "required": ["summary", "reasoning_summary", "follow_ups", "output_label"],
             "additionalProperties": false,
             "properties": {
+              "output_label": { "type": "string" },
               "summary": { "type": "string" },
-              "highlights": { "type": "array", "items": { "type": "string" } }
+              "highlights": { "type": "array", "items": { "type": "string" } },
+              "reasoning_summary": {
+                "type": "object",
+                "required": ["approach", "assumptions", "risks"],
+                "additionalProperties": false,
+                "properties": {
+                  "approach": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 3 },
+                  "assumptions": { "type": "array", "items": { "type": "string" } },
+                  "risks": { "type": "array", "items": { "type": "string" } }
+                }
+              },
+              "follow_ups": { "type": "array", "items": { "type": "string" }, "minItems": 3, "maxItems": 3 }
             }
           }
         }

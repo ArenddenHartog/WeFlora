@@ -20,24 +20,41 @@ interface EnrichedCitation extends Citation {
 
 const CitationsSidebar: React.FC<CitationsSidebarProps> = ({ messages, onCitationClick, onSourceClick, highlightedFileName, onCitationHover }) => {
     // Access global contexts
-    const { openFilePreview } = useUI();
+    const { openFilePreview, citationsFilter, setCitationsFilter } = useUI();
     const { files: projectFiles } = useProject();
 
     // Flatten messages to citations while keeping track of which message they came from
-    const allCitations: EnrichedCitation[] = messages.flatMap(m => 
-        (m.citations || []).map(c => ({ ...c, messageId: m.id }))
-    );
+    const allCitations: EnrichedCitation[] = messages.flatMap((m) => {
+        if (m.floraGPT?.meta?.sources_used?.length) {
+            return m.floraGPT.meta.sources_used.map((entry) => ({
+                source: entry.source_id,
+                text: entry.source_id,
+                type: 'project_file' as const,
+                sourceId: entry.source_id,
+                messageId: m.id
+            }));
+        }
+        return (m.citations || []).map((c) => ({ ...c, messageId: m.id }));
+    });
 
-    const projectFileCitations = allCitations.filter(c => c.type === 'project_file');
-    const researchCitations = allCitations.filter(c => c.type === 'research');
+    const filteredCitations = citationsFilter?.sourceIds?.length
+        ? allCitations.filter((citation) => citation.sourceId && citationsFilter.sourceIds.includes(citation.sourceId))
+        : allCitations;
+
+    const projectFileCitations = filteredCitations.filter(c => c.type === 'project_file');
+    const researchCitations = filteredCitations.filter(c => c.type === 'research');
     
     // Extract Web Sources
-    const webSources = messages.flatMap(m => 
-        (m.grounding?.webSources || []).map(s => ({ ...s, messageId: m.id }))
-    );
-     const mapSources = messages.flatMap(m => 
-        (m.grounding?.mapSources || []).map(s => ({ ...s, messageId: m.id }))
-    );
+    const webSources = citationsFilter
+        ? []
+        : messages.flatMap(m =>
+            (m.grounding?.webSources || []).map(s => ({ ...s, messageId: m.id }))
+        );
+    const mapSources = citationsFilter
+        ? []
+        : messages.flatMap(m =>
+            (m.grounding?.mapSources || []).map(s => ({ ...s, messageId: m.id }))
+        );
 
     const highlightedRef = useRef<HTMLButtonElement>(null);
 
@@ -84,9 +101,20 @@ const CitationsSidebar: React.FC<CitationsSidebarProps> = ({ messages, onCitatio
     return (
         <aside className="w-80 flex-shrink-0 border-l border-slate-200 bg-slate-50 h-full overflow-y-auto">
             <div className="p-4">
-                <h2 className="text-lg font-semibold text-slate-800 mb-4 sticky top-0 bg-slate-50 py-2 -mt-4 z-10 border-b border-slate-200 -mx-4 px-4">References</h2>
+                <h2 className="text-lg font-semibold text-slate-800 mb-4 sticky top-0 bg-slate-50 py-2 -mt-4 z-10 border-b border-slate-200 -mx-4 px-4">Citations</h2>
+                {citationsFilter && (
+                    <div className="mb-4 p-3 bg-white border border-weflora-teal/20 rounded-lg flex items-center justify-between">
+                        <div className="text-xs font-semibold text-slate-700">Filtered to selected row</div>
+                        <button
+                            className="text-xs font-bold text-weflora-teal hover:underline"
+                            onClick={() => setCitationsFilter(null)}
+                        >
+                            Clear filter
+                        </button>
+                    </div>
+                )}
                 
-                {allCitations.length === 0 && webSources.length === 0 && mapSources.length === 0 ? (
+                {filteredCitations.length === 0 && webSources.length === 0 && mapSources.length === 0 ? (
                     <p className="text-sm text-slate-500 text-center py-8">No citations found in this conversation.</p>
                 ) : (
                     <>
