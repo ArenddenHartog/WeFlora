@@ -15,46 +15,42 @@
     "data": { "type": "object" },
     "tables": { "$ref": "commonEnvelope.v0_2.json#/properties/tables" }
   },
-  "allOf": [
+  "oneOf": [
     {
-      "if": { "properties": { "responseType": { "const": "clarifying_questions" } } },
-      "then": {
-        "properties": {
-          "data": {
-            "type": "object",
-            "required": ["questions"],
-            "additionalProperties": false,
-            "properties": {
-              "questions": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 3 }
-            }
+      "properties": {
+        "responseType": { "const": "clarifying_questions" },
+        "data": {
+          "type": "object",
+          "required": ["questions"],
+          "additionalProperties": false,
+          "properties": {
+            "questions": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 3 }
           }
         }
       }
     },
     {
-      "if": { "properties": { "responseType": { "const": "answer" } } },
-      "then": {
-        "properties": {
-          "data": {
-            "type": "object",
-            "required": ["summary", "reasoning_summary", "follow_ups", "output_label"],
-            "additionalProperties": false,
-            "properties": {
-              "output_label": { "type": "string" },
-              "summary": { "type": "string" },
-              "highlights": { "type": "array", "items": { "type": "string" } },
-              "reasoning_summary": {
-                "type": "object",
-                "required": ["approach", "assumptions", "risks"],
-                "additionalProperties": false,
-                "properties": {
-                  "approach": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 3 },
-                  "assumptions": { "type": "array", "items": { "type": "string" } },
-                  "risks": { "type": "array", "items": { "type": "string" } }
-                }
-              },
-              "follow_ups": { "type": "array", "items": { "type": "string" }, "minItems": 3, "maxItems": 3 }
-            }
+      "properties": {
+        "responseType": { "const": "answer" },
+        "data": {
+          "type": "object",
+          "required": ["summary", "reasoning_summary", "follow_ups", "output_label"],
+          "additionalProperties": false,
+          "properties": {
+            "output_label": { "type": "string" },
+            "summary": { "type": "string" },
+            "highlights": { "type": "array", "items": { "type": "string" } },
+            "reasoning_summary": {
+              "type": "object",
+              "required": ["approach", "assumptions", "risks"],
+              "additionalProperties": false,
+              "properties": {
+                "approach": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 3 },
+                "assumptions": { "type": "array", "items": { "type": "string" } },
+                "risks": { "type": "array", "items": { "type": "string" } }
+              }
+            },
+            "follow_ups": { "type": "array", "items": { "type": "string" }, "minItems": 3, "maxItems": 3 }
           }
         }
       }

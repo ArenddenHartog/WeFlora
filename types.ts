@@ -286,7 +286,7 @@ export interface ChatMessage {
     contextSnapshot?: ContextItem[]; // Traceability: What context was active when this message was sent?
     reasoningSteps?: ReasoningStep[]; // For Deep Research visualization
     suggestedActions?: Array<{ label: string, action: string, icon?: string }>; // "Convert to Worksheet"
-    floraGPT?: FloraGPTResponseEnvelope;
+    floraGPT?: FloraGPTResponseEnvelope | null;
     createdAt?: string;
 }
 

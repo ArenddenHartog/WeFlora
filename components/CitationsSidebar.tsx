@@ -24,9 +24,18 @@ const CitationsSidebar: React.FC<CitationsSidebarProps> = ({ messages, onCitatio
     const { files: projectFiles } = useProject();
 
     // Flatten messages to citations while keeping track of which message they came from
-    const allCitations: EnrichedCitation[] = messages.flatMap((m) =>
-        (m.citations || []).map((c) => ({ ...c, messageId: m.id }))
-    );
+    const allCitations: EnrichedCitation[] = messages.flatMap((m) => {
+        if (m.floraGPT?.meta?.sources_used?.length) {
+            return m.floraGPT.meta.sources_used.map((entry) => ({
+                source: entry.source_id,
+                text: entry.source_id,
+                type: 'project_file' as const,
+                sourceId: entry.source_id,
+                messageId: m.id
+            }));
+        }
+        return (m.citations || []).map((c) => ({ ...c, messageId: m.id }));
+    });
 
     const filteredCitations = citationsFilter?.sourceIds?.length
         ? allCitations.filter((citation) => citation.sourceId && citationsFilter.sourceIds.includes(citation.sourceId))

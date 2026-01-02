@@ -20,6 +20,7 @@ import { mapSelectedDocs } from '../src/floragpt/utils/mapSelectedDocs';
 import { extractReferencedSourceIds } from '../src/floragpt/utils/extractReferencedSourceIds';
 import { detectUserLanguage } from '../src/floragpt/utils/detectUserLanguage';
 import { guardEvidencePack } from '../src/floragpt/orchestrator/guardEvidencePack';
+import { decodeMessageFromDb, encodeMessageForDb } from '../src/persistence/messageCodec';
 
 interface ChatContextType {
     chats: { [projectId: string]: Chat[] };
@@ -116,12 +117,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         createdAt: t.created_at,
                         updatedAt: t.updated_at,
                         contextSnapshot: t.context_snapshot || [],
-                        messages: msgs?.map((m: any) => ({
-                            id: m.id,
-                            sender: m.sender,
-                            text: m.text,
-                            createdAt: m.created_at
-                        })) || []
+                        messages: msgs?.map(decodeMessageFromDb) || []
                     };
                 }));
                 setThreads(threadsWithMsgs);
@@ -179,11 +175,11 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setMessages(prev => [...prev, message]);
         setThreads(prev => prev.map(t => t.id === threadId ? { ...t, messages: [...t.messages, message] } : t));
 
-        await supabase.from('messages').insert({
-            thread_id: threadId,
-            sender: message.sender,
-            text: message.text
-        });
+        const insertPayload = encodeMessageForDb(message, threadId);
+        await supabase.from('messages').insert(insertPayload);
+        if (message.sender === 'ai') {
+            console.info('[message:persist]', { insertedFloragptPayload: Boolean(insertPayload.floragpt_payload) });
+        }
         
         await supabase.from('threads').update({ updated_at: new Date().toISOString() }).eq('id', threadId);
     }, []);
@@ -251,7 +247,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             // 4. Save User Message to DB
             if (currentThreadId) {
-                supabase.from('messages').insert({ thread_id: currentThreadId, sender: 'user', text: text });
+                await supabase.from('messages').insert(encodeMessageForDb(userMsg, currentThreadId));
             }
 
             const userId = (await supabase.auth.getUser()).data.user?.id || '';
@@ -382,6 +378,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             citations,
                             createdAt: new Date().toISOString()
                         };
+                        console.info('[floragpt:result]', {
+                            schemaVersionReceived: floraResult.schemaVersionReceived ?? null,
+                            validationPassed: true
+                        });
                         logFloraGPTSchemaAttempt({
                             projectId: workOrder.projectId,
                             mode,
@@ -425,6 +425,11 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         fallbackUsed: true,
                         failureReason: floraResult.failureReason ?? 'schema-pipeline-failed'
                     });
+                    console.info('[floragpt:result]', {
+                        schemaVersionReceived: floraResult.schemaVersionReceived ?? null,
+                        validationPassed: false
+                    });
+                    console.warn('[floragpt:fallback]', { failureReason: floraResult.failureReason ?? 'schema-pipeline-failed' });
                 } catch (error) {
                     if (schemaAttempted) {
                         console.error('[floragpt:error]', error);

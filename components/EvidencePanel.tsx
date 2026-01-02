@@ -49,7 +49,7 @@ const EvidencePanel: React.FC = () => {
       <div className="h-14 px-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 flex-none">
         <div className="flex items-center gap-2 font-bold text-slate-800">
           <SparklesIcon className="h-5 w-5 text-weflora-teal" />
-          Skill Citations
+          Citations
         </div>
         <button
           onClick={closeEvidencePanel}
