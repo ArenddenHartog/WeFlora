@@ -1,47 +1,151 @@
 import React from 'react';
-import type { FloraGPTResponseEnvelope } from '../types';
-
-const TableRenderer = ({ table }: { table: { title?: string; columns: string[]; rows: string[][] } }) => (
-  <div className="overflow-x-auto border border-slate-200 rounded-lg my-2 bg-white shadow-sm">
-    {table.title && <div className="px-3 py-2 text-xs font-semibold text-slate-600 border-b border-slate-200">{table.title}</div>}
-    <table className="w-full text-xs text-left">
-      <thead className="bg-slate-50 border-b border-slate-200 font-semibold text-slate-700">
-        <tr>{table.columns.map((h, i) => <th key={i} className="p-2 whitespace-nowrap border-r border-slate-200 last:border-0 bg-slate-100">{h}</th>)}</tr>
-      </thead>
-      <tbody className="divide-y divide-slate-100 bg-white">
-        {table.rows.map((row, rI) => (
-          <tr key={rI} className="hover:bg-slate-50 transition-colors">
-            {row.map((cell, cI) => <td key={cI} className="p-2 border-r border-slate-100 last:border-0 align-top text-slate-600">{cell}</td>)}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-);
+import type { FloraGPTResponseEnvelope, FloraGPTTable } from '../types';
+import { InfoIcon } from './icons';
+import { useUI } from '../contexts/UIContext';
 
 export const FloraGPTJsonRenderer = ({ payload }: { payload: FloraGPTResponseEnvelope }) => {
+  const { setCitationsFilter } = useUI();
+
+  const sourcesUsed = Array.isArray(payload.meta?.sources_used)
+    ? payload.meta.sources_used.map((entry) => entry.source_id).filter(Boolean)
+    : [];
+
+  const renderTable = (table: FloraGPTTable, idx: number) => {
+    const hasCitations = sourcesUsed.length > 0;
+    return (
+      <div key={idx} className="overflow-x-auto border border-slate-200 rounded-lg my-2 bg-white shadow-sm">
+        {table.title && (
+          <div className="px-3 py-2 text-xs font-semibold text-slate-600 border-b border-slate-200">
+            {table.title}
+          </div>
+        )}
+        <table className="w-full text-xs text-left">
+          <thead className="bg-slate-50 border-b border-slate-200 font-semibold text-slate-700">
+            <tr>
+              {table.columns.map((h, i) => (
+                <th key={i} className="p-2 whitespace-nowrap border-r border-slate-200 last:border-0 bg-slate-100">
+                  {h}
+                </th>
+              ))}
+              {hasCitations && (
+                <th className="p-2 whitespace-nowrap border-r border-slate-200 last:border-0 bg-slate-100">Citations</th>
+              )}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white">
+            {table.rows.map((row, rI) => {
+              return (
+                <tr key={rI} className="hover:bg-slate-50 transition-colors">
+                  {row.map((cell, cI) => (
+                    <td key={cI} className="p-2 border-r border-slate-100 last:border-0 align-top text-slate-600">
+                      {cell}
+                    </td>
+                  ))}
+                  {hasCitations && (
+                    <td className="p-2 border-r border-slate-100 last:border-0 align-top text-slate-600">
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-slate-200 text-slate-500 hover:text-weflora-teal hover:border-weflora-teal/40 hover:bg-weflora-mint/10"
+                        title="View citations"
+                        onClick={() => setCitationsFilter({ sourceIds: sourcesUsed })}
+                      >
+                        <InfoIcon className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   if (payload.responseType === 'clarifying_questions') {
     const questions = payload.data.questions as string[] | undefined;
     return (
       <div className="text-sm text-slate-700 space-y-2">
         <p className="font-semibold text-slate-800">Clarifying questions</p>
         <ul className="list-disc list-inside space-y-1">
-          {(questions || []).map((q, idx) => <li key={idx}>{q}</li>)}
+          {(questions || []).map((q, idx) => (
+            <li key={idx}>{q}</li>
+          ))}
         </ul>
       </div>
     );
   }
 
   if (payload.mode === 'general_research') {
+    const reasoning = payload.data.reasoning_summary || {};
+    const followUps = Array.isArray(payload.data.follow_ups) ? payload.data.follow_ups : [];
     return (
       <div className="text-sm text-slate-700 space-y-3">
+        {payload.data.output_label && (
+          <div className="text-[10px] uppercase tracking-wider font-bold text-weflora-teal">
+            {payload.data.output_label}
+          </div>
+        )}
         <p>{payload.data.summary}</p>
         {Array.isArray(payload.data.highlights) && (
           <ul className="list-disc list-inside space-y-1">
-            {payload.data.highlights.map((item: string, idx: number) => <li key={idx}>{item}</li>)}
+            {payload.data.highlights.map((item: string, idx: number) => (
+              <li key={idx}>{item}</li>
+            ))}
           </ul>
         )}
-        {payload.tables?.map((table, idx) => <TableRenderer key={idx} table={table} />)}
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+          <p className="text-xs font-semibold text-slate-700 mb-2">Reasoning summary</p>
+          <div className="space-y-2">
+            <div>
+              <p className="text-[11px] font-semibold text-slate-600 uppercase">Approach</p>
+              {Array.isArray(reasoning.approach) && reasoning.approach.length > 0 ? (
+                <ul className="list-disc list-inside text-xs text-slate-600">
+                  {reasoning.approach.map((item: string, idx: number) => (
+                    <li key={idx}>{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-slate-500">None stated.</p>
+              )}
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-slate-600 uppercase">Assumptions</p>
+              {Array.isArray(reasoning.assumptions) && reasoning.assumptions.length > 0 ? (
+                <ul className="list-disc list-inside text-xs text-slate-600">
+                  {reasoning.assumptions.map((item: string, idx: number) => (
+                    <li key={idx}>{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-slate-500">None stated.</p>
+              )}
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-slate-600 uppercase">Risks</p>
+              {Array.isArray(reasoning.risks) && reasoning.risks.length > 0 ? (
+                <ul className="list-disc list-inside text-xs text-slate-600">
+                  {reasoning.risks.map((item: string, idx: number) => (
+                    <li key={idx}>{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-slate-500">None stated.</p>
+              )}
+            </div>
+          </div>
+        </div>
+        {payload.tables?.map(renderTable)}
+        <div className="pt-2">
+          <p className="font-semibold text-slate-800">Follow-ups</p>
+          <ol className="list-decimal list-inside space-y-1">
+            {(followUps.length > 0 ? followUps : ['Pending follow-up', 'Pending follow-up', 'Pending follow-up']).map(
+              (item: string, idx: number) => (
+                <li key={idx}>{item}</li>
+              )
+            )}
+          </ol>
+        </div>
       </div>
     );
   }
@@ -63,7 +167,7 @@ export const FloraGPTJsonRenderer = ({ payload }: { payload: FloraGPTResponseEnv
             </div>
           ))}
         </div>
-        {payload.tables?.map((table, idx) => <TableRenderer key={idx} table={table} />)}
+        {payload.tables?.map(renderTable)}
       </div>
     );
   }
@@ -84,7 +188,9 @@ export const FloraGPTJsonRenderer = ({ payload }: { payload: FloraGPTResponseEnv
           <div>
             <p className="font-semibold text-slate-700">Assumptions</p>
             <ul className="list-disc list-inside text-xs text-slate-600">
-              {payload.data.assumptions.map((item: string, idx: number) => <li key={idx}>{item}</li>)}
+              {payload.data.assumptions.map((item: string, idx: number) => (
+                <li key={idx}>{item}</li>
+              ))}
             </ul>
           </div>
         )}

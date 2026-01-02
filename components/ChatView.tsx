@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Chat, ChatMessage, ContextItem } from '../types';
 import ChatInput from './ChatInput';
-import { MessageRenderer, EvidenceChip } from './MessageRenderer';
+import { MessageRenderer, CitationsChip } from './MessageRenderer';
 import { FloraGPTJsonRenderer } from './FloraGPTJsonRenderer';
 import CitationsSidebar from './CitationsSidebar';
 import { 
@@ -141,8 +141,13 @@ const ChatView: React.FC<ChatViewProps> = ({
                                     <div className={`flex-1 min-w-0 max-w-[85%] ${msg.sender === 'user' ? 'text-right' : ''}`}>
                                         <div className={`prose prose-sm max-w-none text-slate-700 leading-relaxed ${msg.sender === 'user' ? 'bg-white border border-slate-200 p-3 rounded-2xl rounded-tr-none shadow-sm text-left inline-block' : ''}`}>
                                             {msg.sender === 'ai' && (
-                                                <div className="flex justify-end mb-2">
-                                                    <EvidenceChip citations={msg.citations} label="Assistant answer" />
+                                                <div className="flex items-center justify-end gap-2 mb-2">
+                                                    {import.meta.env.DEV && (
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-slate-200 text-slate-500">
+                                                            {msg.floraGPT ? 'Structured v0.2' : 'Legacy'}
+                                                        </span>
+                                                    )}
+                                                    <CitationsChip citations={msg.citations} label="Assistant answer" />
                                                 </div>
                                             )}
                                             {msg.sender === 'ai' && msg.floraGPT
@@ -163,10 +168,10 @@ const ChatView: React.FC<ChatViewProps> = ({
                                                     <button 
                                                         onClick={() => onContinueInWorksheet(msg)} 
                                                         className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors hover:bg-weflora-mint/20 hover:text-weflora-dark text-slate-400`}
-                                                        title="Extract Data to Worksheet"
+                                                        title="Preview Worksheet"
                                                     >
                                                         <TableIcon className="h-3.5 w-3.5" />
-                                                        Extract Data
+                                                        Preview Worksheet
                                                     </button>
                                                 )}
                                             </div>
@@ -200,7 +205,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                                 <FileTextIcon className="h-4 w-4" /> Convert to Report
                             </button>
                             <button onClick={() => handleBulkAction('worksheet')} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold transition-colors">
-                                <TableIcon className="h-4 w-4" /> Create Worksheet
+                                <TableIcon className="h-4 w-4" /> Preview Worksheet
                             </button>
                         </div>
                     </div>

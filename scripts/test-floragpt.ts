@@ -7,19 +7,31 @@ import { extractFirstJson } from '../src/floragpt/utils/extractJson.ts';
 import { buildEvidencePack } from '../src/floragpt/orchestrator/buildEvidencePack.ts';
 import { extractReferencedSourceIds } from '../src/floragpt/utils/extractReferencedSourceIds.ts';
 import { mapSelectedDocs } from '../src/floragpt/utils/mapSelectedDocs.ts';
+import { guardEvidencePack } from '../src/floragpt/orchestrator/guardEvidencePack.ts';
 import type { WorkOrder } from '../src/floragpt/types.ts';
 
 const workOrderBase: WorkOrder = {
   mode: 'general_research',
-  schemaVersion: 'v0.1',
+  schemaVersion: 'v0.2',
   projectId: 'proj-1',
   privateEnvelopeId: null,
   userQuery: 'Compare street trees',
-  userLanguage: 'auto',
+  userLanguage: 'English',
   responseMode: 'short',
   viewContext: 'chat',
   selectedDocs: []
 };
+
+let evidencePackCalled = false;
+const gateResult = await guardEvidencePack({
+  workOrder: { ...workOrderBase, userQuery: 'Suggest trees' },
+  buildEvidencePack: async () => {
+    evidencePackCalled = true;
+    return { globalHits: [], projectHits: [], policyHits: [] };
+  }
+});
+assert.ok(gateResult.gate);
+assert.equal(evidencePackCalled, false);
 
 assert.equal(
   resolveMode({
@@ -37,11 +49,20 @@ const policyGate = ensureContext({
 assert.ok(policyGate);
 
 const validPayload = {
-  schemaVersion: 'v0.1',
-  meta: { schema_version: 'v0.1' },
+  schemaVersion: 'v0.2',
+  meta: { schema_version: 'v0.2', sources_used: [] },
   mode: 'general_research',
   responseType: 'answer',
-  data: { summary: 'Summary.' }
+  data: {
+    output_label: 'Draft planting shortlist (v1)',
+    summary: 'Summary.',
+    reasoning_summary: {
+      approach: ['Step 1'],
+      assumptions: [],
+      risks: []
+    },
+    follow_ups: ['Question', 'Suggestion', 'Direction']
+  }
 };
 const validation = validateFloraGPTPayload('general_research', validPayload);
 assert.ok(validation.ok);
@@ -102,7 +123,7 @@ const clarifyPayload = {
 assert.ok(validateFloraGPTPayload('suitability_scoring', clarifyPayload).ok);
 
 const missingMeta = validateFloraGPTPayload('general_research', {
-  schemaVersion: 'v0.1',
+  schemaVersion: 'v0.2',
   mode: 'general_research',
   responseType: 'answer',
   data: { summary: 'Summary.' }
@@ -174,13 +195,13 @@ const referenced = extractReferencedSourceIds({
 assert.deepEqual(referenced.sort(), ['doc-3']);
 
 const generalRefs = extractReferencedSourceIds({
-  schemaVersion: 'v0.1',
-  meta: { schema_version: 'v0.1' },
+  schemaVersion: 'v0.2',
+  meta: { schema_version: 'v0.2', sources_used: [{ source_id: 'doc-9' }] },
   mode: 'general_research',
   responseType: 'answer',
   data: { summary: 'Summary.' }
 } as any);
-assert.deepEqual(generalRefs, []);
+assert.deepEqual(generalRefs, ['doc-9']);
 
 const invalidRefs = extractReferencedSourceIds({
   schemaVersion: 'v0.1',

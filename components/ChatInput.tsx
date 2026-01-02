@@ -7,7 +7,7 @@ import {
   UploadIcon, XIcon, ArrowUpIcon, PlusIcon, 
   FolderIcon, DatabaseIcon, GlobeIcon, SearchIcon,
   CheckIcon, ChatBubbleIcon, MessageSquareIcon,
-  TableIcon, FileTextIcon, SparklesIcon
+  TableIcon, FileTextIcon
 } from './icons';
 import { useProject } from '../contexts/ProjectContext';
 import { useData } from '../contexts/DataContext';
@@ -16,7 +16,7 @@ import { FILE_VALIDATION } from '../services/fileService';
 
 interface ChatInputProps {
     // Logic Props
-    onSend?: (text: string, files?: File[], instructions?: string, model?: string, contextItems?: ContextItem[], enableThinking?: boolean) => void;
+    onSend?: (text: string, files?: File[], instructions?: string, model?: string, contextItems?: ContextItem[]) => void;
     isLoading?: boolean;
     draftKey?: string;
     initialContextItems?: ContextItem[];
@@ -69,7 +69,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
     
     const [searchQuery, setSearchQuery] = useState('');
     const [isDeepResearchEnabled, setIsDeepResearchEnabled] = useState(false);
-    const [isReasoningEnabled, setIsReasoningEnabled] = useState(false);
     
     const [responseMode, setResponseMode] = useState<ResponseMode>('chat');
     const [userHasSelectedMode, setUserHasSelectedMode] = useState(false);
@@ -231,16 +230,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             }
             
             let outputFormatInstruction = "";
-            if (responseMode === 'table') {
-                outputFormatInstruction = `
-                OUTPUT FORMATTING RULE: 
-                You MUST generate the response strictly as a Markdown Table. 
-                - **NEGATIVE CONSTRAINT:** Do NOT write an introduction. Do NOT write a conclusion.
-                - Start your response immediately with the table headers (e.g. | Item | Feature |).
-                - Use the primary entities (e.g. Species, Sites) as ROWS.
-                - Use their attributes as COLUMNS.
-                `;
-            } else if (responseMode === 'report') {
+            if (responseMode === 'report') {
                 outputFormatInstruction = `
                 OUTPUT FORMATTING RULE:
                 You MUST generate the response as a Structured Report.
@@ -259,14 +249,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 finalInstructions += `\n\n${outputFormatInstruction}`;
             }
 
-            onSend(text, files.length > 0 ? files : undefined, finalInstructions, undefined, activeContext, isReasoningEnabled);
+            onSend(text, files.length > 0 ? files : undefined, finalInstructions, undefined, activeContext);
             
             if (draftKey) localStorage.removeItem(draftKey);
             setText('');
             setActiveSystemInstruction(undefined);
             setSelectedContextItems([]); 
             setIsDeepResearchEnabled(false); 
-            setIsReasoningEnabled(false);
             setUserHasSelectedMode(false);
             setResponseMode('chat');
         }
@@ -394,7 +383,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     return (
         <FilePicker accept={FILE_VALIDATION.ACCEPTED_FILE_TYPES} multiple onPick={handleFileSelect}>
             {({ open }) => (
-                <div ref={containerRef} className={`bg-white border transition-all rounded-xl shadow-sm relative flex flex-col ${isDeepResearchEnabled || isReasoningEnabled ? 'border-weflora-teal ring-2 ring-weflora-mint/30' : 'border-slate-200 focus-within:ring-2 focus-within:ring-weflora-teal/20 focus-within:border-weflora-teal'}`}>
+                <div ref={containerRef} className={`bg-white border transition-all rounded-xl shadow-sm relative flex flex-col ${isDeepResearchEnabled ? 'border-weflora-teal ring-2 ring-weflora-mint/30' : 'border-slate-200 focus-within:ring-2 focus-within:ring-weflora-teal/20 focus-within:border-weflora-teal'}`}>
             {/* Header: Mode Selector */}
             <div className="flex items-center gap-1 p-1.5 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
                 <button onClick={() => handleModeSelect('chat')} className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg text-xs transition-all relative ${responseMode === 'chat' ? 'bg-white text-slate-800 shadow-sm ring-1 ring-slate-200 font-bold' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700 font-medium'}`}><MessageSquareIcon className={`h-3.5 w-3.5 ${responseMode === 'chat' ? 'text-weflora-teal' : ''}`} /> Chat</button>
@@ -403,10 +392,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
             </div>
 
             {/* Active Context Pills */}
-            {(selectedContextItems.length > 0 || isDeepResearchEnabled || isReasoningEnabled) && (
+            {(selectedContextItems.length > 0 || isDeepResearchEnabled) && (
                 <div className="flex flex-wrap gap-2 px-3 pt-3 pb-1 animate-fadeIn">
                      {isDeepResearchEnabled && <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-weflora-mint/20 text-weflora-dark border border-weflora-teal"><GlobeIcon className="h-3 w-3" /> Deep Research On</div>}
-                     {isReasoningEnabled && <div className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-weflora-teal/20 text-weflora-dark border border-weflora-teal/20"><SparklesIcon className="h-3 w-3" /> Thinking Mode</div>}
                      {selectedContextItems.map((item) => (
                         <div key={item.id} className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border ${getContextStyle(item.source)}`}>
                             {getIcon(item.source)}
@@ -432,7 +420,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     <button ref={addRefButtonRef} onClick={() => setIsContextPickerOpen(!isContextPickerOpen)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isContextPickerOpen ? 'bg-weflora-mint/20 text-weflora-dark' : 'text-slate-500 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Add files or context"><PlusIcon className="h-3.5 w-3.5" /> Add Context</button>
                     <div className="w-px h-4 bg-slate-300 mx-1"></div>
                     <button onClick={() => setIsDeepResearchEnabled(!isDeepResearchEnabled)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isDeepResearchEnabled ? 'bg-weflora-mint/20 text-weflora-dark' : 'text-slate-500 hover:bg-weflora-mint/10 hover:text-weflora-teal'}`} title="Enable Web Search"><GlobeIcon className="h-3.5 w-3.5" /> Research</button>
-                    <button onClick={() => setIsReasoningEnabled(!isReasoningEnabled)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isReasoningEnabled ? 'bg-weflora-teal/20 text-weflora-dark' : 'text-slate-500 hover:bg-weflora-teal/10 hover:text-weflora-dark'}`} title="Enable Complex Reasoning"><SparklesIcon className="h-3.5 w-3.5" /> Think</button>
                     <div className="w-px h-4 bg-slate-300 mx-1"></div>
                     <button ref={templateButtonRef} onClick={() => setIsTemplatePickerOpen(!isTemplatePickerOpen)} className={`p-1.5 px-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold ${isTemplatePickerOpen ? 'bg-weflora-mint/20 text-weflora-dark' : 'text-slate-500 hover:text-weflora-teal hover:bg-weflora-mint/10'}`} title="Prompts"><ChatBubbleIcon className="h-3.5 w-3.5" /> Prompts</button>
                 </div>

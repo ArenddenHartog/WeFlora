@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
@@ -16,6 +16,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AuthView from './components/AuthView';
 import { XIcon, AlertTriangleIcon, CheckCircleIcon, SparklesIcon } from './components/icons';
 import type { ProjectFile, KnowledgeItem } from './types';
+import { FEATURES } from './src/config/features';
 
 // -- Global Toast Component --
 const GlobalToast = () => {
@@ -47,6 +48,10 @@ const AppContent: React.FC = () => {
     const dataContext = useData();
     const projectContext = useProject();
     const chatContext = useChat();
+
+    useEffect(() => {
+        console.info('[features]', FEATURES);
+    }, []);
 
     if (loading) return <div className="h-[100dvh] w-full flex items-center justify-center bg-slate-50">Loading WeFlora...</div>;
     if (!user) return <AuthView />;
@@ -90,10 +95,9 @@ const AppContent: React.FC = () => {
         model?: string, 
         contextItems?: any[], 
         viewModeArg?: string, 
-        enableThinking?: boolean, 
         forceNewChat?: boolean
     ) => {
-        handleSendMessage(text, filesToSend, instructions, model, contextItems, viewModeArg, enableThinking, forceNewChat);
+        handleSendMessage(text, filesToSend, instructions, model, contextItems, viewModeArg, forceNewChat);
     };
 
     return (
@@ -110,7 +114,7 @@ const AppContent: React.FC = () => {
                         const context = { id: `ctx-${item.id}`, name: itemName, source: 'upload' as const, itemId: item.id };
                         closeFilePreview();
                         navigate('/');
-                        onSendMessageWrapper(`Analyze ${itemName}`, undefined, undefined, undefined, [context], 'home', false, true);
+                        onSendMessageWrapper(`Analyze ${itemName}`, undefined, undefined, undefined, [context], 'home', true);
                     }}
                 />
             )}

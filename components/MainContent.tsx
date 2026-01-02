@@ -223,6 +223,8 @@ const MainContent: React.FC<MainContentProps> = ({
     const [newDestProjectName, setNewDestProjectName] = useState('');
     const [isExtracting, setIsExtracting] = useState(false);
     const [runSpeciesCorrectionPass, setRunSpeciesCorrectionPass] = useState(false);
+    const [worksheetStep, setWorksheetStep] = useState<'configure' | 'preview'>('configure');
+    const [worksheetPreview, setWorksheetPreview] = useState<Matrix | null>(null);
 
     // Effect to reset state when modal opens
     useEffect(() => {
@@ -232,8 +234,32 @@ const MainContent: React.FC<MainContentProps> = ({
             setNewDestProjectName('');
             setIsExtracting(false);
             setRunSpeciesCorrectionPass(false);
+            setWorksheetStep('configure');
+            setWorksheetPreview(null);
         }
     }, [destinationModal.isOpen]);
+
+    const updatePreviewColumnTitle = (columnId: string, title: string) => {
+        setWorksheetPreview(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                columns: prev.columns.map(col => col.id === columnId ? { ...col, title } : col)
+            };
+        });
+    };
+
+    const removePreviewColumn = (columnId: string) => {
+        setWorksheetPreview(prev => {
+            if (!prev) return prev;
+            const nextColumns = prev.columns.filter(col => col.id !== columnId);
+            const nextRows = prev.rows.map(row => {
+                const { [columnId]: _removed, ...rest } = row.cells;
+                return { ...row, cells: rest };
+            });
+            return { ...prev, columns: nextColumns, rows: nextRows };
+        });
+    };
 
     const handleOpenDestinationModal = (type: 'report' | 'worksheet', message: ChatMessage) => {
         openDestinationModal(type, message);
@@ -296,13 +322,33 @@ const MainContent: React.FC<MainContentProps> = ({
             closeDestinationModal();
             showNotification('Report created from chat');
         } else {
+            if (worksheetStep === 'configure') {
+                setIsExtracting(true);
+                try {
+                    const citationsText = Array.isArray(message.citations) && message.citations.length > 0
+                        ? message.citations.map(c => c.sourceId || c.source).join('; ')
+                        : '';
+                    const floraMatrix = message.floraGPT ? buildMatrixFromFloraGPT(message.floraGPT, citationsText) : null;
+                    const result = floraMatrix ?? await aiService.structureTextAsMatrix(message.text, { runSpeciesCorrectionPass });
+                    setWorksheetPreview(result);
+                    setWorksheetStep('preview');
+                } catch (error) {
+                    console.error("Extraction failed", error);
+                    showNotification("Failed to extract worksheet data.", 'error');
+                } finally {
+                    setIsExtracting(false);
+                }
+                return;
+            }
+
+            if (!worksheetPreview) {
+                showNotification("No worksheet preview available.", 'error');
+                return;
+            }
+
             setIsExtracting(true);
             try {
-                const citationsText = Array.isArray(message.citations) && message.citations.length > 0
-                    ? message.citations.map(c => c.sourceId || c.source).join('; ')
-                    : '';
-                const floraMatrix = message.floraGPT ? buildMatrixFromFloraGPT(message.floraGPT, citationsText) : null;
-                const result = floraMatrix ?? await aiService.structureTextAsMatrix(message.text, { runSpeciesCorrectionPass });
+                const result = worksheetPreview;
 
                 // Append mode: only when in standalone worksheet editor AND the user chose General Library.
                 if (appendTargetMatrixId && destination.type === 'standalone') {
@@ -601,10 +647,23 @@ const MainContent: React.FC<MainContentProps> = ({
             <BaseModal
                 isOpen={destinationModal.isOpen}
                 onClose={() => !isExtracting && closeDestinationModal()}
-                title={`Save to ${destinationModal.type === 'report' ? 'Report' : 'Worksheet'}`}
+                title={
+                    destinationModal.type === 'worksheet'
+                        ? (worksheetStep === 'preview' ? 'Submit Worksheet' : 'Preview Worksheet')
+                        : 'Save to Report'
+                }
                 size="sm"
                 footer={
                     <>
+                        {destinationModal.type === 'worksheet' && worksheetStep === 'preview' && (
+                            <button
+                                onClick={() => setWorksheetStep('configure')}
+                                disabled={isExtracting}
+                                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                            >
+                                Back
+                            </button>
+                        )}
                         <button 
                             onClick={() => closeDestinationModal()}
                             disabled={isExtracting}
@@ -620,10 +679,16 @@ const MainContent: React.FC<MainContentProps> = ({
                             {isExtracting ? (
                                 <>
                                     <RefreshIcon className="h-4 w-4 animate-spin" />
-                                    Extracting...
+                                    {destinationModal.type === 'worksheet'
+                                        ? (worksheetStep === 'preview' ? 'Submitting...' : 'Preparing preview...')
+                                        : 'Saving...'}
                                 </>
                             ) : (
-                                <span>{destinationModal.type === 'worksheet' ? 'Extract & Save' : 'Save Content'}</span>
+                                <span>
+                                    {destinationModal.type === 'worksheet'
+                                        ? (worksheetStep === 'preview' ? 'Submit Worksheet' : 'Preview Worksheet')
+                                        : 'Save Content'}
+                                </span>
                             )}
                         </button>
                     </>
@@ -635,6 +700,63 @@ const MainContent: React.FC<MainContentProps> = ({
                             <SparklesIcon className="h-10 w-10 text-weflora-teal mb-4 animate-pulse" />
                             <h3 className="text-sm font-bold text-slate-800">Analyzing Content</h3>
                             <p className="text-xs text-slate-500 mt-1">FloraGPT is structuring the data into columns and rows...</p>
+                        </div>
+                    ) : destinationModal.type === 'worksheet' && worksheetStep === 'preview' ? (
+                        <div className="space-y-4">
+                            <p className="text-sm text-slate-500">
+                                Review the worksheet structure below. You can rename or remove columns before submitting.
+                            </p>
+                            {worksheetPreview ? (
+                                <>
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-bold text-slate-600 uppercase">Columns</p>
+                                        {worksheetPreview.columns.map(col => (
+                                            <div key={col.id} className="flex items-center gap-2">
+                                                <input
+                                                    value={col.title}
+                                                    onChange={(e) => updatePreviewColumnTitle(col.id, e.target.value)}
+                                                    className="flex-1 px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700"
+                                                />
+                                                <button
+                                                    onClick={() => removePreviewColumn(col.id)}
+                                                    className="text-[10px] font-bold text-slate-500 hover:text-weflora-red uppercase"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="overflow-x-auto border border-slate-200 rounded-lg bg-white">
+                                        <table className="w-full text-xs text-left">
+                                            <thead className="bg-slate-50 border-b border-slate-200">
+                                                <tr>
+                                                    {worksheetPreview.columns.map(col => (
+                                                        <th key={col.id} className="p-2 whitespace-nowrap border-r border-slate-200 last:border-0">
+                                                            {col.title}
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {worksheetPreview.rows.slice(0, 5).map(row => (
+                                                    <tr key={row.id}>
+                                                        {worksheetPreview.columns.map(col => (
+                                                            <td key={col.id} className="p-2 border-r border-slate-100 last:border-0 text-slate-600">
+                                                                {String(row.cells?.[col.id]?.value ?? '')}
+                                                            </td>
+                                                        ))}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {worksheetPreview.rows.length > 5 && (
+                                        <div className="text-[10px] text-slate-400">Showing first 5 rows.</div>
+                                    )}
+                                </>
+                            ) : (
+                                <p className="text-sm text-slate-400">No preview available.</p>
+                            )}
                         </div>
                     ) : (
                         <>

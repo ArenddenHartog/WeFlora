@@ -18,6 +18,9 @@ import { buildCitationsFromEvidencePack } from '../src/floragpt/orchestrator/bui
 import { logFloraGPTSchemaAttempt } from '../src/floragpt/utils/logFloraGPT';
 import { mapSelectedDocs } from '../src/floragpt/utils/mapSelectedDocs';
 import { extractReferencedSourceIds } from '../src/floragpt/utils/extractReferencedSourceIds';
+import { detectUserLanguage } from '../src/floragpt/utils/detectUserLanguage';
+import { guardEvidencePack } from '../src/floragpt/orchestrator/guardEvidencePack';
+import { decodeMessageFromDb, encodeMessageForDb } from '../src/persistence/messageCodec';
 
 interface ChatContextType {
     chats: { [projectId: string]: Chat[] };
@@ -33,7 +36,7 @@ interface ChatContextType {
     // Main Chat Actions
     createThread: (initialMessage: string, contextSnapshot?: ContextItem[]) => Promise<string>;
     addMessageToThread: (threadId: string, message: ChatMessage) => void;
-    sendMessage: (text: string, files?: File[], instructions?: string, model?: string, contextItems?: ContextItem[], viewMode?: string, enableThinking?: boolean, forceNewChat?: boolean) => Promise<void>;
+    sendMessage: (text: string, files?: File[], instructions?: string, model?: string, contextItems?: ContextItem[], viewMode?: string, forceNewChat?: boolean) => Promise<void>;
     togglePinThread: (threadId: string) => void;
     deleteThread: (threadId: string) => void;
 
@@ -114,12 +117,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         createdAt: t.created_at,
                         updatedAt: t.updated_at,
                         contextSnapshot: t.context_snapshot || [],
-                        messages: msgs?.map((m: any) => ({
-                            id: m.id,
-                            sender: m.sender,
-                            text: m.text,
-                            createdAt: m.created_at
-                        })) || []
+                        messages: msgs?.map(decodeMessageFromDb) || []
                     };
                 }));
                 setThreads(threadsWithMsgs);
@@ -177,11 +175,11 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setMessages(prev => [...prev, message]);
         setThreads(prev => prev.map(t => t.id === threadId ? { ...t, messages: [...t.messages, message] } : t));
 
-        await supabase.from('messages').insert({
-            thread_id: threadId,
-            sender: message.sender,
-            text: message.text
-        });
+        const insertPayload = encodeMessageForDb(message, threadId);
+        await supabase.from('messages').insert(insertPayload);
+        if (message.sender === 'ai') {
+            console.info('[message:persist]', { insertedFloragptPayload: Boolean(insertPayload.floragpt_payload) });
+        }
         
         await supabase.from('threads').update({ updated_at: new Date().toISOString() }).eq('id', threadId);
     }, []);
@@ -217,7 +215,6 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         model?: string, 
         contextItems?: ContextItem[], 
         viewMode?: string, 
-        enableThinking?: boolean,
         forceNewChat?: boolean
     ) => {
         // 1. INSTANT FEEDBACK: Set loading immediately so UI switches view
@@ -250,7 +247,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             // 4. Save User Message to DB
             if (currentThreadId) {
-                supabase.from('messages').insert({ thread_id: currentThreadId, sender: 'user', text: text });
+                await supabase.from('messages').insert(encodeMessageForDb(userMsg, currentThreadId));
             }
 
             const userId = (await supabase.auth.getUser()).data.user?.id || '';
@@ -300,7 +297,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
 
             const promptWithHistory = buildPromptWithHistory(text, recentMessages);
-            const effectiveInstructions = [instructions, memoryInstruction].filter(Boolean).join('\n\n');
+            const userLanguage = detectUserLanguage(text);
+            const languageInstruction = `Respond only in ${userLanguage} regardless of source language.`;
+            const effectiveInstructions = [instructions, memoryInstruction, languageInstruction].filter(Boolean).join('\n\n');
 
             if (FEATURES.floragpt_modes_v0) {
                 let schemaAttempted = false;
@@ -319,14 +318,43 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         selectedDocs
                     });
 
-                    const evidencePack = await buildEvidencePack({
-                        mode,
-                        projectId: workOrder.projectId,
-                        query: text,
-                        contextItems: hydratedContext,
-                        selectedDocs: workOrder.selectedDocs,
-                        evidencePolicy: workOrder.evidencePolicy
+                    const { gate, evidencePack } = await guardEvidencePack({
+                        workOrder,
+                        buildEvidencePack: () => buildEvidencePack({
+                            mode,
+                            projectId: workOrder.projectId,
+                            query: text,
+                            contextItems: hydratedContext,
+                            selectedDocs: workOrder.selectedDocs,
+                            evidencePolicy: workOrder.evidencePolicy
+                        })
                     });
+
+                    if (gate) {
+                        const aiMsgId = `ai-${Date.now()}`;
+                        const summary = summarizeFloraGPTPayload(gate);
+                        const aiMessage: ChatMessage = {
+                            id: aiMsgId,
+                            sender: 'ai',
+                            text: summary,
+                            floraGPT: gate,
+                            citations: [],
+                            createdAt: new Date().toISOString()
+                        };
+                        setMessages(prev => [...prev, aiMessage]);
+                        if (currentThreadId) {
+                            await addMessageToThread(currentThreadId, aiMessage);
+                            if (userId && memoryPolicy) {
+                                await maybeSummarizeThread({ userId, threadId: currentThreadId, policy: memoryPolicy });
+                            }
+                        }
+                        setIsGenerating(false);
+                        return;
+                    }
+
+                    if (!evidencePack) {
+                        throw new Error('Failed to build evidence pack.');
+                    }
 
                     schemaAttempted = true;
                     const floraResult = await runMode({
@@ -350,6 +378,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             citations,
                             createdAt: new Date().toISOString()
                         };
+                        console.info('[floragpt:result]', {
+                            schemaVersionReceived: floraResult.schemaVersionReceived ?? null,
+                            validationPassed: true
+                        });
                         logFloraGPTSchemaAttempt({
                             projectId: workOrder.projectId,
                             mode,
@@ -393,6 +425,11 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         fallbackUsed: true,
                         failureReason: floraResult.failureReason ?? 'schema-pipeline-failed'
                     });
+                    console.info('[floragpt:result]', {
+                        schemaVersionReceived: floraResult.schemaVersionReceived ?? null,
+                        validationPassed: false
+                    });
+                    console.warn('[floragpt:fallback]', { failureReason: floraResult.failureReason ?? 'schema-pipeline-failed' });
                 } catch (error) {
                     if (schemaAttempted) {
                         console.error('[floragpt:error]', error);
@@ -408,7 +445,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             let accumulatedText = "";
             let finalGrounding = undefined;
 
-            const stream = aiService.generateChatStream(promptWithHistory, allFilesForAI, effectiveInstructions, model, hydratedContext, enableThinking);
+            const stream = aiService.generateChatStream(promptWithHistory, allFilesForAI, effectiveInstructions, model, hydratedContext);
 
             for await (const chunk of stream) {
                 if (chunk.text) accumulatedText += chunk.text;
