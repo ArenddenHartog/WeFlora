@@ -141,7 +141,12 @@ const ChatView: React.FC<ChatViewProps> = ({
                                     <div className={`flex-1 min-w-0 max-w-[85%] ${msg.sender === 'user' ? 'text-right' : ''}`}>
                                         <div className={`prose prose-sm max-w-none text-slate-700 leading-relaxed ${msg.sender === 'user' ? 'bg-white border border-slate-200 p-3 rounded-2xl rounded-tr-none shadow-sm text-left inline-block' : ''}`}>
                                             {msg.sender === 'ai' && (
-                                                <div className="flex justify-end mb-2">
+                                                <div className="flex items-center justify-end gap-2 mb-2">
+                                                    {import.meta.env.DEV && (
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-slate-200 text-slate-500">
+                                                            {msg.floraGPT ? 'Structured v0.2' : 'Legacy'}
+                                                        </span>
+                                                    )}
                                                     <CitationsChip citations={msg.citations} label="Assistant answer" />
                                                 </div>
                                             )}

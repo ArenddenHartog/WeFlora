@@ -985,7 +985,7 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                                                     if (!(cell.citations?.length || cell.status === 'error' || cell.reasoning)) return;
                                                     
                                                     openEvidencePanel({
-                                                        label: `Skill Citations • ${col.title}`,
+                                                        label: `Citations • ${col.title}`,
                                                         sources: cell.citations?.map(c => c.source).filter(Boolean),
                                                         generatedAt: cell.provenance?.ranAt || new Date().toLocaleString(),
                                                         reasoning: cell.reasoning,
