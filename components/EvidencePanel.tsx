@@ -49,7 +49,7 @@ const EvidencePanel: React.FC = () => {
       <div className="h-14 px-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 flex-none">
         <div className="flex items-center gap-2 font-bold text-slate-800">
           <SparklesIcon className="h-5 w-5 text-weflora-teal" />
-          Skill Evidence
+          Skill Citations
         </div>
         <button
           onClick={closeEvidencePanel}
@@ -112,10 +112,10 @@ const EvidencePanel: React.FC = () => {
         <div>
           <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
             <DatabaseIcon className="h-4 w-4 text-slate-400" />
-            Context Used
+            Citations Used
           </div>
           {sources.length === 0 ? (
-            <div className="text-xs text-slate-400 italic pl-6">No specific files cited.</div>
+            <div className="text-xs text-slate-400 italic pl-6">No specific citations available.</div>
           ) : (
             <ul className="space-y-2">
               {sources.map((s, idx) => (

@@ -144,8 +144,8 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
                         activeThreadId={activeThreadId}
                         threads={threads}
                         onSelectProject={onSelectProject}
-                        onSendQuery={(text, files, instructions, model, contextItems, enableThinking) => 
-                            sendMessage(text, files, instructions, model, contextItems, 'home', enableThinking)
+                        onSendQuery={(text, files, instructions, model, contextItems) => 
+                            sendMessage(text, files, instructions, model, contextItems, 'home')
                         }
                         onOpenMenu={onOpenMenu}
                         onOpenCreateWorksheet={() => setIsCreateWorksheetOpen(true)}

@@ -7,7 +7,7 @@ import {
     SparklesIcon, LogoIcon, RefreshIcon, CopyIcon, CheckIcon, BookmarkIcon,
     ArrowUpIcon, TrendingUpIcon, ChevronRightIcon
 } from './icons'; 
-import { MessageRenderer, EvidenceChip } from './MessageRenderer';
+import { MessageRenderer, CitationsChip } from './MessageRenderer';
 
 interface HomeViewProps {
     pinnedProjects: PinnedProject[];
@@ -16,7 +16,7 @@ interface HomeViewProps {
     activeThreadId: string | null;
     threads: Thread[];
     onSelectProject: (id: string) => void;
-    onSendQuery: (text: string, files?: File[], instructions?: string, model?: string, contextItems?: ContextItem[], enableThinking?: boolean) => void;
+    onSendQuery: (text: string, files?: File[], instructions?: string, model?: string, contextItems?: ContextItem[]) => void;
     onOpenMenu: () => void;
     onOpenCreateWorksheet: () => void;
     onOpenCreateProject: () => void;
@@ -190,7 +190,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                                     }`}>
                                         {msg.sender === 'ai' && (
                                             <div className="flex justify-end mb-2">
-                                                <EvidenceChip citations={msg.citations} label="Assistant answer" />
+                                                <CitationsChip citations={msg.citations} label="Assistant answer" />
                                             </div>
                                         )}
                                         <MessageRenderer text={msg.text} />

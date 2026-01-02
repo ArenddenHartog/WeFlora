@@ -1,6 +1,6 @@
 import type { FloraGPTResponseEnvelope } from '../types';
 
-// NOTE: This extractor strictly follows v0.1 schema citation locations.
+// NOTE: This extractor follows schema citation locations, including meta.sources_used for general_research v0.2.
 const collectIds = (items: unknown, context: string): string[] => {
   if (!Array.isArray(items)) {
     if (items !== undefined) {
@@ -21,8 +21,12 @@ export const extractReferencedSourceIds = (payload: FloraGPTResponseEnvelope): s
   const ids = new Set<string>();
 
   if (payload.mode === 'general_research') {
-    // v0.1 has no citations for general_research.
-    return [];
+    const sources = payload.meta?.sources_used || [];
+    sources
+      .map((entry) => entry?.source_id)
+      .filter((id): id is string => typeof id === 'string')
+      .forEach((id) => ids.add(id));
+    return Array.from(ids);
   }
 
   if (payload.mode === 'suitability_scoring') {

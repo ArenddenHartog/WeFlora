@@ -8,19 +8,26 @@ export type ValidationResult = {
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 
+const expectedSchemaVersion = (mode: FloraGPTMode) =>
+  mode === 'general_research' ? 'v0.2' : 'v0.1';
+
 const validateCommon = (payload: FloraGPTResponseEnvelope, mode: FloraGPTMode): string[] => {
   const errors: string[] = [];
-  if (payload.schemaVersion !== 'v0.1') errors.push('schemaVersion must be v0.1');
+  const expected = expectedSchemaVersion(mode);
+  if (payload.schemaVersion !== expected) errors.push(`schemaVersion must be ${expected}`);
   if (!payload.meta?.schema_version) {
     errors.push('meta.schema_version is required');
-  } else if (payload.meta.schema_version !== 'v0.1') {
-    errors.push('meta.schema_version must be v0.1');
+  } else if (payload.meta.schema_version !== expected) {
+    errors.push(`meta.schema_version must be ${expected}`);
   }
   if (payload.mode !== mode) errors.push('mode mismatch');
   if (!['answer', 'clarifying_questions', 'error'].includes(payload.responseType)) {
     errors.push('invalid responseType');
   }
   if (!payload.data || typeof payload.data !== 'object') errors.push('data must be an object');
+  if (mode === 'general_research' && !Array.isArray(payload.meta?.sources_used)) {
+    errors.push('meta.sources_used is required for general_research');
+  }
   return errors;
 };
 
@@ -41,6 +48,20 @@ export const validateFloraGPTPayload = (mode: FloraGPTMode, payload: unknown): V
   if (envelope.responseType === 'answer') {
     if (mode === 'general_research') {
       if (typeof envelope.data?.summary !== 'string') errors.push('summary is required');
+      if (typeof envelope.data?.output_label !== 'string') errors.push('output_label is required');
+      const reasoning = envelope.data?.reasoning_summary;
+      if (!reasoning || typeof reasoning !== 'object') {
+        errors.push('reasoning_summary is required');
+      } else {
+        if (!isStringArray(reasoning.approach) || reasoning.approach.length === 0 || reasoning.approach.length > 3) {
+          errors.push('reasoning_summary.approach must be 1-3 items');
+        }
+        if (!isStringArray(reasoning.assumptions)) errors.push('reasoning_summary.assumptions must be string[]');
+        if (!isStringArray(reasoning.risks)) errors.push('reasoning_summary.risks must be string[]');
+      }
+      if (!isStringArray(envelope.data?.follow_ups) || envelope.data.follow_ups.length < 3 || envelope.data.follow_ups.length > 3) {
+        errors.push('follow_ups must contain exactly 3 items');
+      }
     }
     if (mode === 'suitability_scoring') {
       const results = envelope.data?.results;
