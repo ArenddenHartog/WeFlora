@@ -90,10 +90,9 @@ const AppContent: React.FC = () => {
         model?: string, 
         contextItems?: any[], 
         viewModeArg?: string, 
-        enableThinking?: boolean, 
         forceNewChat?: boolean
     ) => {
-        handleSendMessage(text, filesToSend, instructions, model, contextItems, viewModeArg, enableThinking, forceNewChat);
+        handleSendMessage(text, filesToSend, instructions, model, contextItems, viewModeArg, forceNewChat);
     };
 
     return (
@@ -110,7 +109,7 @@ const AppContent: React.FC = () => {
                         const context = { id: `ctx-${item.id}`, name: itemName, source: 'upload' as const, itemId: item.id };
                         closeFilePreview();
                         navigate('/');
-                        onSendMessageWrapper(`Analyze ${itemName}`, undefined, undefined, undefined, [context], 'home', false, true);
+                        onSendMessageWrapper(`Analyze ${itemName}`, undefined, undefined, undefined, [context], 'home', true);
                     }}
                 />
             )}

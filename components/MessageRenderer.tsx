@@ -44,7 +44,7 @@ const renderInlineStyles = (text: string) => {
 };
 
 export const MessageRenderer = ({ text }: { text: string }) => {
-    // Optional evidence chip support (call sites opt-in)
+    // Optional citations chip support (call sites opt-in)
     let content = text;
     let reasoning = null;
 
@@ -135,12 +135,12 @@ export const MessageRenderer = ({ text }: { text: string }) => {
     );
 };
 
-type EvidenceChipProps = {
+type CitationsChipProps = {
     citations?: Citation[];
     label?: string;
 };
 
-export const EvidenceChip: React.FC<EvidenceChipProps> = ({ citations, label }) => {
+export const CitationsChip: React.FC<CitationsChipProps> = ({ citations, label }) => {
     const { openEvidencePanel } = useUI();
     const hasCitations = Boolean(citations && citations.length > 0);
     const sources = useMemo(() => {
@@ -160,11 +160,11 @@ export const EvidenceChip: React.FC<EvidenceChipProps> = ({ citations, label }) 
                     ? 'bg-weflora-success/10 border-weflora-success/20 text-weflora-dark hover:bg-weflora-success/20'
                     : 'bg-weflora-teal/10 border-weflora-teal/20 text-weflora-dark hover:bg-weflora-teal/20'
             }`}
-            title="View evidence"
+            title="View citations"
             type="button"
         >
             {hasCitations ? <ShieldCheckIcon className="h-3 w-3" /> : <SparklesIcon className="h-3 w-3" />}
-            Evidence
+            Citations
         </button>
     );
 };

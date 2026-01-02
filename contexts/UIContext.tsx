@@ -27,6 +27,10 @@ export type EvidenceProvenance = {
     promptHash?: string;
 };
 
+export type CitationsFilter = {
+    sourceIds: string[];
+};
+
 interface UIContextType {
     // Sidebar State
     isSidebarOpen: boolean;
@@ -63,10 +67,14 @@ interface UIContextType {
     openFilePreview: (item: ProjectFile | KnowledgeItem) => void;
     closeFilePreview: () => void;
 
-    // Evidence Panel (Global, right-side)
+    // Citations Panel (Global, right-side)
     activeEvidence: EvidenceProvenance | null;
     openEvidencePanel: (provenance: EvidenceProvenance) => void;
     closeEvidencePanel: () => void;
+
+    // Citations Sidebar Filter
+    citationsFilter: CitationsFilter | null;
+    setCitationsFilter: (filter: CitationsFilter | null) => void;
 
     // Assistant Panel (Global, right-side)
     isAssistantOpen: boolean;
@@ -94,6 +102,7 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
     const [previewItem, setPreviewItem] = useState<ProjectFile | KnowledgeItem | null>(null);
     const [activeEvidence, setActiveEvidence] = useState<EvidenceProvenance | null>(null);
+    const [citationsFilter, setCitationsFilter] = useState<CitationsFilter | null>(null);
     const [isAssistantOpen, setIsAssistantOpen] = useState(false);
     const assistantDraftKey = 'weflora-global-assistant-draft';
 
@@ -168,6 +177,7 @@ export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
             destinationModal, openDestinationModal, closeDestinationModal,
             previewItem, openFilePreview, closeFilePreview,
             activeEvidence, openEvidencePanel, closeEvidencePanel,
+            citationsFilter, setCitationsFilter,
             isAssistantOpen, assistantDraftKey, openAssistantPanel, closeAssistantPanel
         }}>
             {children}

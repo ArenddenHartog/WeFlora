@@ -1,4 +1,5 @@
 import type { WorkOrder } from '../types';
+import { detectUserLanguage } from '../utils/detectUserLanguage';
 import type { WorksheetSelectionSnapshot } from './types';
 
 type WorksheetActionType = 'score_suitability' | 'write_spec' | 'check_policy';
@@ -15,15 +16,16 @@ export const buildWorksheetWorkOrder = (args: {
   worksheetId: string;
   selection: WorksheetSelectionSnapshot | null;
   selectedDocs: WorkOrder['selectedDocs'];
+  userLanguage?: string;
 }): WorkOrder => {
-  const { actionType, projectId, worksheetId, selection, selectedDocs } = args;
+  const { actionType, projectId, worksheetId, selection, selectedDocs, userLanguage } = args;
   return {
     mode: modeByAction[actionType],
     schemaVersion: 'v0.1',
     projectId,
     privateEnvelopeId: null,
     userQuery: `Worksheet action: ${actionType} for ${worksheetId}`,
-    userLanguage: 'auto',
+    userLanguage: userLanguage ?? detectUserLanguage(''),
     responseMode: 'short',
     viewContext: 'worksheet',
     worksheetSelection: selection

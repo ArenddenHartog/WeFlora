@@ -1,8 +1,8 @@
-export const buildJsonContract = (schema: object) => `
+export const buildJsonContract = (schema: object, schemaVersion: string) => `
 You must output ONLY valid JSON that matches the provided JSON schema.
 No markdown, no code fences, no commentary, and no extra keys.
 All citations must reference source_id values from the EvidencePack.
-Include meta.schema_version with the value "v0.1".
+Include meta.schema_version with the value "${schemaVersion}".
 Schema:
 ${JSON.stringify(schema)}
 `.trim();
