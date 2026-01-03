@@ -17,7 +17,11 @@ const payload = {
       assumptions: ['Assumption'],
       risks: ['Risk']
     },
-    follow_ups: ['Question', 'Suggestion', 'Direction']
+    follow_ups: {
+      deepen: 'Question',
+      refine: 'Constraint',
+      next_step: 'Direction'
+    }
   }
 };
 

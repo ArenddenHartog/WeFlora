@@ -5,7 +5,7 @@ import ChatInput from './ChatInput';
 import { MessageRenderer, CitationsChip } from './MessageRenderer';
 import { FloraGPTJsonRenderer } from './FloraGPTJsonRenderer';
 import CitationsSidebar from './CitationsSidebar';
-import { LegacyFallbackBadge } from './ChatMessageBadges';
+import { CompatibilityBadge, LegacyFallbackBadge } from './ChatMessageBadges';
 import { 
     MenuIcon, ArrowUpIcon, RefreshIcon, CopyIcon, 
     FileTextIcon, TableIcon, CheckCircleIcon, CircleIcon,
@@ -129,6 +129,9 @@ const ChatView: React.FC<ChatViewProps> = ({
                         {messages.map(msg => {
                             // Robust Table Detection Logic: Look for pipe separator lines
                             const hasTable = /\|.*\|/.test(msg.text) && /\|[\s-]*\|/.test(msg.text);
+                            const hasEmptyLegacy = msg.sender === 'ai'
+                                && msg.floraGPTDebug?.fallbackUsed
+                                && String(msg.text || '').trim().length === 0;
                             
                             return (
                                 <div key={msg.id} className={`group flex gap-4 ${msg.sender === 'user' ? 'flex-row-reverse' : ''} ${isSelectionMode ? 'cursor-pointer' : ''}`} onClick={() => isSelectionMode && handleToggleSelection(msg.id)}>
@@ -147,6 +150,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                                             {msg.sender === 'ai' && (
                                                 <div className="flex items-center justify-end gap-2 mb-2">
                                                     <LegacyFallbackBadge message={msg} />
+                                                    <CompatibilityBadge message={msg} />
                                                     {isDev && (
                                                         <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-slate-200 text-slate-500">
                                                             {msg.floraGPT ? 'Structured v0.2' : 'Legacy'}
@@ -155,7 +159,11 @@ const ChatView: React.FC<ChatViewProps> = ({
                                                     <CitationsChip citations={msg.citations} label="Assistant answer" />
                                                 </div>
                                             )}
-                                            {msg.sender === 'ai' && msg.floraGPT && !msg.floraGPTDebug?.fallbackUsed
+                                            {hasEmptyLegacy ? (
+                                                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                                                    Empty legacy response — regeneration required.
+                                                </div>
+                                            ) : msg.sender === 'ai' && msg.floraGPT && !msg.floraGPTDebug?.fallbackUsed
                                                 ? <FloraGPTJsonRenderer payload={msg.floraGPT} />
                                                 : <MessageRenderer text={msg.text} />}
                                         </div>

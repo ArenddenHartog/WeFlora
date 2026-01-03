@@ -168,7 +168,9 @@ const CitationsSidebar: React.FC<CitationsSidebarProps> = ({ messages, onCitatio
                         {/* Internal File Sources */}
                         {selectedProjectCitations.length > 0 && (
                             <div className="mb-6">
-                                <h3 className="text-sm font-semibold text-slate-500 uppercase mb-3">Selected docs</h3>
+                                <h3 className="text-sm font-semibold text-slate-500 uppercase mb-3">
+                                    Selected docs ({selectedProjectCitations.length})
+                                </h3>
                                 <ul className="space-y-2">
                                     {selectedProjectCitations.map((citation, index) => {
                                         const isHighlighted = citation.source === highlightedFileName;

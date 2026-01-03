@@ -280,6 +280,8 @@ export interface ReasoningStep {
 export interface FloraGPTDebugInfo {
     fallbackUsed: boolean;
     failureReason?: string | null;
+    schemaVersionExpected?: string | null;
+    schemaVersionReceived?: string | null;
 }
 
 export interface ChatMessage {

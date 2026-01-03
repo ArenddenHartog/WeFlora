@@ -50,7 +50,15 @@
                 "risks": { "type": "array", "items": { "type": "string" } }
               }
             },
-            "follow_ups": { "type": "array", "items": { "type": "string" }, "minItems": 3, "maxItems": 3 }
+            "follow_ups": {
+              "type": "object",
+              "required": ["deepen", "refine", "next_step"],
+              "properties": {
+                "deepen": { "type": "string" },
+                "refine": { "type": "string" },
+                "next_step": { "type": "string" }
+              }
+            }
           }
         }
       }

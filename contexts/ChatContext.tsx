@@ -81,7 +81,7 @@ const isMissingGeneralResearchFields = (payload: ChatMessage['floraGPT']): boole
     const reasoningOk = Array.isArray(reasoningSummary?.approach)
         && Array.isArray(reasoningSummary?.assumptions)
         && Array.isArray(reasoningSummary?.risks);
-    const followUpsOk = Array.isArray(followUps) && followUps.length === 3;
+    const followUpsOk = Boolean(followUps?.deepen && followUps?.refine && followUps?.next_step);
     return !(reasoningOk && followUpsOk);
 };
 
@@ -417,8 +417,13 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     if (floraResult.ok && floraResult.payload) {
                         const repairedPayload = repairSourcesUsed(floraResult.payload, workOrder, evidencePack);
                         const missingRequiredFields = isMissingGeneralResearchFields(repairedPayload);
-                        const aiMsgId = `ai-${Date.now()}`;
-                        const summary = summarizeFloraGPTPayload(repairedPayload);
+                        const schemaMismatch = Boolean(
+                            floraResult.schemaVersionReceived
+                            && floraResult.schemaVersionReceived !== workOrder.schemaVersion
+                        );
+                        const compatibilityNote = schemaMismatch
+                            ? `Compatibility note: response schema ${floraResult.schemaVersionReceived} differs from expected ${workOrder.schemaVersion}.`
+                            : null;
                         const referencedIds = extractReferencedSourceIds(repairedPayload);
                         const citations = floraResult.payload.responseType === 'clarifying_questions'
                             ? []
@@ -427,14 +432,29 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                 referencedIds,
                                 workOrder.selectedDocs?.map((doc) => doc.sourceId) || []
                             );
+                        const selectedDocsNotice = (workOrder.selectedDocs?.length || 0) > 0
+                            && !citations.some((citation) => citation.group === 'selected')
+                            ? 'No extractable evidence found in the selected documents.'
+                            : null;
+                        const payloadWithSummary = {
+                            ...repairedPayload,
+                            data: {
+                                ...repairedPayload.data,
+                                summary: [compatibilityNote, selectedDocsNotice, repairedPayload.data?.summary].filter(Boolean).join(' ')
+                            }
+                        };
+                        const aiMsgId = `ai-${Date.now()}`;
+                        const summary = summarizeFloraGPTPayload(payloadWithSummary);
                         const aiMessage: ChatMessage = {
                             id: aiMsgId,
                             sender: 'ai',
                             text: summary,
-                            floraGPT: repairedPayload,
-                            floraGPTDebug: missingRequiredFields ? {
-                                fallbackUsed: true,
-                                failureReason: 'missing-required-fields'
+                            floraGPT: payloadWithSummary,
+                            floraGPTDebug: (missingRequiredFields || schemaMismatch) ? {
+                                fallbackUsed: missingRequiredFields,
+                                failureReason: missingRequiredFields ? 'missing-required-fields' : (schemaMismatch ? 'schema-mismatch' : undefined),
+                                schemaVersionExpected: schemaMismatch ? workOrder.schemaVersion : undefined,
+                                schemaVersionReceived: schemaMismatch ? floraResult.schemaVersionReceived ?? undefined : undefined
                             } : undefined,
                             citations,
                             createdAt: new Date().toISOString()

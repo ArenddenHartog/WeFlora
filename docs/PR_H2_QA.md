@@ -31,3 +31,6 @@ limit 20;
 1. Select a project doc, submit a query, and verify `meta.sources_used` is non-empty while the Citations panel shows items.
 2. Hard refresh after a structured v0.2 response and confirm `FloraGPTJsonRenderer` renders (not `MessageRenderer`).
 3. Provide soil/site details in the last 6 user messages, then ask a new question and confirm no repeat soil/site clarifying questions.
+4. If a fallback occurs and message text is empty, verify the UI shows “Empty legacy response — regeneration required.”
+5. If schemaVersionExpected != schemaVersionReceived, verify the compatibility badge appears and the answer includes the compatibility note.
+6. For general_research v0.2, verify follow_ups object includes deepen/refine/next_step (renderer should error if missing).
