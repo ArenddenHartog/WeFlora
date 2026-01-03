@@ -224,6 +224,7 @@ export interface Citation {
   type: 'research' | 'project_file';
   sourceId?: string;
   locationHint?: string | null;
+  group?: 'selected' | 'other';
 }
 
 export type FloraGPTMode =
@@ -267,12 +268,20 @@ export interface GroundingMetadata {
     webSources?: WebSource[];
     mapSources?: MapSource[];
     searchEntryPoint?: any;
+    floraGPTDebug?: FloraGPTDebugInfo;
 }
 
 export interface ReasoningStep {
     id: string;
     text: string;
     status: 'pending' | 'active' | 'completed';
+}
+
+export interface FloraGPTDebugInfo {
+    fallbackUsed: boolean;
+    failureReason?: string | null;
+    schemaVersionExpected?: string | null;
+    schemaVersionReceived?: string | null;
 }
 
 export interface ChatMessage {
@@ -287,6 +296,7 @@ export interface ChatMessage {
     reasoningSteps?: ReasoningStep[]; // For Deep Research visualization
     suggestedActions?: Array<{ label: string, action: string, icon?: string }>; // "Convert to Worksheet"
     floraGPT?: FloraGPTResponseEnvelope | null;
+    floraGPTDebug?: FloraGPTDebugInfo;
     createdAt?: string;
 }
 

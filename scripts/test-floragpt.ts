@@ -8,6 +8,7 @@ import { buildEvidencePack } from '../src/floragpt/orchestrator/buildEvidencePac
 import { extractReferencedSourceIds } from '../src/floragpt/utils/extractReferencedSourceIds.ts';
 import { mapSelectedDocs } from '../src/floragpt/utils/mapSelectedDocs.ts';
 import { guardEvidencePack } from '../src/floragpt/orchestrator/guardEvidencePack.ts';
+import { buildToneInstruction } from '../src/floragpt/orchestrator/tone.ts';
 import type { WorkOrder } from '../src/floragpt/types.ts';
 
 const workOrderBase: WorkOrder = {
@@ -21,6 +22,13 @@ const workOrderBase: WorkOrder = {
   viewContext: 'chat',
   selectedDocs: []
 };
+
+const toneGeneral = buildToneInstruction({ ...workOrderBase, mode: 'general_research', viewContext: 'chat' });
+const toneSuitability = buildToneInstruction({ ...workOrderBase, mode: 'suitability_scoring', viewContext: 'chat' });
+const toneWorksheet = buildToneInstruction({ ...workOrderBase, mode: 'general_research', viewContext: 'worksheet' });
+assert.notEqual(toneGeneral, toneSuitability);
+assert.notEqual(toneGeneral, toneWorksheet);
+assert.notEqual(toneSuitability, toneWorksheet);
 
 let evidencePackCalled = false;
 const gateResult = await guardEvidencePack({
@@ -61,7 +69,11 @@ const validPayload = {
       assumptions: [],
       risks: []
     },
-    follow_ups: ['Question', 'Suggestion', 'Direction']
+    follow_ups: {
+      deepen: 'Question',
+      refine: 'Constraint',
+      next_step: 'Direction'
+    }
   }
 };
 const validation = validateFloraGPTPayload('general_research', validPayload);

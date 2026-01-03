@@ -59,10 +59,18 @@ export const validateFloraGPTPayload = (mode: FloraGPTMode, payload: unknown): V
         if (!isStringArray(reasoning.assumptions)) errors.push('reasoning_summary.assumptions must be string[]');
         if (!isStringArray(reasoning.risks)) errors.push('reasoning_summary.risks must be string[]');
       }
-      if (!isStringArray(envelope.data?.follow_ups) || envelope.data.follow_ups.length < 3 || envelope.data.follow_ups.length > 3) {
-        errors.push('follow_ups must contain exactly 3 items');
+    const followUps = envelope.data?.follow_ups;
+    if (!followUps || typeof followUps !== 'object') {
+      errors.push('follow_ups must be an object');
+    } else {
+      const deepen = (followUps as any).deepen;
+      const refine = (followUps as any).refine;
+      const nextStep = (followUps as any).next_step;
+      if (!deepen || !refine || !nextStep) {
+        errors.push('follow_ups must include deepen, refine, next_step');
       }
     }
+  }
     if (mode === 'suitability_scoring') {
       const results = envelope.data?.results;
       if (!Array.isArray(results) || results.length === 0) {

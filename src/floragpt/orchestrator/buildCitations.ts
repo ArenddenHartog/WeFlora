@@ -9,9 +9,14 @@ const hitTypeToCitationType = (hit: EvidenceHit): Citation['type'] => {
   return 'project_file';
 };
 
-export const buildCitationsFromEvidencePack = (pack: EvidencePack, referencedSourceIds: string[]): Citation[] => {
+export const buildCitationsFromEvidencePack = (
+  pack: EvidencePack,
+  referencedSourceIds: string[],
+  selectedSourceIds: string[] = []
+): Citation[] => {
   const hits = [...pack.globalHits, ...pack.projectHits, ...pack.policyHits];
   const hitById = new Map(hits.map((hit) => [hit.sourceId, hit]));
+  const selectedSet = new Set(selectedSourceIds);
   return referencedSourceIds
     .map((id) => hitById.get(id))
     .filter((hit): hit is EvidenceHit => Boolean(hit))
@@ -20,6 +25,7 @@ export const buildCitationsFromEvidencePack = (pack: EvidencePack, referencedSou
     text: buildCitationText(hit),
     type: hitTypeToCitationType(hit),
     sourceId: hit.sourceId,
-    locationHint: hit.locationHint ?? null
+    locationHint: hit.locationHint ?? null,
+    group: selectedSet.has(hit.sourceId) ? 'selected' : 'other'
     }));
 };
