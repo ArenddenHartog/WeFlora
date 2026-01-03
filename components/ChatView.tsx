@@ -5,6 +5,7 @@ import ChatInput from './ChatInput';
 import { MessageRenderer, CitationsChip } from './MessageRenderer';
 import { FloraGPTJsonRenderer } from './FloraGPTJsonRenderer';
 import CitationsSidebar from './CitationsSidebar';
+import { LegacyFallbackBadge } from './ChatMessageBadges';
 import { 
     MenuIcon, ArrowUpIcon, RefreshIcon, CopyIcon, 
     FileTextIcon, TableIcon, CheckCircleIcon, CircleIcon,
@@ -25,17 +26,20 @@ interface ChatViewProps {
     onContinueInWorksheet?: (message: ChatMessage) => void;
     contextProjectId?: string; // New prop for scoping
     draftKey?: string;
+    showInput?: boolean;
 }
 
 const ChatView: React.FC<ChatViewProps> = ({ 
     chat, messages, onBack, onSendMessage, isGenerating, 
     onRegenerateMessage, onOpenMenu, variant = 'full',
-    onContinueInReport, onContinueInWorksheet, contextProjectId, draftKey
+    onContinueInReport, onContinueInWorksheet, contextProjectId, draftKey,
+    showInput = true
 }) => {
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
     const [highlightedFileName, setHighlightedFileName] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const isDev = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV);
 
     // Auto-scroll
     useEffect(() => {
@@ -142,7 +146,8 @@ const ChatView: React.FC<ChatViewProps> = ({
                                         <div className={`prose prose-sm max-w-none text-slate-700 leading-relaxed ${msg.sender === 'user' ? 'bg-white border border-slate-200 p-3 rounded-2xl rounded-tr-none shadow-sm text-left inline-block' : ''}`}>
                                             {msg.sender === 'ai' && (
                                                 <div className="flex items-center justify-end gap-2 mb-2">
-                                                    {import.meta.env.DEV && (
+                                                    <LegacyFallbackBadge message={msg} />
+                                                    {isDev && (
                                                         <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-slate-200 text-slate-500">
                                                             {msg.floraGPT ? 'Structured v0.2' : 'Legacy'}
                                                         </span>
@@ -150,7 +155,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                                                     <CitationsChip citations={msg.citations} label="Assistant answer" />
                                                 </div>
                                             )}
-                                            {msg.sender === 'ai' && msg.floraGPT
+                                            {msg.sender === 'ai' && msg.floraGPT && !msg.floraGPTDebug?.fallbackUsed
                                                 ? <FloraGPTJsonRenderer payload={msg.floraGPT} />
                                                 : <MessageRenderer text={msg.text} />}
                                         </div>
@@ -212,7 +217,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                 )}
 
                 {/* Input Area */}
-                {!isSelectionMode && (
+                {!isSelectionMode && showInput && (
                     <div className="p-4 bg-white border-t border-slate-200">
                         <div className="max-w-3xl mx-auto">
                             <ChatInput 

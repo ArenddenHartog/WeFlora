@@ -8,6 +8,7 @@ export interface WorkOrder {
   projectId: string;
   privateEnvelopeId: string | null;
   userQuery: string;
+  recentUserMessages?: string[];
   userLanguage: string;
   responseMode: 'short' | 'enriched';
   viewContext: WorkOrderViewContext;

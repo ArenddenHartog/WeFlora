@@ -4,6 +4,21 @@ import { floragptTools } from '../tools/index.ts';
 
 const MAX_CHARS = 600;
 
+const buildSelectedHit = (args: {
+  sourceId: string;
+  sourceType: 'upload' | 'global_kb' | 'policy_manual' | 'project' | 'worksheet' | 'report';
+  title?: string;
+  scope: string;
+  index: number;
+}): EvidenceHit => ({
+  sourceId: args.sourceId,
+  sourceType: args.sourceType,
+  title: args.title || 'Selected document',
+  locationHint: `selected#${args.index + 1}`,
+  snippet: `Selected source: ${args.title || args.sourceId}`,
+  scope: args.scope
+});
+
 export const buildEvidencePack = async (args: {
   mode: FloraGPTMode;
   projectId: string;
@@ -72,9 +87,31 @@ export const buildEvidencePack = async (args: {
     });
   }
 
+  const selectedProjectDocs = (selectedDocs || [])
+    .filter((doc) => doc.scope === scopeProject);
+  const selectedHits = selectedProjectDocs
+    .filter((doc) => !scopedProject.some((hit) => hit.sourceId === doc.sourceId))
+    .map((doc, index) => buildSelectedHit({
+      sourceId: doc.sourceId,
+      sourceType: doc.sourceType as EvidenceHit['sourceType'],
+      title: doc.title,
+      scope: doc.scope,
+      index
+    }));
+
+  const ensuredProjectHits = selectedProjectDocs.length > 0 && scopedProject.length + selectedHits.length === 0
+    ? [buildSelectedHit({
+      sourceId: selectedProjectDocs[0].sourceId,
+      sourceType: selectedProjectDocs[0].sourceType as EvidenceHit['sourceType'],
+      title: selectedProjectDocs[0].title,
+      scope: scopeProject,
+      index: 0
+    })]
+    : [];
+
   return {
     globalHits: scopedGlobal,
-    projectHits: [...worksheetHit, ...scopedProject],
+    projectHits: [...worksheetHit, ...scopedProject, ...selectedHits, ...ensuredProjectHits],
     policyHits: scopedPolicy
   };
 };

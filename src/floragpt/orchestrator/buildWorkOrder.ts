@@ -8,8 +8,9 @@ export const buildWorkOrder = (args: {
   contextItems: ContextItem[];
   uiAction?: string | null;
   selectedDocs?: { sourceId: string; sourceType: string; scope: string; title?: string }[];
+  recentUserMessages?: string[];
 }): WorkOrder => {
-  const { mode, userQuery, contextItems, uiAction, selectedDocs } = args;
+  const { mode, userQuery, contextItems, uiAction, selectedDocs, recentUserMessages } = args;
   const projectId =
     contextItems.find((item) => item.projectId)?.projectId ||
     'global';
@@ -20,6 +21,7 @@ export const buildWorkOrder = (args: {
     projectId,
     privateEnvelopeId: null,
     userQuery,
+    recentUserMessages,
     userLanguage: detectUserLanguage(userQuery),
     responseMode: 'short',
     viewContext: 'chat',
