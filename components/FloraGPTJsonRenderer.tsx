@@ -78,7 +78,19 @@ export const FloraGPTJsonRenderer = ({ payload }: { payload: FloraGPTResponseEnv
 
   if (payload.mode === 'general_research') {
     const reasoning = payload.data.reasoning_summary || {};
-    const followUps = Array.isArray(payload.data.follow_ups) ? payload.data.follow_ups : [];
+    const followUps = payload.data.follow_ups as {
+      deepen?: string;
+      refine?: string;
+      next_step?: string;
+    } | undefined;
+    const hasFollowUps = Boolean(followUps?.deepen && followUps?.refine && followUps?.next_step);
+    if (!hasFollowUps) {
+      return (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+          Missing required follow-ups (deepen/refine/next_step). Regeneration required.
+        </div>
+      );
+    }
     return (
       <div className="text-sm text-slate-700 space-y-3">
         {payload.data.output_label && (
@@ -139,11 +151,9 @@ export const FloraGPTJsonRenderer = ({ payload }: { payload: FloraGPTResponseEnv
         <div className="pt-2">
           <p className="font-semibold text-slate-800">Follow-ups</p>
           <ol className="list-decimal list-inside space-y-1">
-            {(followUps.length > 0 ? followUps : ['Pending follow-up', 'Pending follow-up', 'Pending follow-up']).map(
-              (item: string, idx: number) => (
-                <li key={idx}>{item}</li>
-              )
-            )}
+            <li><span className="font-semibold">Deepen:</span> {followUps?.deepen}</li>
+            <li><span className="font-semibold">Refine:</span> {followUps?.refine}</li>
+            <li><span className="font-semibold">Next step:</span> {followUps?.next_step}</li>
           </ol>
         </div>
       </div>

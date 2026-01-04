@@ -25,6 +25,9 @@ const CitationsSidebar: React.FC<CitationsSidebarProps> = ({ messages, onCitatio
 
     // Flatten messages to citations while keeping track of which message they came from
     const allCitations: EnrichedCitation[] = messages.flatMap((m) => {
+        if (m.citations && m.citations.length > 0) {
+            return m.citations.map((c) => ({ ...c, messageId: m.id }));
+        }
         if (m.floraGPT?.meta?.sources_used?.length) {
             return m.floraGPT.meta.sources_used.map((entry) => ({
                 source: entry.source_id,
@@ -34,7 +37,7 @@ const CitationsSidebar: React.FC<CitationsSidebarProps> = ({ messages, onCitatio
                 messageId: m.id
             }));
         }
-        return (m.citations || []).map((c) => ({ ...c, messageId: m.id }));
+        return [];
     });
 
     const filteredCitations = citationsFilter?.sourceIds?.length
@@ -43,6 +46,8 @@ const CitationsSidebar: React.FC<CitationsSidebarProps> = ({ messages, onCitatio
 
     const projectFileCitations = filteredCitations.filter(c => c.type === 'project_file');
     const researchCitations = filteredCitations.filter(c => c.type === 'research');
+    const selectedProjectCitations = projectFileCitations.filter(c => c.group === 'selected');
+    const otherProjectCitations = projectFileCitations.filter(c => c.group !== 'selected');
     
     // Extract Web Sources
     const webSources = citationsFilter
@@ -161,14 +166,52 @@ const CitationsSidebar: React.FC<CitationsSidebarProps> = ({ messages, onCitatio
                         )}
 
                         {/* Internal File Sources */}
-                        {projectFileCitations.length > 0 && (
+                        {selectedProjectCitations.length > 0 && (
                             <div className="mb-6">
-                                <h3 className="text-sm font-semibold text-slate-500 uppercase mb-3">From Project Files</h3>
+                                <h3 className="text-sm font-semibold text-slate-500 uppercase mb-3">
+                                    Selected docs ({selectedProjectCitations.length})
+                                </h3>
                                 <ul className="space-y-2">
-                                    {projectFileCitations.map((citation, index) => {
+                                    {selectedProjectCitations.map((citation, index) => {
                                         const isHighlighted = citation.source === highlightedFileName;
                                         return (
-                                            <li key={`proj-${index}`}>
+                                            <li key={`proj-selected-${index}`}>
+                                                <button 
+                                                    ref={isHighlighted ? highlightedRef : null}
+                                                    onClick={() => handleCitationClick(citation)}
+                                                    onMouseEnter={() => onCitationHover?.(citation.messageId)}
+                                                    onMouseLeave={() => onCitationHover?.(null)}
+                                                    className={`w-full text-left p-2 rounded-lg transition-all duration-300 group ${
+                                                        isHighlighted 
+                                                            ? 'bg-weflora-amber/10 ring-2 ring-weflora-amber shadow-sm' 
+                                                            : 'hover:bg-slate-200'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2 font-medium text-slate-700 mb-1 text-sm">
+                                                        {getIconForSource(citation.source)}
+                                                        <span className="truncate">{citation.source}</span>
+                                                    </div>
+                                                    <blockquote className={`pl-4 text-slate-600 border-l-2 ml-2 py-1 text-sm ${
+                                                        isHighlighted ? 'border-weflora-amber' : 'border-slate-200 group-hover:border-slate-400'
+                                                    }`}>
+                                                    "{citation.text}"
+                                                    </blockquote>
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
+                        )}
+
+                        {otherProjectCitations.length > 0 && (
+                            <div className="mb-6">
+                                <h3 className="text-sm font-semibold text-slate-500 uppercase mb-3">Other sources</h3>
+                                <ul className="space-y-2">
+                                    {otherProjectCitations.map((citation, index) => {
+                                        const isHighlighted = citation.source === highlightedFileName;
+                                        return (
+                                            <li key={`proj-other-${index}`}>
                                                 <button 
                                                     ref={isHighlighted ? highlightedRef : null}
                                                     onClick={() => handleCitationClick(citation)}
@@ -199,7 +242,7 @@ const CitationsSidebar: React.FC<CitationsSidebarProps> = ({ messages, onCitatio
 
                         {researchCitations.length > 0 && (
                             <div>
-                                <h3 className="text-sm font-semibold text-slate-500 uppercase mb-3">General Research</h3>
+                                <h3 className="text-sm font-semibold text-slate-500 uppercase mb-3">Other sources</h3>
                                 <ul className="space-y-4">
                                     {researchCitations.map((citation, index) => (
                                         <li key={`res-${index}`}>

@@ -7,6 +7,9 @@ export type FloraGPTSchemaLog = {
   schemaVersionReceived?: string | null;
   evidenceCounts: EvidenceCounts;
   citationsCount: number;
+  selectedDocsCount: number;
+  fallbackTextLength?: number | null;
+  schemaMismatch?: boolean;
   validationPassed: boolean;
   repairAttempted: boolean;
   fallbackUsed: boolean;

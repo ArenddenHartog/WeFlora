@@ -420,6 +420,9 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
                         policy: evidencePack.policyHits.length
                     },
                     citationsCount: 0,
+                    selectedDocsCount: workOrder.selectedDocs?.length || 0,
+                    fallbackTextLength: 0,
+                    schemaMismatch: false,
                     validationPassed: false,
                     repairAttempted: floraResult.repairAttempted,
                     fallbackUsed: true,
@@ -441,6 +444,9 @@ const WorksheetContainer: React.FC<WorksheetContainerProps> = ({
                     policy: evidencePack.policyHits.length
                 },
                 citationsCount: referencedIds.length,
+                selectedDocsCount: workOrder.selectedDocs?.length || 0,
+                fallbackTextLength: null,
+                schemaMismatch: false,
                 validationPassed: true,
                 repairAttempted: floraResult.repairAttempted,
                 fallbackUsed: false,

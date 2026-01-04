@@ -21,6 +21,8 @@ import { extractReferencedSourceIds } from '../src/floragpt/utils/extractReferen
 import { detectUserLanguage } from '../src/floragpt/utils/detectUserLanguage';
 import { guardEvidencePack } from '../src/floragpt/orchestrator/guardEvidencePack';
 import { decodeMessageFromDb, encodeMessageForDb } from '../src/persistence/messageCodec';
+import { applyThreadHydrationGuard } from '../src/persistence/threadHydrationGuard';
+import { repairSourcesUsed } from '../src/floragpt/utils/repairSourcesUsed';
 
 interface ChatContextType {
     chats: { [projectId: string]: Chat[] };
@@ -34,7 +36,7 @@ interface ChatContextType {
     isGenerating: boolean;
     
     // Main Chat Actions
-    createThread: (initialMessage: string, contextSnapshot?: ContextItem[]) => Promise<string>;
+    createThread: (initialMessage: string, contextSnapshot?: ContextItem[], initialMessages?: ChatMessage[]) => Promise<string>;
     addMessageToThread: (threadId: string, message: ChatMessage) => void;
     sendMessage: (text: string, files?: File[], instructions?: string, model?: string, contextItems?: ContextItem[], viewMode?: string, forceNewChat?: boolean) => Promise<void>;
     togglePinThread: (threadId: string) => void;
@@ -44,6 +46,7 @@ interface ChatContextType {
     entityThreads: { [entityId: string]: ChatMessage[] };
     sendEntityMessage: (entityId: string, text: string, contextData?: string, files?: File[]) => Promise<void>;
 }
+
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
@@ -71,10 +74,24 @@ const buildCitationsFromGrounding = (grounding?: { webSources?: { uri?: string; 
     return citations;
 };
 
+const isMissingGeneralResearchFields = (payload: ChatMessage['floraGPT']): boolean => {
+    if (!payload) return false;
+    if (payload.meta?.schema_version !== 'v0.2') return false;
+    if (payload.mode !== 'general_research') return false;
+    const reasoningSummary = payload.data?.reasoning_summary;
+    const followUps = payload.data?.follow_ups;
+    const reasoningOk = Array.isArray(reasoningSummary?.approach)
+        && Array.isArray(reasoningSummary?.assumptions)
+        && Array.isArray(reasoningSummary?.risks);
+    const followUpsOk = Boolean(followUps?.deepen && followUps?.refine && followUps?.next_step);
+    return !(reasoningOk && followUpsOk);
+};
+
 export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { user } = useAuth();
     const { resolveProjectFile, matrices, reports } = useProject();
     const { showNotification } = useUI();
+    const lastHydratedThreadId = React.useRef<string | null>(null);
     
     // Global/Main Chat State
     const [chats, setChats] = useState<{ [projectId: string]: Chat[] }>({});
@@ -109,7 +126,11 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             
             if (data) {
                 const threadsWithMsgs = await Promise.all(data.map(async (t: any) => {
-                    const { data: msgs } = await supabase.from('messages').select('*').eq('thread_id', t.id).order('created_at', { ascending: true });
+                    const { data: msgs } = await supabase
+                        .from('messages')
+                        .select('id, sender, text, floragpt_payload, citations, context_snapshot, grounding, suggested_actions, created_at')
+                        .eq('thread_id', t.id)
+                        .order('created_at', { ascending: true });
                     return {
                         id: t.id,
                         title: t.title,
@@ -130,7 +151,16 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (activeThreadId) {
             const thread = threads.find(t => t.id === activeThreadId);
             if (thread) {
-                setMessages(thread.messages);
+                setMessages((prev) => {
+                    const { nextMessages, nextHydratedThreadId } = applyThreadHydrationGuard({
+                        prevMessages: prev,
+                        incomingMessages: thread.messages,
+                        lastHydratedThreadId: lastHydratedThreadId.current,
+                        threadId: thread.id
+                    });
+                    lastHydratedThreadId.current = nextHydratedThreadId;
+                    return nextMessages;
+                });
             }
         } else {
             // Do NOT clear messages if we are in the middle of generating a new thread (isGenerating=true)
@@ -141,7 +171,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeThreadId, threads]); // Intentionally exclude isGenerating to avoid circular logic.
 
-    const createThread = useCallback(async (initialMessage: string, contextSnapshot: ContextItem[] = []): Promise<string> => {
+    const createThread = useCallback(async (initialMessage: string, contextSnapshot: ContextItem[] = [], initialMessages: ChatMessage[] = []): Promise<string> => {
         if (!user) return '';
         const title = initialMessage.length > 40 ? initialMessage.substring(0, 40) + '...' : initialMessage;
         
@@ -162,7 +192,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             title: data.title,
             createdAt: data.created_at,
             updatedAt: data.created_at,
-            messages: [],
+            messages: initialMessages,
             contextSnapshot
         };
         
@@ -222,6 +252,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         try {
             let currentThreadId = forceNewChat ? null : activeThreadId;
+            let fallbackDebug: ChatMessage['floraGPTDebug'] | undefined;
 
             if (forceNewChat) {
                 setActiveThreadId(null);
@@ -238,10 +269,13 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 createdAt: new Date().toISOString()
             };
             setMessages(prev => [...prev, userMsg]);
+            if (currentThreadId) {
+                setThreads(prev => prev.map(t => t.id === currentThreadId ? { ...t, messages: [...t.messages, userMsg] } : t));
+            }
 
             // 3. Ensure Thread Exists (Async)
             if (!currentThreadId) {
-                currentThreadId = await createThread(text, contextItems);
+                currentThreadId = await createThread(text, contextItems, [userMsg]);
                 if (!currentThreadId) throw new Error("Failed to initialize conversation.");
             }
 
@@ -306,6 +340,13 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 try {
                     const inferredProjectId = hydratedContext.find((item) => item.projectId)?.projectId || 'project';
                     const selectedDocs = mapSelectedDocs(hydratedContext, inferredProjectId);
+                    const threadMessages = currentThreadId
+                        ? threads.find(t => t.id === currentThreadId)?.messages || []
+                        : [];
+                    const recentUserMessages = [...threadMessages, userMsg]
+                        .filter((msg) => msg.sender === 'user')
+                        .map((msg) => msg.text)
+                        .slice(-6);
                     const mode = resolveMode({
                         userQuery: text,
                         selectedDocs
@@ -315,7 +356,14 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         mode,
                         userQuery: text,
                         contextItems: hydratedContext,
-                        selectedDocs
+                        selectedDocs,
+                        recentUserMessages
+                    });
+
+                    console.debug('[floragpt:workorder]', {
+                        selectedDocs,
+                        evidencePolicy: workOrder.evidencePolicy,
+                        projectId: workOrder.projectId
                     });
 
                     const { gate, evidencePack } = await guardEvidencePack({
@@ -356,6 +404,14 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         throw new Error('Failed to build evidence pack.');
                     }
 
+                    if ((workOrder.selectedDocs?.length || 0) > 0 && evidencePack.projectHits.length === 0) {
+                        console.warn('[floragpt:evidence]', {
+                            message: 'Selected docs present but no project evidence returned.',
+                            selectedDocsCount: workOrder.selectedDocs?.length || 0,
+                            projectId: workOrder.projectId
+                        });
+                    }
+
                     schemaAttempted = true;
                     const floraResult = await runMode({
                         workOrder,
@@ -364,23 +420,53 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     });
 
                     if (floraResult.ok && floraResult.payload) {
-                        const aiMsgId = `ai-${Date.now()}`;
-                        const summary = summarizeFloraGPTPayload(floraResult.payload);
-                        const referencedIds = extractReferencedSourceIds(floraResult.payload);
+                        const repairedPayload = repairSourcesUsed(floraResult.payload, workOrder, evidencePack);
+                        const missingRequiredFields = isMissingGeneralResearchFields(repairedPayload);
+                        const schemaMismatch = Boolean(
+                            floraResult.schemaVersionReceived
+                            && floraResult.schemaVersionReceived !== workOrder.schemaVersion
+                        );
+                        const compatibilityNote = schemaMismatch
+                            ? `Compatibility note: response schema ${floraResult.schemaVersionReceived} differs from expected ${workOrder.schemaVersion}.`
+                            : null;
+                        const referencedIds = extractReferencedSourceIds(repairedPayload);
                         const citations = floraResult.payload.responseType === 'clarifying_questions'
                             ? []
-                            : buildCitationsFromEvidencePack(evidencePack, referencedIds);
+                            : buildCitationsFromEvidencePack(
+                                evidencePack,
+                                referencedIds,
+                                workOrder.selectedDocs?.map((doc) => doc.sourceId) || []
+                            );
+                        const selectedDocsNotice = (workOrder.selectedDocs?.length || 0) > 0
+                            && !citations.some((citation) => citation.group === 'selected')
+                            ? 'No extractable evidence found in the selected documents.'
+                            : null;
+                        const payloadWithSummary = {
+                            ...repairedPayload,
+                            data: {
+                                ...repairedPayload.data,
+                                summary: [compatibilityNote, selectedDocsNotice, repairedPayload.data?.summary].filter(Boolean).join(' ')
+                            }
+                        };
+                        const aiMsgId = `ai-${Date.now()}`;
+                        const summary = summarizeFloraGPTPayload(payloadWithSummary);
                         const aiMessage: ChatMessage = {
                             id: aiMsgId,
                             sender: 'ai',
                             text: summary,
-                            floraGPT: floraResult.payload,
+                            floraGPT: payloadWithSummary,
+                            floraGPTDebug: (missingRequiredFields || schemaMismatch) ? {
+                                fallbackUsed: missingRequiredFields,
+                                failureReason: missingRequiredFields ? 'missing-required-fields' : (schemaMismatch ? 'schema-mismatch' : undefined),
+                                schemaVersionExpected: schemaMismatch ? workOrder.schemaVersion : undefined,
+                                schemaVersionReceived: schemaMismatch ? floraResult.schemaVersionReceived ?? undefined : undefined
+                            } : undefined,
                             citations,
                             createdAt: new Date().toISOString()
                         };
                         console.info('[floragpt:result]', {
                             schemaVersionReceived: floraResult.schemaVersionReceived ?? null,
-                            validationPassed: true
+                            validationPassed: !missingRequiredFields
                         });
                         logFloraGPTSchemaAttempt({
                             projectId: workOrder.projectId,
@@ -393,10 +479,13 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                 policy: evidencePack.policyHits.length
                             },
                             citationsCount: citations.length,
-                            validationPassed: true,
+                            selectedDocsCount: workOrder.selectedDocs?.length || 0,
+                            fallbackTextLength: missingRequiredFields ? summary.length : null,
+                            schemaMismatch,
+                            validationPassed: !missingRequiredFields,
                             repairAttempted: floraResult.repairAttempted,
-                            fallbackUsed: false,
-                            failureReason: floraResult.failureReason ?? null
+                            fallbackUsed: missingRequiredFields ? true : false,
+                            failureReason: missingRequiredFields ? 'missing-required-fields' : (floraResult.failureReason ?? null)
                         });
                         setMessages(prev => [...prev, aiMessage]);
                         if (currentThreadId) {
@@ -409,6 +498,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         return;
                     }
 
+                    fallbackDebug = {
+                        fallbackUsed: true,
+                        failureReason: floraResult.failureReason ?? 'schema-pipeline-failed'
+                    };
                     logFloraGPTSchemaAttempt({
                         projectId: workOrder.projectId,
                         mode,
@@ -420,6 +513,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             policy: evidencePack.policyHits.length
                         },
                         citationsCount: 0,
+                        selectedDocsCount: workOrder.selectedDocs?.length || 0,
+                        fallbackTextLength: 0,
+                        schemaMismatch: false,
                         validationPassed: false,
                         repairAttempted: floraResult.repairAttempted,
                         fallbackUsed: true,
@@ -439,7 +535,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             // 6. Stream Response (fallback / default)
             const aiMsgId = `ai-${Date.now()}`;
-            const initialAiMsg: ChatMessage = { id: aiMsgId, sender: 'ai', text: '', grounding: undefined, createdAt: new Date().toISOString() };
+            const initialAiMsg: ChatMessage = { id: aiMsgId, sender: 'ai', text: '', grounding: undefined, floraGPTDebug: fallbackDebug, createdAt: new Date().toISOString() };
             setMessages(prev => [...prev, initialAiMsg]);
 
             let accumulatedText = "";
@@ -451,7 +547,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 if (chunk.text) accumulatedText += chunk.text;
                 if (chunk.grounding) finalGrounding = chunk.grounding;
 
-                setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: accumulatedText, grounding: finalGrounding } : m));
+                setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: accumulatedText, grounding: finalGrounding, floraGPTDebug: fallbackDebug } : m));
             }
 
             const groundingCitations = buildCitationsFromGrounding(finalGrounding);
@@ -464,6 +560,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     text: accumulatedText,
                     grounding: finalGrounding,
                     citations: groundingCitations,
+                    floraGPTDebug: fallbackDebug,
                     createdAt: new Date().toISOString()
                 });
                 if (userId && memoryPolicy) {

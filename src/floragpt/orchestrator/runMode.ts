@@ -12,6 +12,7 @@ import type { AIService } from '../../../services/aiService';
 import { ensureContext } from './ensureContext.ts';
 import { extractFirstJson } from '../utils/extractJson.ts';
 import { buildCitationErrors, buildCitationFailurePayload } from './citations.ts';
+import { buildToneInstruction } from './tone.ts';
 import generalResearchSchema from '../schemas/general_research.v0_2.json';
 import suitabilityScoringSchema from '../schemas/suitability_scoring.v0_1.json';
 import specWriterSchema from '../schemas/spec_writer.v0_1.json';
@@ -73,9 +74,11 @@ export const runMode = async (args: {
   const modeSystem = modeSystemMap[workOrder.mode];
   const schema = modeSchemaMap[workOrder.mode];
   const languageInstruction = `Respond only in ${workOrder.userLanguage} regardless of source language.`;
+  const toneInstruction = buildToneInstruction(workOrder);
   const systemInstruction = [
     FLORAGPT_BASE_SYSTEM,
     languageInstruction,
+    toneInstruction,
     modeSystem,
     buildJsonContract(schema, workOrder.schemaVersion)
   ].join('\n\n');
