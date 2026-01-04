@@ -21,6 +21,7 @@ import { extractReferencedSourceIds } from '../src/floragpt/utils/extractReferen
 import { detectUserLanguage } from '../src/floragpt/utils/detectUserLanguage';
 import { guardEvidencePack } from '../src/floragpt/orchestrator/guardEvidencePack';
 import { decodeMessageFromDb, encodeMessageForDb } from '../src/persistence/messageCodec';
+import { applyThreadHydrationGuard } from '../src/persistence/threadHydrationGuard';
 import { repairSourcesUsed } from '../src/floragpt/utils/repairSourcesUsed';
 
 interface ChatContextType {
@@ -45,6 +46,7 @@ interface ChatContextType {
     entityThreads: { [entityId: string]: ChatMessage[] };
     sendEntityMessage: (entityId: string, text: string, contextData?: string, files?: File[]) => Promise<void>;
 }
+
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
@@ -89,6 +91,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const { user } = useAuth();
     const { resolveProjectFile, matrices, reports } = useProject();
     const { showNotification } = useUI();
+    const lastHydratedThreadId = React.useRef<string | null>(null);
     
     // Global/Main Chat State
     const [chats, setChats] = useState<{ [projectId: string]: Chat[] }>({});
@@ -149,12 +152,14 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const thread = threads.find(t => t.id === activeThreadId);
             if (thread) {
                 setMessages((prev) => {
-                    const prevHasStructured = prev.some((msg) => msg.floraGPT || msg.citations?.length || msg.grounding || msg.suggestedActions || msg.contextSnapshot);
-                    const threadHasStructured = thread.messages.some((msg) => msg.floraGPT || msg.citations?.length || msg.grounding || msg.suggestedActions || msg.contextSnapshot);
-                    if (prev.length > 0 && prevHasStructured && !threadHasStructured) {
-                        return prev;
-                    }
-                    return thread.messages;
+                    const { nextMessages, nextHydratedThreadId } = applyThreadHydrationGuard({
+                        prevMessages: prev,
+                        incomingMessages: thread.messages,
+                        lastHydratedThreadId: lastHydratedThreadId.current,
+                        threadId: thread.id
+                    });
+                    lastHydratedThreadId.current = nextHydratedThreadId;
+                    return nextMessages;
                 });
             }
         } else {
@@ -475,6 +480,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             },
                             citationsCount: citations.length,
                             selectedDocsCount: workOrder.selectedDocs?.length || 0,
+                            fallbackTextLength: missingRequiredFields ? summary.length : null,
+                            schemaMismatch,
                             validationPassed: !missingRequiredFields,
                             repairAttempted: floraResult.repairAttempted,
                             fallbackUsed: missingRequiredFields ? true : false,
@@ -507,6 +514,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         },
                         citationsCount: 0,
                         selectedDocsCount: workOrder.selectedDocs?.length || 0,
+                        fallbackTextLength: 0,
+                        schemaMismatch: false,
                         validationPassed: false,
                         repairAttempted: floraResult.repairAttempted,
                         fallbackUsed: true,
