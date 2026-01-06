@@ -127,7 +127,7 @@ const ChatView: React.FC<ChatViewProps> = ({
         setDecisionState(planned);
         const stepped = await runAgentStep(planned, program, agentRegistry);
         setDecisionState(withActionCards(stepped));
-    }, [agentRegistry, defaultDecisionContext, program]);
+    }, [agentRegistry, defaultDecisionContext, program, withActionCards]);
 
     const stepsVM = useMemo(() => {
         return program.steps.map(step => {
