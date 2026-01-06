@@ -6,6 +6,7 @@ import { createExecutionState, stepExecution } from '../src/decision-program/run
 import { buildAgentRegistry } from '../src/decision-program/agents/registry.ts';
 import { buildActionCards } from '../src/decision-program/orchestrator/buildActionCards.ts';
 import { minimalDraftColumns } from '../src/decision-program/orchestrator/buildDraftMatrix.ts';
+import { captureConsole } from './test-utils/captureConsole.ts';
 
 const program = buildProgram();
 const validation = validateDecisionProgram(program);
@@ -34,10 +35,17 @@ const programWithInputs = {
 const programWithInputsValidation = validateDecisionProgram(programWithInputs as any);
 assert.ok(programWithInputsValidation.ok);
 
-const invalidValidation = validateDecisionProgram({ id: 'bad' } as any);
+const invalidCapture = await captureConsole(() => validateDecisionProgram({ id: 'bad' } as any));
+const invalidValidation = invalidCapture.result;
 assert.equal(invalidValidation.ok, false);
 assert.ok(invalidValidation.errors.length > 0);
 assert.ok(invalidValidation.errors.every((error) => typeof error === 'string' && error.length > 0));
+const validationErrors = invalidCapture.entries.filter((entry) => entry.level === 'error');
+assert.ok(validationErrors.some((entry) => entry.args.some((arg) => String(arg).includes('decision_program_validation_failed'))));
+const unexpectedValidationErrors = validationErrors.filter(
+  (entry) => !entry.args.some((arg) => String(arg).includes('decision_program_validation_failed'))
+);
+assert.equal(unexpectedValidationErrors.length, 0);
 
 const missing = listMissingPointers(
   { context: { site: { stripWidthM: 2 } }, a: { b: 1 } },
@@ -64,10 +72,15 @@ const blockedState = createExecutionState(program, {
   species: {},
   supply: {}
 });
-const blockedResult = await stepExecution(blockedState, program, registry);
+const blockedCapture = await captureConsole(() => stepExecution(blockedState, program, registry));
+const blockedResult = blockedCapture.result;
 const blockedStep = blockedResult.steps.find((step) => step.status === 'blocked');
 assert.ok(blockedStep);
 assert.ok(blockedStep?.blockingMissingInputs?.includes('/context/supply/availabilityWindow'));
+const blockedWarns = blockedCapture.entries.filter((entry) => entry.level === 'warn');
+assert.ok(blockedWarns.some((entry) => entry.args.some((arg) => String(arg).includes('decision_program_blocked'))));
+const blockedErrors = blockedCapture.entries.filter((entry) => entry.level === 'error');
+assert.equal(blockedErrors.length, 0);
 
 const cards = buildActionCards(blockedResult);
 const cardTypes = cards.map((card) => card.type).sort();

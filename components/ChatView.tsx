@@ -14,7 +14,7 @@ import { planRun } from '../src/decision-program/orchestrator/planRun';
 import { runAgentStep } from '../src/decision-program/orchestrator/runAgentStep';
 import { buildAgentRegistry } from '../src/decision-program/agents/registry';
 import { setByPointer } from '../src/decision-program/runtime/pointers';
-import { handleRouteAction } from '../src/decision-program/ui/decision-accelerator/routeHandlers';
+import { buildRouteLogEntry, handleRouteAction } from '../src/decision-program/ui/decision-accelerator/routeHandlers';
 import { 
     MenuIcon, ArrowUpIcon, RefreshIcon, CopyIcon, 
     FileTextIcon, TableIcon, CheckCircleIcon, CircleIcon,
@@ -113,10 +113,10 @@ const ChatView: React.FC<ChatViewProps> = ({
         setSelectedMessageIds(new Set());
     };
 
-    const withActionCards = (state: ExecutionState) => ({
+    const withActionCards = useCallback((state: ExecutionState) => ({
         ...state,
         actionCards: buildActionCards(state)
-    });
+    }), []);
 
     const startDecisionRun = useCallback(async () => {
         const planned = withActionCards(planRun(program, defaultDecisionContext));
@@ -151,66 +151,91 @@ const ChatView: React.FC<ChatViewProps> = ({
 
     const handleSubmitActionCard = useCallback(
         async ({ cardId, cardType, input }: { cardId: string; cardType: 'deepen' | 'refine' | 'next_step'; input?: Record<string, unknown> }) => {
-            const nextState = { ...decisionState };
             const action = typeof (input as any)?.action === 'string' ? ((input as any).action as string) : null;
-            if (action) {
-                const handled = handleRouteAction({
-                    action,
-                    onPromoteToWorksheet: () => {
-                        if (!onContinueInWorksheet) return;
-                        onContinueInWorksheet({
-                            id: `decision-${cardId}`,
-                            sender: 'ai',
-                            text: 'Decision Action: promote to worksheet.'
-                        } as ChatMessage);
-                    },
-                    onDraftReport: () => {
-                        if (!onContinueInReport) {
-                            window.alert('Report drafting not yet implemented');
-                            return;
-                        }
-                        onContinueInReport({
-                            id: `decision-report-${cardId}`,
-                            sender: 'ai',
-                            text: 'Decision Action: draft report.'
-                        } as ChatMessage);
-                    },
-                    toast: (message) => window.alert(message)
-                });
-                if (handled) {
-                    return { navigation: { kind: action.replace('route:', '') as 'worksheet' | 'report' } };
-                }
-            }
             const patches = Array.isArray((input as any)?.patches)
                 ? ((input as any).patches as Array<{ pointer: string; value: unknown }>)
                 : [];
-            patches.forEach((patch) => {
-                try {
-                    setByPointer(nextState, patch.pointer, patch.value);
-                } catch (error) {
-                    console.error('decision_program_patch_failed', {
-                        runId: decisionState.runId,
-                        pointer: patch.pointer,
-                        error: (error as Error).message
+            const contextPatch = input && (input as any).context && typeof (input as any).context === 'object'
+                ? ((input as any).context as any)
+                : null;
+
+            let resumeRequested = false;
+            let handledRoute = false;
+            let nextStateSnapshot: ExecutionState | null = null;
+
+            setDecisionState((prev) => {
+                let nextState = { ...prev };
+                if (action) {
+                    handledRoute = handleRouteAction({
+                        action,
+                        onPromoteToWorksheet: () => {
+                            if (!onContinueInWorksheet) return;
+                            onContinueInWorksheet({
+                                id: `decision-${cardId}`,
+                                sender: 'ai',
+                                text: 'Decision Action: promote to worksheet.'
+                            } as ChatMessage);
+                        },
+                        onDraftReport: () => {
+                            if (!onContinueInReport) {
+                                window.alert('Report drafting not yet implemented');
+                                return;
+                            }
+                            onContinueInReport({
+                                id: `decision-report-${cardId}`,
+                                sender: 'ai',
+                                text: 'Decision Action: draft report.'
+                            } as ChatMessage);
+                        },
+                        toast: (message) => window.alert(message)
                     });
+                    if (handledRoute) {
+                        nextState = {
+                            ...nextState,
+                            logs: [...nextState.logs, buildRouteLogEntry({ action, runId: nextState.runId })]
+                        };
+                        nextStateSnapshot = nextState;
+                        return withActionCards(nextState);
+                    }
                 }
+
+                patches.forEach((patch) => {
+                    try {
+                        setByPointer(nextState, patch.pointer, patch.value);
+                    } catch (error) {
+                        console.error('decision_program_patch_failed', {
+                            runId: nextState.runId,
+                            pointer: patch.pointer,
+                            error: (error as Error).message
+                        });
+                    }
+                });
+
+                if (contextPatch) {
+                    nextState.context = { ...nextState.context, ...contextPatch };
+                }
+
+                resumeRequested = cardType === 'refine' && patches.length > 0;
+                nextStateSnapshot = nextState;
+                return withActionCards(nextState);
             });
-            if (input && (input as any).context && typeof (input as any).context === 'object') {
-                nextState.context = { ...nextState.context, ...((input as any).context as any) };
+
+            if (handledRoute && action) {
+                return { navigation: { kind: action.replace('route:', '') as 'worksheet' | 'report' } };
             }
+
             if (cardType === 'next_step') {
                 return { navigation: { kind: 'worksheet' } };
             }
-            const shouldResume = cardType === 'refine' && patches.length > 0;
-            if (shouldResume) {
-                const stepped = await runAgentStep(nextState, program, agentRegistry);
+
+            if (resumeRequested && nextStateSnapshot) {
+                const stepped = await runAgentStep(nextStateSnapshot, program, agentRegistry);
                 setDecisionState(withActionCards(stepped));
                 return { patches, resumeRun: true };
             }
-            setDecisionState(withActionCards(nextState));
             return { patches, resumeRun: false };
         },
-        [agentRegistry, decisionState, program]
+        [agentRegistry, onContinueInReport, onContinueInWorksheet, program, withActionCards]
     );
 
     useEffect(() => {

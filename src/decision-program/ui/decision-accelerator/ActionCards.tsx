@@ -1,5 +1,12 @@
 import React, { useMemo, useRef, useState } from 'react';
 import type { ActionCard, ActionCardInput, ActionCardSuggestedAction, ExecutionState, PointerPatch } from '../../types';
+import {
+  InputEl,
+  buildPatchesForInputs,
+  buildSuggestedActionSubmitArgs,
+  normalizeNumberInputValue,
+  shouldDisableRefine
+} from './actionCardUtils';
 
 type _ActionCardsExecutionState = ExecutionState;
 type _ActionCardInput = ActionCardInput;
@@ -48,21 +55,15 @@ const ActionCards: React.FC<ActionCardsProps> = ({
   showTypeBadges = true,
   className
 }) => {
-  const [formValues, setFormValues] = useState<Record<string, string | number | boolean>>({});
-  const inputRefs = useRef<Record<string, HTMLInputElement | HTMLSelectElement | null>>({});
+  const [formValues, setFormValues] = useState<Record<string, string | number | boolean | undefined>>({});
+  const inputRefs = useRef<Record<string, InputEl | null>>({});
 
   const setFieldValue = (input: ActionCardInput, value: string | number | boolean) => {
     setFormValues((prev) => ({ ...prev, [input.id]: value }));
   };
 
-  const buildPatches = (inputs: ActionCardInput[]): PointerPatch[] =>
-    inputs.map((input) => ({
-      pointer: input.pointer,
-      value: formValues[input.id]
-    }));
-
-  const hasMissingRequired = (inputs: ActionCardInput[]) =>
-    inputs.some((input) => input.required && (formValues[input.id] === undefined || formValues[input.id] === ''));
+  const buildPatches = (inputs: ActionCardInput[]): PointerPatch[] => buildPatchesForInputs(inputs, formValues);
+  const hasMissingRequired = (inputs: ActionCardInput[]) => shouldDisableRefine(inputs, formValues);
 
   const allInputsByPointer = useMemo(() => {
     const map: Record<string, ActionCardInput> = {};
@@ -87,7 +88,11 @@ const ActionCards: React.FC<ActionCardsProps> = ({
       }
       return;
     }
-    onSubmitCard({ cardId: card.id, cardType: card.type, input: { action: action.action } });
+    if (action.action.startsWith('route:')) {
+      onSubmitCard(buildSuggestedActionSubmitArgs(card, action));
+      return;
+    }
+    onSubmitCard(buildSuggestedActionSubmitArgs(card, action));
   };
 
   return (
@@ -153,7 +158,10 @@ const ActionCards: React.FC<ActionCardsProps> = ({
                         }}
                         type="number"
                         value={(formValues[input.id] as number | string | undefined) ?? ''}
-                        onChange={(event) => setFieldValue(input, Number(event.target.value))}
+                        onChange={(event) => {
+                          const nextValue = normalizeNumberInputValue(event.target.value);
+                          setFieldValue(input, nextValue as number | undefined);
+                        }}
                         placeholder={input.placeholder}
                         className="w-full rounded-md border border-slate-200 px-2 py-1 text-xs"
                       />
@@ -210,6 +218,7 @@ const ActionCards: React.FC<ActionCardsProps> = ({
                   onSubmitCard({
                     cardId: card.id,
                     cardType: card.type,
+                    // Submit payload uses input.patches for ChatView handler.
                     input: card.inputs ? { patches: buildPatches(card.inputs) } : undefined
                   })
                 }
