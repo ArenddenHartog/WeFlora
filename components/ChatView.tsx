@@ -14,7 +14,7 @@ import { planRun } from '../src/decision-program/orchestrator/planRun';
 import { runAgentStep } from '../src/decision-program/orchestrator/runAgentStep';
 import { buildAgentRegistry } from '../src/decision-program/agents/registry';
 import { setByPointer } from '../src/decision-program/runtime/pointers';
-import { handleRouteAction } from '../src/decision-program/ui/decision-accelerator/routeHandlers';
+import { buildRouteLogEntry, handleRouteAction } from '../src/decision-program/ui/decision-accelerator/routeHandlers';
 import { 
     MenuIcon, ArrowUpIcon, RefreshIcon, CopyIcon, 
     FileTextIcon, TableIcon, CheckCircleIcon, CircleIcon,
@@ -178,6 +178,14 @@ const ChatView: React.FC<ChatViewProps> = ({
                     toast: (message) => window.alert(message)
                 });
                 if (handled) {
+                    const routedState = {
+                        ...nextState,
+                        logs: [
+                            ...nextState.logs,
+                            buildRouteLogEntry({ action, runId: nextState.runId })
+                        ]
+                    };
+                    setDecisionState(withActionCards(routedState));
                     return { navigation: { kind: action.replace('route:', '') as 'worksheet' | 'report' } };
                 }
             }
