@@ -10,6 +10,10 @@ import { DecisionModeView } from '../src/decision-program/ui/decision-accelerato
 import { buildProgram } from '../src/decision-program/orchestrator/buildProgram';
 import { inferIntent } from '../src/decision-program/orchestrator/inferIntent';
 import { buildActionCards } from '../src/decision-program/orchestrator/buildActionCards';
+import {
+    buildDefaultPatchesForPointers,
+    buildDefaultsLogEntry
+} from '../src/decision-program/orchestrator/pointerInputRegistry';
 import { planRun } from '../src/decision-program/orchestrator/planRun';
 import { runAgentStep } from '../src/decision-program/orchestrator/runAgentStep';
 import { buildAgentRegistry } from '../src/decision-program/agents/registry';
@@ -53,7 +57,7 @@ const ChatView: React.FC<ChatViewProps> = ({
     const agentRegistry = useMemo(() => buildAgentRegistry(), []);
     const defaultDecisionContext = useMemo(
         () => ({
-            site: { stripWidthM: 2.4, soilType: 'Loam', canopyGoal: 'Shade' },
+            site: {},
             regulatory: {},
             equity: {},
             species: {},
@@ -152,7 +156,7 @@ const ChatView: React.FC<ChatViewProps> = ({
     const handleSubmitActionCard = useCallback(
         async ({ cardId, cardType, input }: { cardId: string; cardType: 'deepen' | 'refine' | 'next_step'; input?: Record<string, unknown> }) => {
             const action = typeof (input as any)?.action === 'string' ? ((input as any).action as string) : null;
-            const patches = Array.isArray((input as any)?.patches)
+            let patches = Array.isArray((input as any)?.patches)
                 ? ((input as any).patches as Array<{ pointer: string; value: unknown }>)
                 : [];
             const contextPatch = input && (input as any).context && typeof (input as any).context === 'object'
@@ -196,6 +200,21 @@ const ChatView: React.FC<ChatViewProps> = ({
                         };
                         nextStateSnapshot = nextState;
                         return withActionCards(nextState);
+                    }
+                }
+
+                if (cardType === 'refine' && action === 'refine:apply-defaults') {
+                    const card = prev.actionCards.find(candidate => candidate.id === cardId);
+                    const pointers = card?.inputs?.map((candidate) => candidate.pointer) ?? [];
+                    const { patches: defaultPatches, appliedPointers } = buildDefaultPatchesForPointers(prev, pointers);
+                    if (appliedPointers.length > 0) {
+                        patches = defaultPatches;
+                        nextState = {
+                            ...nextState,
+                            logs: [...nextState.logs, buildDefaultsLogEntry({ runId: nextState.runId, pointers: appliedPointers })]
+                        };
+                    } else {
+                        patches = [];
                     }
                 }
 

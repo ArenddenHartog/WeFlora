@@ -38,7 +38,7 @@ assert.equal(stateLogs[0].message, 'User routed run to worksheet');
 assert.equal(stateLogs[1].message, 'User routed run to report');
 
 const handledOther = handleRouteAction({
-  action: 'resolve:/context/site/soilType',
+  action: 'resolve:/context/site/soil/type',
   onPromoteToWorksheet: () => {
     worksheetCalls += 1;
   },

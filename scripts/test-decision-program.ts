@@ -5,6 +5,8 @@ import { listMissingPointers, setByPointer } from '../src/decision-program/runti
 import { createExecutionState, stepExecution } from '../src/decision-program/runtime/engine.ts';
 import { buildAgentRegistry } from '../src/decision-program/agents/registry.ts';
 import { buildActionCards } from '../src/decision-program/orchestrator/buildActionCards.ts';
+import { STREET_TREE_SHORTLIST_REQUIRED_POINTERS } from '../src/decision-program/orchestrator/canonicalPointers.ts';
+import { getInputSpec } from '../src/decision-program/orchestrator/pointerInputRegistry.ts';
 import { minimalDraftColumns } from '../src/decision-program/orchestrator/buildDraftMatrix.ts';
 import { captureConsole } from './test-utils/captureConsole.ts';
 
@@ -49,34 +51,64 @@ assert.equal(unexpectedValidationErrors.length, 0);
 
 const missing = listMissingPointers(
   { context: { site: { stripWidthM: 2 } }, a: { b: 1 } },
-  ['/a/b', '/a/c', '/context/site/soilType']
+  ['/a/b', '/a/c', '/context/site/soil/type']
 );
-assert.deepEqual(missing, ['/a/c', '/context/site/soilType']);
+assert.deepEqual(missing, ['/a/c', '/context/site/soil/type']);
 
 const registry = buildAgentRegistry();
 
 const runnableState = createExecutionState(program, {
-  site: { stripWidthM: 2.4, soilType: 'Loam' },
-  regulatory: {},
-  equity: {},
-  species: {},
-  supply: { availabilityWindow: 'Fall 2025' }
-});
-const runnableResult = await stepExecution(runnableState, program, registry);
-assert.ok(runnableResult.steps.every((step) => step.status === 'done'));
-
-const blockedState = createExecutionState(program, {
-  site: { stripWidthM: 2.4, soilType: 'Loam' },
+  site: {},
   regulatory: {},
   equity: {},
   species: {},
   supply: {}
 });
+STREET_TREE_SHORTLIST_REQUIRED_POINTERS.forEach((pointer) => {
+  const spec = getInputSpec(pointer);
+  let value: unknown = spec?.defaultValue ?? 'Unknown';
+  if (spec?.input.type === 'boolean') {
+    value = false;
+  } else if (spec?.input.type === 'number') {
+    value = 1;
+  } else if (spec?.input.type === 'select') {
+    value = spec.input.options?.[0] ?? 'unknown';
+  }
+  setByPointer(runnableState, pointer, value);
+});
+const runnableResult = await stepExecution(runnableState, program, registry);
+assert.ok(runnableResult.steps.every((step) => step.status === 'done'));
+
+const blockedMissingPointers = [
+  '/context/site/soil/compaction',
+  '/context/regulatory/setting',
+  '/context/species/goals/primaryGoal'
+];
+const blockedState = createExecutionState(program, {
+  site: {},
+  regulatory: {},
+  equity: {},
+  species: {},
+  supply: {}
+});
+STREET_TREE_SHORTLIST_REQUIRED_POINTERS.forEach((pointer) => {
+  if (blockedMissingPointers.includes(pointer)) return;
+  const spec = getInputSpec(pointer);
+  let value: unknown = spec?.defaultValue ?? 'Unknown';
+  if (spec?.input.type === 'boolean') {
+    value = false;
+  } else if (spec?.input.type === 'number') {
+    value = 1;
+  } else if (spec?.input.type === 'select') {
+    value = spec.input.options?.[0] ?? 'unknown';
+  }
+  setByPointer(blockedState, pointer, value);
+});
 const blockedCapture = await captureConsole(() => stepExecution(blockedState, program, registry));
 const blockedResult = blockedCapture.result;
 const blockedStep = blockedResult.steps.find((step) => step.status === 'blocked');
 assert.ok(blockedStep);
-assert.ok(blockedStep?.blockingMissingInputs?.includes('/context/supply/availabilityWindow'));
+assert.deepEqual(blockedStep?.blockingMissingInputs, blockedMissingPointers);
 const blockedWarns = blockedCapture.entries.filter((entry) => entry.level === 'warn');
 assert.ok(blockedWarns.some((entry) => entry.args.some((arg) => String(arg).includes('decision_program_blocked'))));
 const blockedErrors = blockedCapture.entries.filter((entry) => entry.level === 'error');
@@ -93,6 +125,14 @@ refineCard?.inputs?.forEach((input) => {
   assert.ok(input.pointer);
   assert.ok(blockedStep?.blockingMissingInputs?.includes(input.pointer));
 });
+blockedMissingPointers.forEach((pointer) => {
+  const spec = getInputSpec(pointer);
+  const input = refineCard?.inputs?.find((candidate) => candidate.pointer === pointer);
+  assert.ok(spec);
+  assert.ok(input);
+  assert.equal(input?.label, spec?.input.label);
+  assert.equal(input?.type, spec?.input.type);
+});
 
 const matrix = runnableResult.draftMatrix;
 assert.ok(matrix);
@@ -108,6 +148,17 @@ assert.ok(nextActions.includes('route:worksheet'));
 assert.ok(nextActions.includes('route:report'));
 
 const patchedState = { ...blockedResult } as any;
-setByPointer(patchedState, blockedStep?.blockingMissingInputs?.[0] as string, 'Fall 2025');
+blockedMissingPointers.forEach((pointer) => {
+  const spec = getInputSpec(pointer);
+  let value: unknown = spec?.defaultValue ?? 'Unknown';
+  if (spec?.input.type === 'boolean') {
+    value = false;
+  } else if (spec?.input.type === 'number') {
+    value = 1;
+  } else if (spec?.input.type === 'select') {
+    value = spec.input.options?.[0] ?? 'unknown';
+  }
+  setByPointer(patchedState, pointer, value);
+});
 const resumedResult = await stepExecution(patchedState, program, registry);
 assert.ok(resumedResult.steps.every((step) => step.status === 'done'));
