@@ -166,14 +166,15 @@ export const stepExecution = async (
         state: nextState
       });
       const produces = getStepProducesPointers(program, step.stepId, agentRegistry);
+      let patchFailed = false;
       for (const patch of result.patches) {
         try {
           setByPointer(nextState, patch.pointer, patch.value);
         } catch (error) {
           pushLog(nextState, {
             level: 'error',
-            message: 'Failed to apply patch',
-            data: { stepId: step.stepId, pointer: patch.pointer, error: (error as Error).message }
+            message: 'Agent patch application failed',
+            data: { stepId: step.stepId, agentId: agent.id, pointer: patch.pointer, message: (error as Error).message }
           });
           console.error('decision_program_patch_failed', {
             runId: nextState.runId,
@@ -183,8 +184,15 @@ export const stepExecution = async (
           });
           step.status = 'error';
           step.error = { message: `Failed to apply patch ${patch.pointer}` };
+          step.endedAt = now();
+          patchFailed = true;
           break;
         }
+      }
+      if (patchFailed) {
+        nextState.status = 'error';
+        nextState.endedAt = now();
+        break;
       }
       pushLog(nextState, {
         level: 'info',

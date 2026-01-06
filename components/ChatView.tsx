@@ -14,6 +14,7 @@ import { planRun } from '../src/decision-program/orchestrator/planRun';
 import { runAgentStep } from '../src/decision-program/orchestrator/runAgentStep';
 import { buildAgentRegistry } from '../src/decision-program/agents/registry';
 import { setByPointer } from '../src/decision-program/runtime/pointers';
+import { handleRouteAction } from '../src/decision-program/ui/decision-accelerator/routeHandlers';
 import { 
     MenuIcon, ArrowUpIcon, RefreshIcon, CopyIcon, 
     FileTextIcon, TableIcon, CheckCircleIcon, CircleIcon,
@@ -152,10 +153,32 @@ const ChatView: React.FC<ChatViewProps> = ({
         async ({ cardId, cardType, input }: { cardId: string; cardType: 'deepen' | 'refine' | 'next_step'; input?: Record<string, unknown> }) => {
             const nextState = { ...decisionState };
             const action = typeof (input as any)?.action === 'string' ? ((input as any).action as string) : null;
-            if (action?.startsWith('route:')) {
-                const destination = action.replace('route:', '');
-                if (destination === 'worksheet' || destination === 'report') {
-                    return { navigation: { kind: destination as 'worksheet' | 'report' } };
+            if (action) {
+                const handled = handleRouteAction({
+                    action,
+                    onPromoteToWorksheet: () => {
+                        if (!onContinueInWorksheet) return;
+                        onContinueInWorksheet({
+                            id: `decision-${cardId}`,
+                            sender: 'ai',
+                            text: 'Decision Action: promote to worksheet.'
+                        } as ChatMessage);
+                    },
+                    onDraftReport: () => {
+                        if (!onContinueInReport) {
+                            window.alert('Report drafting not yet implemented');
+                            return;
+                        }
+                        onContinueInReport({
+                            id: `decision-report-${cardId}`,
+                            sender: 'ai',
+                            text: 'Decision Action: draft report.'
+                        } as ChatMessage);
+                    },
+                    toast: (message) => window.alert(message)
+                });
+                if (handled) {
+                    return { navigation: { kind: action.replace('route:', '') as 'worksheet' | 'report' } };
                 }
             }
             const patches = Array.isArray((input as any)?.patches)
