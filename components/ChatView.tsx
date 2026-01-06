@@ -1,10 +1,20 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { Chat, ChatMessage, ContextItem } from '../types';
+import type { ExecutionState } from '../src/decision-program/types';
 import ChatInput from './ChatInput';
 import { MessageRenderer, CitationsChip } from './MessageRenderer';
 import { FloraGPTJsonRenderer } from './FloraGPTJsonRenderer';
 import CitationsSidebar from './CitationsSidebar';
+import { DecisionModeView } from '../src/decision-program/ui/decision-accelerator';
+import { buildProgram } from '../src/decision-program/orchestrator/buildProgram';
+import { inferIntent } from '../src/decision-program/orchestrator/inferIntent';
+import { buildActionCards } from '../src/decision-program/orchestrator/buildActionCards';
+import { planRun } from '../src/decision-program/orchestrator/planRun';
+import { runAgentStep } from '../src/decision-program/orchestrator/runAgentStep';
+import { buildAgentRegistry } from '../src/decision-program/agents/registry';
+import { setByPointer } from '../src/decision-program/runtime/pointers';
+import { handleRouteAction } from '../src/decision-program/ui/decision-accelerator/routeHandlers';
 import { 
     MenuIcon, ArrowUpIcon, RefreshIcon, CopyIcon, 
     FileTextIcon, TableIcon, CheckCircleIcon, CircleIcon,
@@ -36,6 +46,28 @@ const ChatView: React.FC<ChatViewProps> = ({
     const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
     const [highlightedFileName, setHighlightedFileName] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const lastIntentMessageId = useRef<string | null>(null);
+    const persistenceErrorLogged = useRef(false);
+
+    const program = useMemo(() => buildProgram(), []);
+    const agentRegistry = useMemo(() => buildAgentRegistry(), []);
+    const defaultDecisionContext = useMemo(
+        () => ({
+            site: { stripWidthM: 2.4, soilType: 'Loam', canopyGoal: 'Shade' },
+            regulatory: {},
+            equity: {},
+            species: {},
+            supply: {},
+            selectedDocs: [] as any[]
+        }),
+        []
+    );
+    const initialDecisionState = useMemo(() => {
+        const planned = planRun(program, defaultDecisionContext);
+        return { ...planned, actionCards: buildActionCards(planned) };
+    }, [defaultDecisionContext, program]);
+    const [decisionState, setDecisionState] = useState<ExecutionState>(initialDecisionState);
+    const [viewMode, setViewMode] = useState<'chat' | 'decision'>('chat');
 
     // Auto-scroll
     useEffect(() => {
@@ -81,6 +113,139 @@ const ChatView: React.FC<ChatViewProps> = ({
         setSelectedMessageIds(new Set());
     };
 
+    const withActionCards = (state: ExecutionState) => ({
+        ...state,
+        actionCards: buildActionCards(state)
+    });
+
+    const startDecisionRun = useCallback(async () => {
+        const planned = withActionCards(planRun(program, defaultDecisionContext));
+        setDecisionState(planned);
+        const stepped = await runAgentStep(planned, program, agentRegistry);
+        setDecisionState(withActionCards(stepped));
+    }, [agentRegistry, defaultDecisionContext, program]);
+
+    const stepsVM = useMemo(() => {
+        return program.steps.map(step => {
+            const stepState = decisionState.steps.find(candidate => candidate.stepId === step.id);
+            const startedAt = stepState?.startedAt;
+            const endedAt = stepState?.endedAt;
+            const durationMs =
+                startedAt && endedAt
+                    ? new Date(endedAt).getTime() - new Date(startedAt).getTime()
+                    : undefined;
+            return {
+                stepId: step.id,
+                title: step.title,
+                kind: step.kind,
+                agentRef: step.agentRef,
+                status: (stepState?.status ?? 'queued') as any,
+                startedAt,
+                endedAt,
+                durationMs,
+                blockingMissingInputs: stepState?.blockingMissingInputs,
+                error: stepState?.error
+            };
+        });
+    }, [decisionState.steps, program.steps]);
+
+    const handleSubmitActionCard = useCallback(
+        async ({ cardId, cardType, input }: { cardId: string; cardType: 'deepen' | 'refine' | 'next_step'; input?: Record<string, unknown> }) => {
+            const nextState = { ...decisionState };
+            const action = typeof (input as any)?.action === 'string' ? ((input as any).action as string) : null;
+            if (action) {
+                const handled = handleRouteAction({
+                    action,
+                    onPromoteToWorksheet: () => {
+                        if (!onContinueInWorksheet) return;
+                        onContinueInWorksheet({
+                            id: `decision-${cardId}`,
+                            sender: 'ai',
+                            text: 'Decision Action: promote to worksheet.'
+                        } as ChatMessage);
+                    },
+                    onDraftReport: () => {
+                        if (!onContinueInReport) {
+                            window.alert('Report drafting not yet implemented');
+                            return;
+                        }
+                        onContinueInReport({
+                            id: `decision-report-${cardId}`,
+                            sender: 'ai',
+                            text: 'Decision Action: draft report.'
+                        } as ChatMessage);
+                    },
+                    toast: (message) => window.alert(message)
+                });
+                if (handled) {
+                    return { navigation: { kind: action.replace('route:', '') as 'worksheet' | 'report' } };
+                }
+            }
+            const patches = Array.isArray((input as any)?.patches)
+                ? ((input as any).patches as Array<{ pointer: string; value: unknown }>)
+                : [];
+            patches.forEach((patch) => {
+                try {
+                    setByPointer(nextState, patch.pointer, patch.value);
+                } catch (error) {
+                    console.error('decision_program_patch_failed', {
+                        runId: decisionState.runId,
+                        pointer: patch.pointer,
+                        error: (error as Error).message
+                    });
+                }
+            });
+            if (input && (input as any).context && typeof (input as any).context === 'object') {
+                nextState.context = { ...nextState.context, ...((input as any).context as any) };
+            }
+            if (cardType === 'next_step') {
+                return { navigation: { kind: 'worksheet' } };
+            }
+            const shouldResume = cardType === 'refine' && patches.length > 0;
+            if (shouldResume) {
+                const stepped = await runAgentStep(nextState, program, agentRegistry);
+                setDecisionState(withActionCards(stepped));
+                return { patches, resumeRun: true };
+            }
+            setDecisionState(withActionCards(nextState));
+            return { patches, resumeRun: false };
+        },
+        [agentRegistry, decisionState, program]
+    );
+
+    useEffect(() => {
+        const lastUserMessage = [...messages].reverse().find(message => message.sender === 'user');
+        if (!lastUserMessage) return;
+        if (lastIntentMessageId.current === lastUserMessage.id) return;
+        lastIntentMessageId.current = lastUserMessage.id;
+        const intent = inferIntent(lastUserMessage.text || '');
+        if (['suggest', 'compare', 'shortlist', 'propose'].includes(intent)) {
+            setViewMode('decision');
+            if (decisionState.status === 'idle') {
+                startDecisionRun();
+            }
+        }
+    }, [decisionState.status, messages, startDecisionRun]);
+
+    useEffect(() => {
+        if (!decisionState.runId) return;
+        try {
+            localStorage.setItem('decision-program:lastRun', JSON.stringify({
+                runId: decisionState.runId,
+                status: decisionState.status,
+                updatedAt: new Date().toISOString()
+            }));
+        } catch (error) {
+            if (!persistenceErrorLogged.current) {
+                persistenceErrorLogged.current = true;
+                console.error('decision_program_persistence_error', {
+                    runId: decisionState.runId,
+                    error: (error as Error).message
+                });
+            }
+        }
+    }, [decisionState.runId, decisionState.status]);
+
     return (
         <div className="flex h-full bg-white relative overflow-hidden">
             <div className="flex-1 flex flex-col min-w-0">
@@ -102,133 +267,171 @@ const ChatView: React.FC<ChatViewProps> = ({
                             </span>
                         </div>
                     </div>
-                    <div>
-                        <button 
-                            onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedMessageIds(new Set()); }}
-                            className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${isSelectionMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                        >
-                            {isSelectionMode ? 'Cancel Selection' : 'Select Messages'}
-                        </button>
+                    <div className="flex items-center gap-2">
+                        <div className="flex rounded-lg bg-slate-100 p-1">
+                            <button
+                                onClick={() => setViewMode('chat')}
+                                className={`text-xs font-bold px-3 py-1.5 rounded-md transition-colors ${viewMode === 'chat' ? 'bg-white text-slate-800 shadow' : 'text-slate-500'}`}
+                            >
+                                Chat
+                            </button>
+                            <button
+                                onClick={() => setViewMode('decision')}
+                                className={`text-xs font-bold px-3 py-1.5 rounded-md transition-colors ${viewMode === 'decision' ? 'bg-white text-slate-800 shadow' : 'text-slate-500'}`}
+                            >
+                                Decision Mode
+                            </button>
+                        </div>
+                        {viewMode === 'chat' && (
+                            <button 
+                                onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedMessageIds(new Set()); }}
+                                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${isSelectionMode ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                            >
+                                {isSelectionMode ? 'Cancel Selection' : 'Select Messages'}
+                            </button>
+                        )}
                     </div>
                 </header>
 
-                {/* Messages Area */}
-                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/30">
-                    <div className="max-w-3xl mx-auto space-y-6 pb-4">
-                        {messages.length === 0 && (
-                            <div className="text-center py-20 text-slate-400">
-                                <SparklesIcon className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                                <p>Start the conversation...</p>
-                            </div>
-                        )}
-
-                        {messages.map(msg => {
-                            // Robust Table Detection Logic: Look for pipe separator lines
-                            const hasTable = /\|.*\|/.test(msg.text) && /\|[\s-]*\|/.test(msg.text);
-                            
-                            return (
-                                <div key={msg.id} className={`group flex gap-4 ${msg.sender === 'user' ? 'flex-row-reverse' : ''} ${isSelectionMode ? 'cursor-pointer' : ''}`} onClick={() => isSelectionMode && handleToggleSelection(msg.id)}>
-                                    {isSelectionMode && (
-                                        <div className="flex items-center justify-center shrink-0 pt-2">
-                                            {selectedMessageIds.has(msg.id) ? <CheckCircleIcon className="h-5 w-5 text-weflora-teal" /> : <CircleIcon className="h-5 w-5 text-slate-300" />}
-                                        </div>
-                                    )}
-                                    
-                                    <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center mt-1 text-[10px] font-bold shadow-sm ${msg.sender === 'user' ? 'bg-slate-200 text-slate-600' : 'bg-weflora-teal text-white'}`}>
-                                        {msg.sender === 'user' ? 'You' : <LogoIcon className="h-5 w-5 fill-white" />}
+                {viewMode === 'chat' ? (
+                    <>
+                        {/* Messages Area */}
+                        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/30">
+                            <div className="max-w-3xl mx-auto space-y-6 pb-4">
+                                {messages.length === 0 && (
+                                    <div className="text-center py-20 text-slate-400">
+                                        <SparklesIcon className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                                        <p>Start the conversation...</p>
                                     </div>
+                                )}
 
-                                    <div className={`flex-1 min-w-0 max-w-[85%] ${msg.sender === 'user' ? 'text-right' : ''}`}>
-                                        <div className={`prose prose-sm max-w-none text-slate-700 leading-relaxed ${msg.sender === 'user' ? 'bg-white border border-slate-200 p-3 rounded-2xl rounded-tr-none shadow-sm text-left inline-block' : ''}`}>
-                                            {msg.sender === 'ai' && (
-                                                <div className="flex items-center justify-end gap-2 mb-2">
-                                                    {import.meta.env.DEV && (
-                                                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-slate-200 text-slate-500">
-                                                            {msg.floraGPT ? 'Structured v0.2' : 'Legacy'}
-                                                        </span>
-                                                    )}
-                                                    <CitationsChip citations={msg.citations} label="Assistant answer" />
+                                {messages.map(msg => {
+                                    // Robust Table Detection Logic: Look for pipe separator lines
+                                    const hasTable = /\|.*\|/.test(msg.text) && /\|[\s-]*\|/.test(msg.text);
+                                    
+                                    return (
+                                        <div key={msg.id} className={`group flex gap-4 ${msg.sender === 'user' ? 'flex-row-reverse' : ''} ${isSelectionMode ? 'cursor-pointer' : ''}`} onClick={() => isSelectionMode && handleToggleSelection(msg.id)}>
+                                            {isSelectionMode && (
+                                                <div className="flex items-center justify-center shrink-0 pt-2">
+                                                    {selectedMessageIds.has(msg.id) ? <CheckCircleIcon className="h-5 w-5 text-weflora-teal" /> : <CircleIcon className="h-5 w-5 text-slate-300" />}
                                                 </div>
                                             )}
-                                            {msg.sender === 'ai' && msg.floraGPT
-                                                ? <FloraGPTJsonRenderer payload={msg.floraGPT} />
-                                                : <MessageRenderer text={msg.text} />}
-                                        </div>
-                                        
-                                        {/* Footer / Actions for AI Message */}
-                                        {msg.sender === 'ai' && !isSelectionMode && (
-                                            <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button className="p-1 hover:bg-slate-100 rounded text-slate-400" title="Copy"><CopyIcon className="h-3.5 w-3.5" /></button>
-                                                <button className="p-1 hover:bg-slate-100 rounded text-slate-400" title="Regenerate" onClick={() => onRegenerateMessage(msg.id)}><RefreshIcon className="h-3.5 w-3.5" /></button>
+                                            
+                                            <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center mt-1 text-[10px] font-bold shadow-sm ${msg.sender === 'user' ? 'bg-slate-200 text-slate-600' : 'bg-weflora-teal text-white'}`}>
+                                                {msg.sender === 'user' ? 'You' : <LogoIcon className="h-5 w-5 fill-white" />}
+                                            </div>
+
+                                            <div className={`flex-1 min-w-0 max-w-[85%] ${msg.sender === 'user' ? 'text-right' : ''}`}>
+                                                <div className={`prose prose-sm max-w-none text-slate-700 leading-relaxed ${msg.sender === 'user' ? 'bg-white border border-slate-200 p-3 rounded-2xl rounded-tr-none shadow-sm text-left inline-block' : ''}`}>
+                                                    {msg.sender === 'ai' && (
+                                                        <div className="flex items-center justify-end gap-2 mb-2">
+                                                            {import.meta.env.DEV && (
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-slate-200 text-slate-500">
+                                                                    {msg.floraGPT ? 'Structured v0.2' : 'Legacy'}
+                                                                </span>
+                                                            )}
+                                                            <CitationsChip citations={msg.citations} label="Assistant answer" />
+                                                        </div>
+                                                    )}
+                                                    {msg.sender === 'ai' && msg.floraGPT
+                                                        ? <FloraGPTJsonRenderer payload={msg.floraGPT} />
+                                                        : <MessageRenderer text={msg.text} />}
+                                                </div>
                                                 
-                                                {onContinueInReport && <button onClick={() => onContinueInReport(msg)} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-weflora-teal" title="Use in Report"><FileTextIcon className="h-3.5 w-3.5" /></button>}
-                                                
-                                                {/* Smart Worksheet Action */}
-                                                {onContinueInWorksheet && (
-                                                    <button 
-                                                        onClick={() => onContinueInWorksheet(msg)} 
-                                                        className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors hover:bg-weflora-mint/20 hover:text-weflora-dark text-slate-400`}
-                                                        title="Preview Worksheet"
-                                                    >
-                                                        <TableIcon className="h-3.5 w-3.5" />
-                                                        Preview Worksheet
-                                                    </button>
+                                                {/* Footer / Actions for AI Message */}
+                                                {msg.sender === 'ai' && !isSelectionMode && (
+                                                    <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button className="p-1 hover:bg-slate-100 rounded text-slate-400" title="Copy"><CopyIcon className="h-3.5 w-3.5" /></button>
+                                                        <button className="p-1 hover:bg-slate-100 rounded text-slate-400" title="Regenerate" onClick={() => onRegenerateMessage(msg.id)}><RefreshIcon className="h-3.5 w-3.5" /></button>
+                                                        
+                                                        {onContinueInReport && <button onClick={() => onContinueInReport(msg)} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-weflora-teal" title="Use in Report"><FileTextIcon className="h-3.5 w-3.5" /></button>}
+                                                        
+                                                        {/* Smart Worksheet Action */}
+                                                        {onContinueInWorksheet && (
+                                                            <button 
+                                                                onClick={() => onContinueInWorksheet(msg)} 
+                                                                className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors hover:bg-weflora-mint/20 hover:text-weflora-dark text-slate-400`}
+                                                                title="Preview Worksheet"
+                                                            >
+                                                                <TableIcon className="h-3.5 w-3.5" />
+                                                                Preview Worksheet
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
-                                        )}
+                                        </div>
+                                    );
+                                })}
+                                
+                                {isGenerating && (
+                                    <div className="flex gap-4 animate-pulse">
+                                        <div className="w-8 h-8 rounded-full bg-weflora-teal text-white shrink-0 flex items-center justify-center">
+                                            <LogoIcon className="h-5 w-5 fill-white" />
+                                        </div>
+                                        <div className="space-y-2 w-full max-w-md pt-2">
+                                            <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+                                            <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+                                        </div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                        
-                        {isGenerating && (
-                            <div className="flex gap-4 animate-pulse">
-                                <div className="w-8 h-8 rounded-full bg-weflora-teal text-white shrink-0 flex items-center justify-center">
-                                    <LogoIcon className="h-5 w-5 fill-white" />
-                                </div>
-                                <div className="space-y-2 w-full max-w-md pt-2">
-                                    <div className="h-4 bg-slate-200 rounded w-3/4"></div>
-                                    <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+                                )}
+                                <div ref={scrollRef} />
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <DecisionModeView
+                        program={program}
+                        state={decisionState}
+                        stepsVM={stepsVM}
+                        onStartRun={startDecisionRun}
+                        onCancelRun={() => setViewMode('chat')}
+                        onSubmitCard={handleSubmitActionCard}
+                        onPromoteToWorksheet={(payload) => onContinueInWorksheet?.({
+                            id: `decision-${payload.matrixId}`,
+                            sender: 'ai',
+                            text: `Decision Matrix promoted (${payload.rowIds?.length ?? 'all'} rows).`
+                        } as ChatMessage)}
+                    />
+                )}
+
+                {viewMode === 'chat' && (
+                    <>
+                        {/* Bulk Actions Bar */}
+                        {isSelectionMode && selectedMessageIds.size > 0 && (
+                            <div className="p-3 bg-slate-800 text-white flex items-center justify-between px-6 animate-slideUp">
+                                <span className="text-sm font-bold">{selectedMessageIds.size} messages selected</span>
+                                <div className="flex gap-3">
+                                    <button onClick={() => handleBulkAction('report')} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold transition-colors">
+                                        <FileTextIcon className="h-4 w-4" /> Convert to Report
+                                    </button>
+                                    <button onClick={() => handleBulkAction('worksheet')} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold transition-colors">
+                                        <TableIcon className="h-4 w-4" /> Preview Worksheet
+                                    </button>
                                 </div>
                             </div>
                         )}
-                        <div ref={scrollRef} />
-                    </div>
-                </div>
 
-                {/* Bulk Actions Bar */}
-                {isSelectionMode && selectedMessageIds.size > 0 && (
-                    <div className="p-3 bg-slate-800 text-white flex items-center justify-between px-6 animate-slideUp">
-                        <span className="text-sm font-bold">{selectedMessageIds.size} messages selected</span>
-                        <div className="flex gap-3">
-                            <button onClick={() => handleBulkAction('report')} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold transition-colors">
-                                <FileTextIcon className="h-4 w-4" /> Convert to Report
-                            </button>
-                            <button onClick={() => handleBulkAction('worksheet')} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold transition-colors">
-                                <TableIcon className="h-4 w-4" /> Preview Worksheet
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Input Area */}
-                {!isSelectionMode && (
-                    <div className="p-4 bg-white border-t border-slate-200">
-                        <div className="max-w-3xl mx-auto">
-                            <ChatInput 
-                                onSend={onSendMessage} 
-                                isLoading={isGenerating}
-                                highlightedFileName={highlightedFileName}
-                                contextProjectId={contextProjectId}
-                                draftKey={draftKey}
-                            />
-                        </div>
-                    </div>
+                        {/* Input Area */}
+                        {!isSelectionMode && (
+                            <div className="p-4 bg-white border-t border-slate-200">
+                                <div className="max-w-3xl mx-auto">
+                                    <ChatInput 
+                                        onSend={onSendMessage} 
+                                        isLoading={isGenerating}
+                                        highlightedFileName={highlightedFileName}
+                                        contextProjectId={contextProjectId}
+                                        draftKey={draftKey}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 
             {/* Citations Sidebar (Responsive, maybe hidden on small screens or toggleable) */}
-            {variant === 'full' && messages.some(m => m.citations && m.citations.length > 0) && (
+            {viewMode === 'chat' && variant === 'full' && messages.some(m => m.citations && m.citations.length > 0) && (
                 <CitationsSidebar 
                     messages={messages} 
                     highlightedFileName={highlightedFileName}

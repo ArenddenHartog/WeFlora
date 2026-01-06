@@ -1,0 +1,235 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://weflora.ai/schemas/decision-program.json",
+  "title": "DecisionProgram",
+  "type": "object",
+  "required": ["id", "title", "version", "steps"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "version": { "type": "string" },
+    "steps": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/DecisionStep" },
+      "minItems": 1
+    },
+    "draftMatrixTemplates": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/DraftMatrix" }
+    },
+    "actionCardTemplates": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/ActionCard" }
+    }
+  },
+  "definitions": {
+    "DecisionStep": {
+      "type": "object",
+      "required": ["id", "title", "kind", "phase"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "kind": { "type": "string", "enum": ["agent"] },
+        "phase": { "type": "string", "enum": ["site", "species", "supply"] },
+        "agentRef": { "type": "string" },
+        "requiredPointers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "producesPointers": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "RunStatus": {
+      "type": "string",
+      "enum": ["idle", "running", "blocked", "done", "error", "canceled"]
+    },
+    "StepStatus": {
+      "type": "string",
+      "enum": ["queued", "running", "done", "blocked", "error", "skipped"]
+    },
+    "StepState": {
+      "type": "object",
+      "required": ["stepId", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "stepId": { "type": "string" },
+        "status": { "$ref": "#/definitions/StepStatus" },
+        "startedAt": { "type": "string" },
+        "endedAt": { "type": "string" },
+        "blockingMissingInputs": { "type": "array", "items": { "type": "string" } },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "message": { "type": "string" },
+            "code": { "type": "string" }
+          }
+        }
+      }
+    },
+    "EvidenceRef": {
+      "type": "object",
+      "required": ["sourceId"],
+      "additionalProperties": false,
+      "properties": {
+        "sourceId": { "type": "string" },
+        "sourceType": { "type": "string" },
+        "locationHint": { "type": "string" },
+        "pointer": { "type": "string" },
+        "note": { "type": "string" }
+      }
+    },
+    "DraftMatrixColumn": {
+      "type": "object",
+      "required": ["id", "label", "kind", "datatype"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "kind": { "type": "string", "enum": ["trait", "constraint", "score", "compliance", "supply"] },
+        "datatype": { "type": "string", "enum": ["string", "number", "boolean", "enum", "range"] },
+        "why": { "type": "string" },
+        "pinned": { "type": "boolean" },
+        "visible": { "type": "boolean" }
+      }
+    },
+    "DraftMatrixCell": {
+      "type": "object",
+      "required": ["columnId", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "columnId": { "type": "string" },
+        "value": { "type": ["string", "number", "boolean", "null"] },
+        "rationale": { "type": "string" },
+        "evidence": { "type": "array", "items": { "$ref": "#/definitions/EvidenceRef" } },
+        "confidence": { "type": "number" },
+        "flags": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "DraftMatrixRow": {
+      "type": "object",
+      "required": ["id", "cells"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "cells": { "type": "array", "items": { "$ref": "#/definitions/DraftMatrixCell" } }
+      }
+    },
+    "DraftMatrix": {
+      "type": "object",
+      "required": ["id", "columns", "rows"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "columns": { "type": "array", "items": { "$ref": "#/definitions/DraftMatrixColumn" } },
+        "rows": { "type": "array", "items": { "$ref": "#/definitions/DraftMatrixRow" } }
+      }
+    },
+    "ActionCard": {
+      "type": "object",
+      "required": ["id", "type", "title", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["deepen", "refine", "next_step"] },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "inputs": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ActionCardInput" }
+        },
+        "suggestedActions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label", "action"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string" },
+              "action": { "type": "string" },
+              "icon": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "ActionInputType": {
+      "type": "string",
+      "enum": ["text", "select", "number", "boolean"]
+    },
+    "ActionCardInput": {
+      "type": "object",
+      "required": ["id", "pointer", "label", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "pointer": { "type": "string" },
+        "label": { "type": "string" },
+        "type": { "$ref": "#/definitions/ActionInputType" },
+        "required": { "type": "boolean" },
+        "placeholder": { "type": "string" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "helpText": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "select" } } },
+          "then": { "required": ["options"] }
+        }
+      ]
+    },
+    "ExecutionContext": {
+      "type": "object",
+      "required": ["site", "regulatory", "equity", "species", "supply"],
+      "additionalProperties": true,
+      "properties": {
+        "site": { "type": "object", "additionalProperties": true },
+        "regulatory": { "type": "object", "additionalProperties": true },
+        "equity": { "type": "object", "additionalProperties": true },
+        "species": { "type": "object", "additionalProperties": true },
+        "supply": { "type": "object", "additionalProperties": true },
+        "selectedDocs": { "type": "array" }
+      }
+    },
+    "ExecutionState": {
+      "type": "object",
+      "required": ["runId", "programId", "status", "steps", "context"],
+      "additionalProperties": false,
+      "properties": {
+        "runId": { "type": "string" },
+        "programId": { "type": "string" },
+        "status": { "$ref": "#/definitions/RunStatus" },
+        "startedAt": { "type": "string" },
+        "endedAt": { "type": "string" },
+        "currentStepId": { "type": "string" },
+        "steps": { "type": "array", "items": { "$ref": "#/definitions/StepState" } },
+        "context": { "$ref": "#/definitions/ExecutionContext" },
+        "draftMatrix": { "$ref": "#/definitions/DraftMatrix" },
+        "actionCards": { "type": "array", "items": { "$ref": "#/definitions/ActionCard" } },
+        "logs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["level", "message"],
+            "additionalProperties": false,
+            "properties": {
+              "level": { "type": "string" },
+              "message": { "type": "string" },
+              "data": { "type": "object" },
+              "timestamp": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
