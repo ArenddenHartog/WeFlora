@@ -14,11 +14,13 @@
     "test:skill-prompts": "node --experimental-strip-types scripts/test-skill-prompts.ts",
     "test:floragpt": "node --experimental-strip-types scripts/test-floragpt.ts && node --experimental-strip-types scripts/test-message-persistence.ts && node --experimental-strip-types scripts/test-citations-enforcement.ts",
     "test:floragpt-worksheet": "node --experimental-strip-types scripts/test-floragpt-worksheet.ts",
+    "test:decision-program": "node --experimental-strip-types scripts/test-decision-program.ts",
     "check": "npm run lint && npm run guard:temp-ids && npm run guard:toast-icons && npm run build"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",
     "@supabase/supabase-js": "^2.88.0",
+    "ajv": "^6.12.6",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-router-dom": "^7.10.1"
