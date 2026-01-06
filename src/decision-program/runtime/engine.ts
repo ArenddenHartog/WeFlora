@@ -1,6 +1,7 @@
 import type { DecisionProgram, ExecutionState, StepState } from '../types.ts';
 import type { AgentRegistry } from '../agents/types.ts';
 import { listMissingPointers, setByPointer } from './pointers.ts';
+import { applyDynamicColumns } from '../orchestrator/dynamicColumns.ts';
 
 const now = () => new Date().toISOString();
 
@@ -188,6 +189,9 @@ export const stepExecution = async (
           patchFailed = true;
           break;
         }
+      }
+      if (nextState.draftMatrix) {
+        nextState.draftMatrix = applyDynamicColumns(nextState.draftMatrix, nextState.context);
       }
       if (patchFailed) {
         nextState.status = 'error';
