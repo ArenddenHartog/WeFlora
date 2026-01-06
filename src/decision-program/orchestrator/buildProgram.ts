@@ -1,4 +1,5 @@
 import type { DecisionProgram } from '../types.ts';
+import { STREET_TREE_SHORTLIST_REQUIRED_POINTERS } from './canonicalPointers.ts';
 
 export const buildProgram = (): DecisionProgram => ({
   id: 'street-tree-decision-program',
@@ -21,7 +22,7 @@ export const buildProgram = (): DecisionProgram => ({
       kind: 'agent',
       phase: 'species',
       agentRef: 'generate-candidates',
-      requiredPointers: ['/context/site/stripWidthM', '/context/site/soilType'],
+      requiredPointers: STREET_TREE_SHORTLIST_REQUIRED_POINTERS,
       producesPointers: ['/draftMatrix']
     },
     {
@@ -48,7 +49,7 @@ export const buildProgram = (): DecisionProgram => ({
       kind: 'agent',
       phase: 'supply',
       agentRef: 'availability-reconcile',
-      requiredPointers: ['/context/supply/availabilityWindow', '/draftMatrix'],
+      requiredPointers: ['/context/supply/availabilityRequired', '/draftMatrix'],
       producesPointers: ['/context/supply/availabilityStatus', '/draftMatrix']
     }
   ]

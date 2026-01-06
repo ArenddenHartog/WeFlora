@@ -5,7 +5,7 @@ export const availabilityReconcile: Agent = {
   id: 'availability-reconcile',
   title: 'Reconcile supply availability',
   phase: 'supply',
-  requiredPointers: ['/context/supply/availabilityWindow', '/draftMatrix'],
+  requiredPointers: ['/context/supply/availabilityRequired', '/draftMatrix'],
   producesPointers: ['/draftMatrix', '/context/supply/availabilityStatus'],
   run: async ({ state }) => {
     const matrix = state.draftMatrix as DraftMatrix | undefined;

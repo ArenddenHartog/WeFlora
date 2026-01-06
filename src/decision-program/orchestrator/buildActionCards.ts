@@ -1,56 +1,40 @@
-import type { ActionCard, ActionCardInput, ActionCardSuggestedAction, ActionInputType, ExecutionState } from '../types.ts';
-
-const labelFromPointer = (pointer: string) => {
-  const cleaned = pointer.replace(/^\/+/, '').replace(/^context\//, '');
-  const parts = cleaned.split('/');
-  return parts
-    .map((part) => part.replace(/([A-Z])/g, ' $1'))
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' → ');
-};
-
-const inputTypeForPointer = (pointer: string): ActionInputType => {
-  const lowered = pointer.toLowerCase();
-  if (/(zone|hardiness|location|context|goal|soil|constraints|utilities|width)/.test(lowered)) {
-    return 'text';
-  }
-  return 'text';
-};
-
-const optionsForPointer = (pointer: string): string[] | undefined => {
-  if (pointer.toLowerCase().includes('goal')) {
-    return ['shade', 'biodiversity', 'drought', 'heat', 'low-maintenance', 'compliance'];
-  }
-  return undefined;
-};
+import type { ActionCard, ActionCardInput, ActionCardSuggestedAction, ExecutionState } from '../types.ts';
+import {
+  buildRefineInputsFromPointers,
+  getInputSpec,
+  pointerGroupOrder
+} from './pointerInputRegistry.ts';
 
 export const buildActionCards = (state: ExecutionState): ActionCard[] => {
   const blockedStep = state.steps.find((step) => step.status === 'blocked');
   const missing = blockedStep?.blockingMissingInputs ?? [];
-  const refineInputs: ActionCardInput[] = missing.map((pointer) => {
-    const baseType = inputTypeForPointer(pointer);
-    const options = optionsForPointer(pointer);
-    const type = options ? 'select' : baseType;
-    return {
-      id: pointer.replace(/\//g, '_').replace(/^_+/, '') || 'input',
-      pointer,
-      label: labelFromPointer(pointer),
-      type,
-      required: true,
-      placeholder: 'Provide value',
-      options
-    };
-  });
+  const refineInputs: ActionCardInput[] = buildRefineInputsFromPointers(missing);
 
+  const groupLabels: Record<string, string> = {
+    site: 'site conditions',
+    regulatory: 'regulatory constraints',
+    equity: 'equity priorities',
+    species: 'species goals',
+    supply: 'supply availability'
+  };
+  const missingGroups = pointerGroupOrder.filter((group) =>
+    missing.some((pointer) => getInputSpec(pointer)?.group === group)
+  );
+  const topGroups = missingGroups.slice(0, 3).map((group) => groupLabels[group]);
   const refineDescription =
-    refineInputs.length > 0
-      ? `We need: ${refineInputs.map((input) => input.label).join(', ')}.`
+    topGroups.length > 0
+      ? `Missing ${topGroups.join(', ')}. These inputs drive scoring, compliance, and supply fit.`
       : 'Confirm the remaining site, regulatory, and supply constraints.';
 
+  const inputsByPointer = new Map(refineInputs.map((input) => [input.pointer, input]));
   const refineSuggestedActions: ActionCardSuggestedAction[] = missing.map((pointer) => ({
-    label: `Provide ${labelFromPointer(pointer)}`,
+    label: `Provide ${inputsByPointer.get(pointer)?.label ?? pointer}`,
     action: `resolve:${pointer}`
   }));
+  const hasDefaults = missing.some((pointer) => getInputSpec(pointer)?.defaultValue !== undefined);
+  if (hasDefaults) {
+    refineSuggestedActions.unshift({ label: 'Apply safe defaults', action: 'refine:apply-defaults' });
+  }
 
   return [
     {

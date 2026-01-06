@@ -1,11 +1,12 @@
 import type { Agent } from '../types.ts';
 import { buildDraftMatrix } from '../../orchestrator/buildDraftMatrix.ts';
+import { STREET_TREE_SHORTLIST_REQUIRED_POINTERS } from '../../orchestrator/canonicalPointers.ts';
 
 export const generateCandidates: Agent = {
   id: 'generate-candidates',
   title: 'Generate candidate species',
   phase: 'species',
-  requiredPointers: ['/context/site/stripWidthM', '/context/site/soilType'],
+  requiredPointers: STREET_TREE_SHORTLIST_REQUIRED_POINTERS,
   producesPointers: ['/draftMatrix'],
   run: async () => {
     const rows = [
