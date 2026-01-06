@@ -139,8 +139,13 @@ assert.ok(matrix);
 const columnIds = matrix?.columns.map((col) => col.id) ?? [];
 const minimalIds = minimalDraftColumns.map((col) => col.id);
 minimalIds.forEach((id) => assert.ok(columnIds.includes(id)));
-assert.ok(columnIds.includes('climateTolerance'));
+assert.ok(columnIds.includes('heatTolerance'));
+assert.ok(columnIds.includes('droughtTolerance'));
+assert.ok(columnIds.includes('compactionTolerance'));
+assert.ok(columnIds.includes('diversityCompliance'));
 assert.ok(columnIds.includes('overallScore'));
+assert.ok(!columnIds.includes('availabilityWindow'));
+assert.ok(!columnIds.includes('stockStatus'));
 
 const nextStepCard = cards.find((card) => card.type === 'next_step');
 const nextActions = nextStepCard?.suggestedActions?.map((action) => action.action) ?? [];

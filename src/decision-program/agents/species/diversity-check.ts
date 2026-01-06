@@ -7,30 +7,26 @@ export const diversityCheck: Agent = {
   phase: 'species',
   requiredPointers: ['/draftMatrix'],
   producesPointers: ['/context/species/diversityCheck', '/draftMatrix'],
-  run: async ({ state }) => {
+  run: async ({ state, context }) => {
     const matrix = state.draftMatrix as DraftMatrix | undefined;
     if (!matrix) {
       return { patches: [] };
     }
-    const diversityColumn = {
-      id: 'diversityCheck',
-      label: 'Diversity Check',
-      kind: 'constraint' as const,
-      datatype: 'string' as const,
-      why: 'Flags over-reliance on a single genus.'
-    };
-
-    const columns = matrix.columns.some((col) => col.id === diversityColumn.id)
-      ? matrix.columns
-      : [...matrix.columns, diversityColumn];
+    const evidence = (context.selectedDocs ?? []).map((doc, index) => ({
+      sourceId: String((doc as any)?.sourceId ?? (doc as any)?.id ?? (doc as any)?.name ?? (doc as any)?.title ?? `doc-${index + 1}`),
+      sourceType: 'project',
+      locationHint: 'selected doc',
+      note: 'Used as input'
+    }));
 
     const rows = matrix.rows.map((row) => {
       const cells = [...row.cells];
-      if (!cells.find((cell) => cell.columnId === diversityColumn.id)) {
+      if (!cells.find((cell) => cell.columnId === 'diversityCompliance')) {
         cells.push({
-          columnId: diversityColumn.id,
+          columnId: 'diversityCompliance',
           value: 'Within 10-20-30 guidance',
-          rationale: 'Genus mix passes diversity targets.'
+          rationale: 'Genus mix passes diversity targets.',
+          evidence: evidence.length ? evidence : undefined
         });
       }
       return { ...row, cells };
@@ -40,7 +36,7 @@ export const diversityCheck: Agent = {
       patches: [
         {
           pointer: '/draftMatrix',
-          value: { ...matrix, columns, rows }
+          value: { ...matrix, rows }
         },
         {
           pointer: '/context/species/diversityCheck',

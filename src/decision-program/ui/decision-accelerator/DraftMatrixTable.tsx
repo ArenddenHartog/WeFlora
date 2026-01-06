@@ -20,6 +20,8 @@ export interface DraftMatrixTableProps {
   onOpenCitations?: (args: { rowId: string; columnId: string; evidence?: EvidenceRef[] }) => void;
   onToggleColumnPinned?: (columnId: string) => void;
   onToggleColumnVisible?: (columnId: string) => void;
+  onAddColumn?: (columnId: string) => void;
+  suggestedColumns?: DraftMatrixColumn[];
   selectedRowIds?: string[];
   onToggleRowSelected?: (rowId: string) => void;
   onPromoteToWorksheet?: (payload: { matrixId: string; rowIds?: string[] }) => void;
@@ -35,6 +37,8 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
   onOpenCitations,
   onToggleColumnPinned,
   onToggleColumnVisible,
+  onAddColumn,
+  suggestedColumns,
   selectedRowIds,
   onToggleRowSelected,
   onPromoteToWorksheet,
@@ -46,6 +50,8 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
 }) => {
   const visibleColumns = matrix.columns.filter((column) => column.visible !== false);
   const rowPadding = density === 'compact' ? 'py-2' : 'py-3';
+  const availableColumns = (suggestedColumns ?? matrix.columns.filter((column) => column.visible === false)) ?? [];
+  const [isAddOpen, setIsAddOpen] = React.useState(false);
 
   return (
     <section className={`space-y-3 ${className ?? ''}`}>
@@ -54,14 +60,47 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
           <h3 className="text-sm font-semibold text-slate-800">{matrix.title ?? 'Draft Matrix'}</h3>
           <p className="text-xs text-slate-500">{matrix.rows.length} candidates · {visibleColumns.length} columns</p>
         </div>
-        {onPromoteToWorksheet && (
-          <button
-            onClick={() => onPromoteToWorksheet({ matrixId: matrix.id, rowIds: selectedRowIds })}
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
-          >
-            Promote to Worksheet
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {onAddColumn && availableColumns.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setIsAddOpen((prev) => !prev)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+              >
+                Add Column
+              </button>
+              {isAddOpen && (
+                <div className="absolute right-0 mt-2 w-48 rounded-lg border border-slate-200 bg-white shadow-lg z-10">
+                  <div className="px-3 py-2 text-[10px] uppercase tracking-wide text-slate-400 border-b border-slate-100">
+                    Suggested columns
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {availableColumns.map((column) => (
+                      <button
+                        key={column.id}
+                        onClick={() => {
+                          onAddColumn(column.id);
+                          setIsAddOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs text-slate-600 hover:bg-slate-50"
+                      >
+                        {column.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {onPromoteToWorksheet && (
+            <button
+              onClick={() => onPromoteToWorksheet({ matrixId: matrix.id, rowIds: selectedRowIds })}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+            >
+              Promote to Worksheet
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">

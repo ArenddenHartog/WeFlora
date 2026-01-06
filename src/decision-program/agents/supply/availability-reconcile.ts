@@ -7,30 +7,34 @@ export const availabilityReconcile: Agent = {
   phase: 'supply',
   requiredPointers: ['/context/supply/availabilityRequired', '/draftMatrix'],
   producesPointers: ['/draftMatrix', '/context/supply/availabilityStatus'],
-  run: async ({ state }) => {
+  run: async ({ state, context }) => {
     const matrix = state.draftMatrix as DraftMatrix | undefined;
     if (!matrix) {
       return { patches: [] };
     }
-    const availabilityColumn = {
-      id: 'availability',
-      label: 'Supply Availability',
-      kind: 'supply' as const,
-      datatype: 'string' as const,
-      why: 'Matches nursery availability for the target window.'
-    };
-
-    const columns = matrix.columns.some((col) => col.id === availabilityColumn.id)
-      ? matrix.columns
-      : [...matrix.columns, availabilityColumn];
+    const evidence = (context.selectedDocs ?? []).map((doc, index) => ({
+      sourceId: String((doc as any)?.sourceId ?? (doc as any)?.id ?? (doc as any)?.name ?? (doc as any)?.title ?? `doc-${index + 1}`),
+      sourceType: 'project',
+      locationHint: 'selected doc',
+      note: 'Used as input'
+    }));
 
     const rows = matrix.rows.map((row) => {
       const cells = [...row.cells];
-      if (!cells.find((cell) => cell.columnId === availabilityColumn.id)) {
+      if (!cells.find((cell) => cell.columnId === 'availabilityWindow')) {
         cells.push({
-          columnId: availabilityColumn.id,
-          value: 'Unknown',
-          rationale: 'Supply reconciliation not yet confirmed.'
+          columnId: 'availabilityWindow',
+          value: 'Seasonal ordering',
+          rationale: 'Procurement aligns with seasonal availability.',
+          evidence: evidence.length ? evidence : undefined
+        });
+      }
+      if (!cells.find((cell) => cell.columnId === 'stockStatus')) {
+        cells.push({
+          columnId: 'stockStatus',
+          value: 'Pending confirmation',
+          rationale: 'Awaiting nursery confirmation.',
+          evidence: evidence.length ? evidence : undefined
         });
       }
       return { ...row, cells };
@@ -40,7 +44,7 @@ export const availabilityReconcile: Agent = {
       patches: [
         {
           pointer: '/draftMatrix',
-          value: { ...matrix, columns, rows }
+          value: { ...matrix, rows }
         },
         {
           pointer: '/context/supply/availabilityStatus',
