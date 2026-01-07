@@ -75,6 +75,25 @@ const ActionCards: React.FC<ActionCardsProps> = ({
 }) => {
   const [formValues, setFormValues] = useState<Record<string, string | number | boolean | undefined>>({});
   const inputRefs = useRef<Record<string, InputEl | null>>({});
+  const groupRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const groupOrder = ['site', 'regulatory', 'equity', 'species', 'supply'] as const;
+  const groupLabels: Record<string, string> = {
+    site: 'Site',
+    regulatory: 'Regulatory',
+    equity: 'Equity',
+    species: 'Species',
+    supply: 'Supply'
+  };
+
+  const getGroupFromPointer = (pointer: string) => {
+    if (pointer.includes('/context/site/')) return 'site';
+    if (pointer.includes('/context/regulatory/')) return 'regulatory';
+    if (pointer.includes('/context/equity/')) return 'equity';
+    if (pointer.includes('/context/species/')) return 'species';
+    if (pointer.includes('/context/supply/')) return 'supply';
+    return 'site';
+  };
 
   const setFieldValue = (input: ActionCardInput, value: string | number | boolean) => {
     setFormValues((prev) => ({ ...prev, [input.id]: value }));
@@ -141,77 +160,108 @@ const ActionCards: React.FC<ActionCardsProps> = ({
           const hasSafeDefaults = Boolean(
             card.suggestedActions?.some((action) => action.action === 'refine:apply-defaults')
           );
-
-          const renderInputs = (sectionInputs: ActionCardInput[]) => (
-            <div className="space-y-3">
-              {sectionInputs.map((input) => (
-                <label key={input.id} className="block text-xs text-slate-600 space-y-1">
-                  <span className="font-semibold">{input.label}</span>
-                  {input.type === 'select' ? (
-                    <select
-                      ref={(element) => {
-                        inputRefs.current[input.id] = element;
-                      }}
-                      value={(formValues[input.id] as string | undefined) ?? ''}
-                      onChange={(event) => setFieldValue(input, event.target.value)}
-                      className="w-full rounded-md border border-slate-200 px-2 py-1 text-xs"
-                    >
-                      <option value="" disabled>
-                        {input.placeholder ?? 'Select option'}
-                      </option>
-                      {input.options?.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  ) : input.type === 'number' ? (
-                    <input
-                      ref={(element) => {
-                        inputRefs.current[input.id] = element;
-                      }}
-                      type="number"
-                      value={(formValues[input.id] as number | string | undefined) ?? ''}
-                      onChange={(event) => {
-                        const nextValue = normalizeNumberInputValue(event.target.value);
-                        setFieldValue(input, nextValue as number | undefined);
-                      }}
-                      placeholder={input.placeholder}
-                      className="w-full rounded-md border border-slate-200 px-2 py-1 text-xs"
-                    />
-                  ) : input.type === 'boolean' ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        ref={(element) => {
-                          inputRefs.current[input.id] = element;
-                        }}
-                        type="checkbox"
-                        checked={Boolean(formValues[input.id])}
-                        onChange={(event) => setFieldValue(input, event.target.checked)}
-                        className="rounded border-slate-300 text-weflora-teal"
-                      />
-                      <span className="text-xs text-slate-500">{input.placeholder ?? 'Toggle'}</span>
-                    </div>
-                  ) : (
-                    <input
-                      ref={(element) => {
-                        inputRefs.current[input.id] = element;
-                      }}
-                      type="text"
-                      value={(formValues[input.id] as string | undefined) ?? ''}
-                      onChange={(event) => setFieldValue(input, event.target.value)}
-                      placeholder={input.placeholder}
-                      className="w-full rounded-md border border-slate-200 px-2 py-1 text-xs"
-                    />
-                  )}
-                  {input.helpText && <p className="text-[10px] text-slate-400">{input.helpText}</p>}
-                  {input.impactNote && input.impactNote !== input.helpText && (
-                    <p className="text-[10px] text-slate-500">{input.impactNote}</p>
-                  )}
-                </label>
-              ))}
-            </div>
+          const availableGroups = groupOrder.filter((group) =>
+            inputs.some((input) => getGroupFromPointer(input.pointer) === group)
           );
+          const showSuggestedActions = !isRefineCard && hasSuggestedActions;
+
+          const renderInputField = (input: ActionCardInput) => (
+            <label key={input.id} className="block text-xs text-slate-600 space-y-1">
+              <span className="font-semibold">{input.label}</span>
+              {input.type === 'select' ? (
+                <select
+                  ref={(element) => {
+                    inputRefs.current[input.id] = element;
+                  }}
+                  value={(formValues[input.id] as string | undefined) ?? ''}
+                  onChange={(event) => setFieldValue(input, event.target.value)}
+                  className="w-full rounded-md border border-slate-200 px-2 py-1 text-xs"
+                >
+                  <option value="" disabled>
+                    {input.placeholder ?? 'Select option'}
+                  </option>
+                  {input.options?.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              ) : input.type === 'number' ? (
+                <input
+                  ref={(element) => {
+                    inputRefs.current[input.id] = element;
+                  }}
+                  type="number"
+                  value={(formValues[input.id] as number | string | undefined) ?? ''}
+                  onChange={(event) => {
+                    const nextValue = normalizeNumberInputValue(event.target.value);
+                    setFieldValue(input, nextValue as number | undefined);
+                  }}
+                  placeholder={input.placeholder}
+                  className="w-full rounded-md border border-slate-200 px-2 py-1 text-xs"
+                />
+              ) : input.type === 'boolean' ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={(element) => {
+                      inputRefs.current[input.id] = element;
+                    }}
+                    type="checkbox"
+                    checked={Boolean(formValues[input.id])}
+                    onChange={(event) => setFieldValue(input, event.target.checked)}
+                    className="rounded border-slate-300 text-weflora-teal"
+                  />
+                  <span className="text-xs text-slate-500">{input.placeholder ?? 'Toggle'}</span>
+                </div>
+              ) : (
+                <input
+                  ref={(element) => {
+                    inputRefs.current[input.id] = element;
+                  }}
+                  type="text"
+                  value={(formValues[input.id] as string | undefined) ?? ''}
+                  onChange={(event) => setFieldValue(input, event.target.value)}
+                  placeholder={input.placeholder}
+                  className="w-full rounded-md border border-slate-200 px-2 py-1 text-xs"
+                />
+              )}
+              {input.helpText && <p className="text-[10px] text-slate-400">{input.helpText}</p>}
+              {input.impactNote && input.impactNote !== input.helpText && (
+                <p className="text-[10px] text-slate-500">{input.impactNote}</p>
+              )}
+            </label>
+          );
+
+          const renderInputs = (sectionInputs: ActionCardInput[]) => {
+            if (!isRefineCard) {
+              return <div className="space-y-3">{sectionInputs.map(renderInputField)}</div>;
+            }
+            const grouped = groupOrder
+              .map((group) => ({
+                group,
+                inputs: sectionInputs.filter((input) => getGroupFromPointer(input.pointer) === group)
+              }))
+              .filter((entry) => entry.inputs.length > 0);
+            return (
+              <div className="space-y-4">
+                {grouped.map(({ group, inputs }) => (
+                  <div key={group} className="space-y-3">
+                    <div
+                      ref={(element) => {
+                        if (!groupRefs.current[group]) {
+                          groupRefs.current[group] = element;
+                        }
+                      }}
+                      className="text-[10px] font-semibold uppercase tracking-wide text-slate-400"
+                    >
+                      {groupLabels[group]}
+                    </div>
+                    {inputs.map(renderInputField)}
+                  </div>
+                ))}
+              </div>
+            );
+          };
 
           return (
             <div
@@ -238,6 +288,20 @@ const ActionCards: React.FC<ActionCardsProps> = ({
                 {isRefineCard && missingRecommended && (
                   <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
                     Some inputs were inferred or left unspecified. Results may be broader or less site-specific.
+                  </div>
+                )}
+
+                {isRefineCard && availableGroups.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {availableGroups.map((group) => (
+                      <button
+                        key={group}
+                        onClick={() => groupRefs.current[group]?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      >
+                        Jump to {groupLabels[group]}
+                      </button>
+                    ))}
                   </div>
                 )}
 
@@ -270,7 +334,7 @@ const ActionCards: React.FC<ActionCardsProps> = ({
                   </div>
                 )}
 
-                {hasSuggestedActions && (
+                {showSuggestedActions && (
                   <div className="flex flex-wrap gap-2">
                     {card.suggestedActions?.map((action) => (
                       <button

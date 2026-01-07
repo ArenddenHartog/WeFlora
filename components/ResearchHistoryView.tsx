@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useChat } from '../contexts/ChatContext';
 import { useUI } from '../contexts/UIContext';
 import { 
-    SearchIcon, MenuIcon, MessageSquareIcon, ClockIcon, XIcon, ChevronRightIcon, ChatBubbleIcon, PinIcon, PinFilledIcon, PlanningIcon
+    SearchIcon, MenuIcon, MessageSquareIcon, ClockIcon, XIcon, ChevronRightIcon, ChatBubbleIcon, PinIcon, PinFilledIcon, FlowerIcon
 } from './icons';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 
@@ -104,7 +104,7 @@ const ResearchHistoryView: React.FC<ResearchHistoryViewProps> = ({ onOpenMenu })
                                 >
                                     <div className="flex items-start gap-4 min-w-0">
                                         <div className="mt-1 h-8 w-8 rounded-lg flex items-center justify-center shrink-0 bg-weflora-mint/20 text-weflora-teal">
-                                            <PlanningIcon className="h-4 w-4" />
+                                            <FlowerIcon className="h-4 w-4" />
                                         </div>
                                         <div className="min-w-0">
                                             <h3 className="font-bold text-sm truncate pr-4 text-slate-800 group-hover:text-weflora-teal">

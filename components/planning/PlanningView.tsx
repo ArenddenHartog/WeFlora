@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import type { ExecutionState } from '../../src/decision-program/types';
 import PlanningRunnerView from './PlanningRunnerView';
 import { buildProgram } from '../../src/decision-program/orchestrator/buildProgram';
@@ -10,19 +10,21 @@ import { runAgentStep } from '../../src/decision-program/orchestrator/runAgentSt
 import { buildAgentRegistry } from '../../src/decision-program/agents/registry';
 import { setByPointer } from '../../src/decision-program/runtime/pointers';
 import { buildRouteLogEntry, handleRouteAction } from '../../src/decision-program/ui/decision-accelerator/routeHandlers';
+import { buildWorksheetTableFromDraftMatrix } from '../../src/decision-program/orchestrator/evidenceToCitations';
 import RightSidebarStepper from '../../src/decision-program/ui/decision-accelerator/RightSidebarStepper';
 import { useUI } from '../../contexts/UIContext';
 import { useChat } from '../../contexts/ChatContext';
-import { ChevronRightIcon, PlanningIcon } from '../icons';
+import { useProject } from '../../contexts/ProjectContext';
+import { ChevronRightIcon, FlowerIcon } from '../icons';
 
 const PlanningView: React.FC = () => {
   const navigate = useNavigate();
   const params = useParams();
-  const [searchParams] = useSearchParams();
   const program = useMemo(() => buildProgram(), []);
   const agentRegistry = useMemo(() => buildAgentRegistry(), []);
   const { showNotification } = useUI();
   const { planningRuns, upsertPlanningRun } = useChat();
+  const { createMatrix } = useProject();
   const planningRunId = params.runId;
   const projectId = params.projectId ?? null;
   const defaultPlanningContext = useMemo(
@@ -75,12 +77,6 @@ const PlanningView: React.FC = () => {
     setPlanningState(withActionCards(stepped));
     setIsStarting(false);
   }, [agentRegistry, defaultPlanningContext, program, withActionCards, navigate]);
-
-  useEffect(() => {
-    if (planningState || isStarting) return;
-    if (searchParams.get('autostart') !== '1') return;
-    startPlanningRun();
-  }, [isStarting, planningState, searchParams, startPlanningRun]);
 
   const evidenceCount = useMemo(() => {
     if (!planningState?.draftMatrix) return 0;
@@ -139,6 +135,46 @@ const PlanningView: React.FC = () => {
     });
   }, [planningState, program.steps, evidenceCount]);
 
+  const promoteToWorksheet = useCallback(async () => {
+    if (!planningState?.draftMatrix) return;
+    const hasEvidence = planningState.draftMatrix.rows.some((row) =>
+      row.cells.some((cell) => (cell.evidence ?? []).length > 0)
+    );
+    const includeCitations = hasEvidence ? window.confirm('Include citations column?') : false;
+    const { columns, rows } = buildWorksheetTableFromDraftMatrix(planningState.draftMatrix, {
+      includeCitations
+    });
+    const worksheetColumns = columns.map((title, index) => ({
+      id: `col-${index + 1}`,
+      title,
+      type: 'text' as const,
+      width: 200,
+      isPrimaryKey: index === 0
+    }));
+    const worksheetRows = rows.map((row, rowIndex) => ({
+      id: `row-${Date.now()}-${rowIndex}`,
+      entityName: row[0] ?? '',
+      cells: worksheetColumns.reduce((acc, column, colIndex) => {
+        acc[column.id] = { columnId: column.id, value: row[colIndex] ?? '' };
+        return acc;
+      }, {} as Record<string, { columnId: string; value: string | number }>)
+    }));
+    const created = await createMatrix({
+      id: `mtx-${Date.now()}`,
+      title: planningState.draftMatrix.title ?? 'Draft Matrix',
+      description: 'Planning matrix promotion',
+      columns: worksheetColumns,
+      rows: worksheetRows,
+      projectId: projectId ?? undefined
+    });
+    if (!created?.id) {
+      showNotification('Worksheet creation not implemented', 'error');
+      return;
+    }
+    showNotification('Worksheet created', 'success');
+    navigate(`/worksheets/${created.id}`);
+  }, [createMatrix, navigate, planningState?.draftMatrix, projectId, showNotification]);
+
   const handleSubmitActionCard = useCallback(
     async ({ cardId, cardType, input }: { cardId: string; cardType: 'deepen' | 'refine' | 'next_step'; input?: Record<string, unknown> }) => {
       const action = typeof (input as any)?.action === 'string' ? ((input as any).action as string) : null;
@@ -160,7 +196,7 @@ const PlanningView: React.FC = () => {
           handledRoute = handleRouteAction({
             action,
             onPromoteToWorksheet: () => {
-              showNotification('Planning action routed to worksheet.', 'success');
+              promoteToWorksheet();
             },
             onDraftReport: () => {
               showNotification('Planning action routed to report.', 'success');
@@ -222,7 +258,7 @@ const PlanningView: React.FC = () => {
         return;
       }
     },
-    [agentRegistry, program, showNotification, withActionCards]
+    [agentRegistry, program, promoteToWorksheet, showNotification, withActionCards]
   );
 
   if (planningState) {
@@ -241,7 +277,7 @@ const PlanningView: React.FC = () => {
               </button>
             )}
             <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
-              <PlanningIcon className="h-6 w-6" />
+              <FlowerIcon className="h-6 w-6" />
             </div>
             <h1 className="text-2xl font-bold text-slate-800">Planning</h1>
           </div>
@@ -254,7 +290,6 @@ const PlanningView: React.FC = () => {
             onStartRun={startPlanningRun}
             onSubmitCard={handleSubmitActionCard}
             onCancelRun={() => setPlanningState(null)}
-            projectId={projectId}
           />
         </div>
       </div>
@@ -276,7 +311,7 @@ const PlanningView: React.FC = () => {
             </button>
           )}
           <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
-            <PlanningIcon className="h-6 w-6" />
+            <FlowerIcon className="h-6 w-6" />
           </div>
           <h1 className="text-2xl font-bold text-slate-800">Planning</h1>
         </div>

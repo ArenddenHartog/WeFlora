@@ -6,7 +6,7 @@ import ChatInput from './ChatInput';
 import { 
     ClockIcon, MenuIcon, TableIcon, PlusIcon, FolderIcon, FileTextIcon, 
     SparklesIcon, LogoIcon, RefreshIcon, CopyIcon, CheckIcon, BookmarkIcon,
-    ArrowUpIcon, TrendingUpIcon, ChevronRightIcon, PlanningIcon
+    ArrowUpIcon, TrendingUpIcon, ChevronRightIcon, FlowerIcon
 } from './icons'; 
 import { MessageRenderer, CitationsChip } from './MessageRenderer';
 
@@ -74,15 +74,15 @@ const HomeView: React.FC<HomeViewProps> = ({
 
                     <div className="w-full max-w-3xl flex flex-col items-center gap-2 mb-6">
                         <button
-                            onClick={() => navigate('/planning?autostart=1')}
+                            onClick={() => navigate('/planning')}
                             className="w-full max-w-2xl bg-weflora-teal text-white rounded-2xl px-6 py-4 font-semibold text-sm shadow-md hover:bg-weflora-dark transition-colors relative flex items-center"
                         >
                             <span className="absolute left-5 flex items-center">
-                                <PlanningIcon className="h-5 w-5" />
+                                <FlowerIcon className="h-5 w-5" />
                             </span>
                             <span className="w-full text-center">Start Automated Planning Flow</span>
                         </button>
-                        <p className="text-xs text-slate-400">Or just ask</p>
+                        <p className="text-lg text-slate-500">Or just ask</p>
                     </div>
         
                     <div className="w-full max-w-3xl mb-12 relative z-10">

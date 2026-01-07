@@ -1,13 +1,11 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type { ExecutionState, DecisionProgram, EvidenceRef } from '../../types';
 import type { StepperStepViewModel } from './RightSidebarStepper';
 import RightSidebarStepper from './RightSidebarStepper';
 import DraftMatrixTable from './DraftMatrixTable';
 import ActionCards from './ActionCards';
 import { useUI } from '../../../../contexts/UIContext';
-import { useProject } from '../../../../contexts/ProjectContext';
-import { buildWorksheetTableFromDraftMatrix, toCitationsPayload } from '../../orchestrator/evidenceToCitations';
+import { toCitationsPayload } from '../../orchestrator/evidenceToCitations';
 
 export interface DecisionModeViewProps {
   program: DecisionProgram;
@@ -19,7 +17,6 @@ export interface DecisionModeViewProps {
   onSubmitCard: (args: { cardId: string; cardType: 'deepen' | 'refine' | 'next_step'; input?: Record<string, unknown> }) =>
     Promise<any>;
   onPromoteToWorksheet?: (payload: { matrixId: string; rowIds?: string[] }) => void;
-  projectId?: string | null;
   labels?: {
     startRun?: string;
     promotionSummary?: string;
@@ -38,8 +35,6 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
   onCancelRun,
   onOpenCitations,
   onSubmitCard,
-  onPromoteToWorksheet,
-  projectId,
   labels,
   stepperTitle,
   stepperSubtitle,
@@ -47,9 +42,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
 }) => {
   const actionCardsRef = useRef<HTMLDivElement>(null);
   const matrixRef = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
   const { openEvidencePanel, setCitationsFilter, showNotification } = useUI();
-  const { createMatrix } = useProject();
   const [localMatrix, setLocalMatrix] = useState(state.draftMatrix);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
@@ -136,43 +129,6 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
     setSelectedRowIds((prev) => (prev.includes(rowId) ? prev.filter((id) => id !== rowId) : [...prev, rowId]));
   };
 
-  const handlePromoteToWorksheet = async () => {
-    if (!visibleMatrix) return;
-    const hasEvidence = visibleMatrix.rows.some((row) => row.cells.some((cell) => (cell.evidence ?? []).length > 0));
-    const includeCitations = hasEvidence ? window.confirm('Include citations column?') : false;
-    const { columns, rows } = buildWorksheetTableFromDraftMatrix(visibleMatrix, {
-      rowIds: selectedRowIds.length > 0 ? selectedRowIds : undefined,
-      includeCitations
-    });
-    const worksheetColumns = columns.map((title, index) => ({
-      id: `col-${index + 1}`,
-      title,
-      type: 'text' as const,
-      width: 200,
-      isPrimaryKey: index === 0
-    }));
-    const worksheetRows = rows.map((row, rowIndex) => ({
-      id: `row-${Date.now()}-${rowIndex}`,
-      entityName: row[0] ?? '',
-      cells: worksheetColumns.reduce((acc, column, colIndex) => {
-        acc[column.id] = { columnId: column.id, value: row[colIndex] ?? '' };
-        return acc;
-      }, {} as Record<string, { columnId: string; value: string | number }>)
-    }));
-    const created = await createMatrix({
-      id: `mtx-${Date.now()}`,
-      title: visibleMatrix.title ?? 'Draft Matrix',
-      description: labels?.promotionSummary ?? 'Decision matrix promotion',
-      columns: worksheetColumns,
-      rows: worksheetRows,
-      projectId: projectId ?? undefined
-    });
-    if (!created?.id) return;
-    showNotification('Worksheet created', 'success');
-    navigate(`/worksheets/${created.id}`);
-    onPromoteToWorksheet?.({ matrixId: created.id, rowIds: selectedRowIds.length ? selectedRowIds : undefined });
-  };
-
   return (
     <div className={`flex h-full bg-slate-50 ${className ?? ''}`}>
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -203,7 +159,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
                 suggestedColumns={suggestedColumns}
                 selectedRowIds={selectedRowIds}
                 onToggleRowSelected={handleToggleRowSelected}
-                onPromoteToWorksheet={handlePromoteToWorksheet}
+                onPromoteToWorksheet={undefined}
                 showCellRationale
                 showConfidence
               />

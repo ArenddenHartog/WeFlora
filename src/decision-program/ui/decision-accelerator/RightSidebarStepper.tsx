@@ -84,7 +84,7 @@ const RightSidebarStepper: React.FC<RightSidebarStepperProps> = ({
   }, {});
 
   return (
-    <aside className={`w-80 border-l border-slate-200 bg-white p-4 space-y-4 ${className ?? ''}`}>
+    <aside className={`w-80 border-l border-slate-200 bg-white p-4 space-y-4 sticky top-0 h-[calc(100vh-96px)] overflow-y-auto ${className ?? ''}`}>
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-slate-800">{headerTitle}</h3>
@@ -124,9 +124,6 @@ const RightSidebarStepper: React.FC<RightSidebarStepperProps> = ({
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {currentStepId === step.stepId && (
-                            <span className="text-[10px] text-weflora-teal font-semibold">Active</span>
-                          )}
                           <button
                             onClick={() =>
                               setExpandedSteps((prev) => ({
