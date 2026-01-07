@@ -1,5 +1,6 @@
 import React from 'react';
 import type { DraftMatrix, DraftMatrixColumn, DraftMatrixRow, EvidenceRef } from '../../types';
+import { getBadgeClass, getSeverity } from './severity';
 
 type _DraftMatrixColumn = DraftMatrixColumn;
 type _DraftMatrixRow = DraftMatrixRow;
@@ -52,6 +53,16 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
   const rowPadding = density === 'compact' ? 'py-2' : 'py-3';
   const availableColumns = (suggestedColumns ?? matrix.columns.filter((column) => column.visible === false)) ?? [];
   const [isAddOpen, setIsAddOpen] = React.useState(false);
+  const badgeBaseClass = 'text-[10px] font-semibold px-2 py-0.5 rounded-full';
+
+  const parseNumeric = (value: CellValue) => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      const parsed = Number.parseFloat(value);
+      return Number.isNaN(parsed) ? null : parsed;
+    }
+    return null;
+  };
 
   return (
     <section className={`space-y-3 ${className ?? ''}`}>
@@ -153,10 +164,21 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
                   )}
                   {visibleColumns.map((column) => {
                     const cell = row.cells.find((entry) => entry.columnId === column.id);
+                    const numericValue = parseNumeric(cell?.value ?? null);
+                    const isScore = column.kind === 'score' && numericValue !== null;
+                    const scoreSeverity = isScore ? getSeverity(numericValue) : 'unknown';
+                    const confidenceSeverity =
+                      cell?.confidence !== undefined ? getSeverity(cell.confidence) : 'unknown';
                     return (
                       <td key={`${row.id}-${column.id}`} className={`px-3 ${rowPadding}`}>
                         <div className="flex items-center gap-2">
-                          <span>{cell?.value ?? '—'}</span>
+                          {isScore ? (
+                            <span className={`${badgeBaseClass} ${getBadgeClass(scoreSeverity)}`}>
+                              {cell?.value ?? '—'}
+                            </span>
+                          ) : (
+                            <span>{cell?.value ?? '—'}</span>
+                          )}
                           {cell?.evidence && cell.evidence.length > 0 && onOpenCitations && (
                             <button
                               onClick={() => onOpenCitations({ rowId: row.id, columnId: column.id, evidence: cell.evidence })}
@@ -170,7 +192,11 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
                           <p className="text-[10px] text-slate-400 mt-1">{cell.rationale}</p>
                         )}
                         {showConfidence && cell?.confidence !== undefined && (
-                          <p className="text-[10px] text-slate-400">Confidence: {Math.round(cell.confidence * 100)}%</p>
+                          <div className="mt-1">
+                            <span className={`${badgeBaseClass} ${getBadgeClass(confidenceSeverity)}`}>
+                              Confidence {Math.round(cell.confidence * 100)}%
+                            </span>
+                          </div>
                         )}
                       </td>
                     );

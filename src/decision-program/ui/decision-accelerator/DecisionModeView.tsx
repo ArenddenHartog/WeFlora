@@ -17,6 +17,13 @@ export interface DecisionModeViewProps {
   onSubmitCard: (args: { cardId: string; cardType: 'deepen' | 'refine' | 'next_step'; input?: Record<string, unknown> }) =>
     Promise<any>;
   onPromoteToWorksheet?: (payload: { matrixId: string; rowIds?: string[] }) => void;
+  labels?: {
+    startRun?: string;
+    promotionSummary?: string;
+    promotionMessage?: string;
+  };
+  stepperTitle?: string;
+  stepperSubtitle?: string;
   className?: string;
 }
 
@@ -29,6 +36,9 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
   onOpenCitations,
   onSubmitCard,
   onPromoteToWorksheet,
+  labels,
+  stepperTitle,
+  stepperSubtitle,
   className
 }) => {
   const actionCardsRef = useRef<HTMLDivElement>(null);
@@ -131,7 +141,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
       schemaVersion: 'v0.2' as const,
       mode: 'general_research' as const,
       responseType: 'answer' as const,
-      data: { summary: 'Decision matrix promotion', highlights: [] },
+      data: { summary: labels?.promotionSummary ?? 'Decision matrix promotion', highlights: [] },
       tables: [
         {
           title: visibleMatrix.title ?? 'Draft Matrix',
@@ -143,7 +153,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
     openDestinationModal('worksheet', {
       id: `decision-${visibleMatrix.id}-${Date.now()}`,
       sender: 'ai',
-      text: 'Decision Matrix promoted to Worksheet.',
+      text: labels?.promotionMessage ?? 'Decision Matrix promoted to Worksheet.',
       floraGPT: payload
     });
     onPromoteToWorksheet?.({ matrixId: visibleMatrix.id, rowIds: selectedRowIds.length ? selectedRowIds : undefined });
@@ -162,7 +172,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
               onClick={onStartRun}
               className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-weflora-teal text-white hover:bg-weflora-dark"
             >
-              Start Decision Run
+              {labels?.startRun ?? 'Start Decision Run'}
             </button>
           )}
         </div>
@@ -207,6 +217,8 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
         steps={stepsVM}
         onCancelRun={onCancelRun}
         onResolveBlocked={() => actionCardsRef.current?.scrollIntoView({ behavior: 'smooth' })}
+        headerTitle={stepperTitle}
+        headerSubtitle={stepperSubtitle}
         showDebug={false}
       />
     </div>

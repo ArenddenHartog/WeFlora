@@ -6,7 +6,7 @@ import ChatInput from './ChatInput';
 import { MessageRenderer, CitationsChip } from './MessageRenderer';
 import { FloraGPTJsonRenderer } from './FloraGPTJsonRenderer';
 import CitationsSidebar from './CitationsSidebar';
-import { DecisionModeView } from '../src/decision-program/ui/decision-accelerator';
+import PlanningRunnerView from './planning/PlanningRunnerView';
 import { buildProgram } from '../src/decision-program/orchestrator/buildProgram';
 import { inferIntent } from '../src/decision-program/orchestrator/inferIntent';
 import { buildActionCards } from '../src/decision-program/orchestrator/buildActionCards';
@@ -177,7 +177,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                             onContinueInWorksheet({
                                 id: `decision-${cardId}`,
                                 sender: 'ai',
-                                text: 'Decision Action: promote to worksheet.'
+                                text: 'Planning Action: promote to worksheet.'
                             } as ChatMessage);
                         },
                         onDraftReport: () => {
@@ -188,7 +188,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                             onContinueInReport({
                                 id: `decision-report-${cardId}`,
                                 sender: 'ai',
-                                text: 'Decision Action: draft report.'
+                                text: 'Planning Action: draft report.'
                             } as ChatMessage);
                         },
                         toast: (message) => window.alert(message)
@@ -323,7 +323,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                                 onClick={() => setViewMode('decision')}
                                 className={`text-xs font-bold px-3 py-1.5 rounded-md transition-colors ${viewMode === 'decision' ? 'bg-white text-slate-800 shadow' : 'text-slate-500'}`}
                             >
-                                Decision Mode
+                                Planning
                             </button>
                         </div>
                         {viewMode === 'chat' && (
@@ -424,7 +424,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                         </div>
                     </>
                 ) : (
-                    <DecisionModeView
+                    <PlanningRunnerView
                         program={program}
                         state={decisionState}
                         stepsVM={stepsVM}
@@ -434,7 +434,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                         onPromoteToWorksheet={(payload) => onContinueInWorksheet?.({
                             id: `decision-${payload.matrixId}`,
                             sender: 'ai',
-                            text: `Decision Matrix promoted (${payload.rowIds?.length ?? 'all'} rows).`
+                            text: `Planning Matrix promoted (${payload.rowIds?.length ?? 'all'} rows).`
                         } as ChatMessage)}
                     />
                 )}

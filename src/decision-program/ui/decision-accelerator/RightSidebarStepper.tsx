@@ -24,6 +24,9 @@ export interface RightSidebarStepperProps {
   onResolveBlocked?: (stepId: string) => void;
   onRerunStep?: (stepId: string) => void;
   onCancelRun?: () => void;
+  headerTitle?: string;
+  headerSubtitle?: string;
+  showRunMeta?: boolean;
   showDebug?: boolean;
   className?: string;
 }
@@ -34,7 +37,7 @@ type _StepperStepState = StepState;
 
 const statusStyles: Record<StepperStatus, string> = {
   queued: 'text-slate-400',
-  running: 'text-weflora-teal',
+  running: 'text-orange-500',
   done: 'text-emerald-600',
   blocked: 'text-amber-600',
   error: 'text-rose-600',
@@ -53,6 +56,9 @@ const RightSidebarStepper: React.FC<RightSidebarStepperProps> = ({
   onResolveBlocked,
   onRerunStep,
   onCancelRun,
+  headerTitle = 'Planning flow',
+  headerSubtitle,
+  showRunMeta = true,
   showDebug = false,
   className
 }) => {
@@ -67,8 +73,12 @@ const RightSidebarStepper: React.FC<RightSidebarStepperProps> = ({
     <aside className={`w-80 border-l border-slate-200 bg-white p-4 space-y-4 ${className ?? ''}`}>
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-slate-800">Decision Accelerator</h3>
-          <p className="text-xs text-slate-500">Run {runId} · {status}</p>
+          <h3 className="text-sm font-semibold text-slate-800">{headerTitle}</h3>
+          {showRunMeta && (
+            <p className="text-xs text-slate-500">
+              {headerSubtitle ?? `Run ${runId} · ${status}`}
+            </p>
+          )}
         </div>
         {onCancelRun && (
           <button onClick={onCancelRun} className="text-xs text-slate-400 hover:text-slate-600">
