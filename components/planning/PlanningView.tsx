@@ -78,9 +78,8 @@ const PlanningView: React.FC = () => {
     setIsStarting(false);
   }, [agentRegistry, defaultPlanningContext, program, withActionCards, navigate]);
 
-  const evidenceIndex = planningState?.evidenceIndex ?? {};
-
   const stepsVM = useMemo(() => {
+    const evidenceIndex = planningState?.evidenceIndex ?? {};
     if (!planningState) {
       return program.steps.map((step) => ({
         stepId: step.id,
@@ -126,7 +125,7 @@ const PlanningView: React.FC = () => {
         evidenceCount: evidenceIndex[step.id]?.length ?? 0
       };
     });
-  }, [planningState, program.steps, evidenceIndex]);
+  }, [planningState, program.steps]);
 
   const promoteToWorksheet = useCallback(async () => {
     if (!planningState?.draftMatrix) return;
