@@ -1,4 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import type { ExecutionState } from '../../src/decision-program/types';
 import PlanningRunnerView from './PlanningRunnerView';
 import { buildProgram } from '../../src/decision-program/orchestrator/buildProgram';
@@ -9,13 +10,23 @@ import { runAgentStep } from '../../src/decision-program/orchestrator/runAgentSt
 import { buildAgentRegistry } from '../../src/decision-program/agents/registry';
 import { setByPointer } from '../../src/decision-program/runtime/pointers';
 import { buildRouteLogEntry, handleRouteAction } from '../../src/decision-program/ui/decision-accelerator/routeHandlers';
+import { buildWorksheetTableFromDraftMatrix } from '../../src/decision-program/orchestrator/evidenceToCitations';
 import RightSidebarStepper from '../../src/decision-program/ui/decision-accelerator/RightSidebarStepper';
 import { useUI } from '../../contexts/UIContext';
+import { useChat } from '../../contexts/ChatContext';
+import { useProject } from '../../contexts/ProjectContext';
+import { ChevronRightIcon, FlowerIcon } from '../icons';
 
 const PlanningView: React.FC = () => {
+  const navigate = useNavigate();
+  const params = useParams();
   const program = useMemo(() => buildProgram(), []);
   const agentRegistry = useMemo(() => buildAgentRegistry(), []);
   const { showNotification } = useUI();
+  const { planningRuns, upsertPlanningRun } = useChat();
+  const { createMatrix } = useProject();
+  const planningRunId = params.runId;
+  const projectId = params.projectId ?? null;
   const defaultPlanningContext = useMemo(
     () => ({
       site: {},
@@ -30,6 +41,28 @@ const PlanningView: React.FC = () => {
   const [planningState, setPlanningState] = useState<ExecutionState | null>(null);
   const [isStarting, setIsStarting] = useState(false);
 
+  useEffect(() => {
+    if (!planningRunId) return;
+    const existing = planningRuns.find((run) => run.runId === planningRunId);
+    if (existing?.executionState) {
+      setPlanningState(existing.executionState);
+    }
+  }, [planningRunId, planningRuns]);
+
+  useEffect(() => {
+    if (!planningState) return;
+    const timeout = window.setTimeout(() => {
+      upsertPlanningRun({
+        runId: planningState.runId,
+        programId: planningState.programId,
+        executionState: planningState,
+        status: planningState.status,
+        projectId
+      });
+    }, 600);
+    return () => window.clearTimeout(timeout);
+  }, [planningState, projectId, upsertPlanningRun]);
+
   const withActionCards = useCallback((state: ExecutionState) => ({
     ...state,
     actionCards: buildActionCards(state)
@@ -39,10 +72,21 @@ const PlanningView: React.FC = () => {
     setIsStarting(true);
     const planned = withActionCards(planRun(program, defaultPlanningContext));
     setPlanningState(planned);
+    navigate(`/planning/${planned.runId}`);
     const stepped = await runAgentStep(planned, program, agentRegistry);
     setPlanningState(withActionCards(stepped));
     setIsStarting(false);
-  }, [agentRegistry, defaultPlanningContext, program, withActionCards]);
+  }, [agentRegistry, defaultPlanningContext, program, withActionCards, navigate]);
+
+  const evidenceCount = useMemo(() => {
+    if (!planningState?.draftMatrix) return 0;
+    return planningState.draftMatrix.rows.reduce((total, row) => {
+      return (
+        total +
+        row.cells.reduce((cellTotal, cell) => cellTotal + (cell.evidence?.length ?? 0), 0)
+      );
+    }, 0);
+  }, [planningState?.draftMatrix]);
 
   const stepsVM = useMemo(() => {
     if (!planningState) {
@@ -51,7 +95,9 @@ const PlanningView: React.FC = () => {
         title: step.title,
         kind: step.kind,
         agentRef: step.agentRef,
-        status: 'queued' as const
+        status: 'queued' as const,
+        summary: 'Waiting to start this step.',
+        evidenceCount
       }));
     }
     return program.steps.map(step => {
@@ -62,6 +108,16 @@ const PlanningView: React.FC = () => {
         startedAt && endedAt
           ? new Date(endedAt).getTime() - new Date(startedAt).getTime()
           : undefined;
+      const relatedLogs = planningState.logs.filter((entry) => entry.data?.stepId === step.id);
+      const summary =
+        relatedLogs[relatedLogs.length - 1]?.message ??
+        (stepState?.status === 'blocked'
+          ? 'Waiting for missing required inputs.'
+          : stepState?.status === 'done'
+              ? 'Completed with current inputs.'
+              : stepState?.status === 'running'
+                  ? 'Executing agents and gathering evidence.'
+                  : 'Queued for execution.');
       return {
         stepId: step.id,
         title: step.title,
@@ -72,10 +128,52 @@ const PlanningView: React.FC = () => {
         endedAt,
         durationMs,
         blockingMissingInputs: stepState?.blockingMissingInputs,
-        error: stepState?.error
+        error: stepState?.error,
+        summary,
+        evidenceCount
       };
     });
-  }, [planningState, program.steps]);
+  }, [planningState, program.steps, evidenceCount]);
+
+  const promoteToWorksheet = useCallback(async () => {
+    if (!planningState?.draftMatrix) return;
+    const hasEvidence = planningState.draftMatrix.rows.some((row) =>
+      row.cells.some((cell) => (cell.evidence ?? []).length > 0)
+    );
+    const includeCitations = hasEvidence ? window.confirm('Include citations column?') : false;
+    const { columns, rows } = buildWorksheetTableFromDraftMatrix(planningState.draftMatrix, {
+      includeCitations
+    });
+    const worksheetColumns = columns.map((title, index) => ({
+      id: `col-${index + 1}`,
+      title,
+      type: 'text' as const,
+      width: 200,
+      isPrimaryKey: index === 0
+    }));
+    const worksheetRows = rows.map((row, rowIndex) => ({
+      id: `row-${Date.now()}-${rowIndex}`,
+      entityName: row[0] ?? '',
+      cells: worksheetColumns.reduce((acc, column, colIndex) => {
+        acc[column.id] = { columnId: column.id, value: row[colIndex] ?? '' };
+        return acc;
+      }, {} as Record<string, { columnId: string; value: string | number }>)
+    }));
+    const created = await createMatrix({
+      id: `mtx-${Date.now()}`,
+      title: planningState.draftMatrix.title ?? 'Draft Matrix',
+      description: 'Planning matrix promotion',
+      columns: worksheetColumns,
+      rows: worksheetRows,
+      projectId: projectId ?? undefined
+    });
+    if (!created?.id) {
+      showNotification('Worksheet creation not implemented', 'error');
+      return;
+    }
+    showNotification('Worksheet created', 'success');
+    navigate(`/worksheets/${created.id}`);
+  }, [createMatrix, navigate, planningState?.draftMatrix, projectId, showNotification]);
 
   const handleSubmitActionCard = useCallback(
     async ({ cardId, cardType, input }: { cardId: string; cardType: 'deepen' | 'refine' | 'next_step'; input?: Record<string, unknown> }) => {
@@ -98,7 +196,7 @@ const PlanningView: React.FC = () => {
           handledRoute = handleRouteAction({
             action,
             onPromoteToWorksheet: () => {
-              showNotification('Planning action routed to worksheet.', 'success');
+              promoteToWorksheet();
             },
             onDraftReport: () => {
               showNotification('Planning action routed to report.', 'success');
@@ -115,20 +213,20 @@ const PlanningView: React.FC = () => {
           }
         }
 
-        if (cardType === 'refine' && action === 'refine:apply-defaults') {
-          const card = prev.actionCards.find(candidate => candidate.id === cardId);
-          const pointers = card?.inputs?.map((candidate) => candidate.pointer) ?? [];
-          const { patches: defaultPatches, appliedPointers } = buildDefaultPatchesForPointers(prev, pointers);
-          if (appliedPointers.length > 0) {
-            patches = defaultPatches;
+      if (cardType === 'refine' && action === 'refine:apply-defaults') {
+        const card = prev.actionCards.find(candidate => candidate.id === cardId);
+        const pointers = card?.inputs?.map((candidate) => candidate.pointer) ?? [];
+        const { patches: defaultPatches, appliedPointers } = buildDefaultPatchesForPointers(prev, pointers);
+        if (appliedPointers.length > 0) {
+          patches = defaultPatches;
             nextState = {
               ...nextState,
               logs: [...nextState.logs, buildDefaultsLogEntry({ runId: nextState.runId, pointers: appliedPointers })]
             };
           } else {
             patches = [];
-          }
         }
+      }
 
         patches.forEach((patch) => {
           try {
@@ -146,10 +244,10 @@ const PlanningView: React.FC = () => {
           nextState.context = { ...nextState.context, ...contextPatch };
         }
 
-        resumeRequested = cardType === 'refine' && patches.length > 0;
-        nextStateSnapshot = nextState;
-        return withActionCards(nextState);
-      });
+      resumeRequested = cardType === 'refine' && (patches.length > 0 || action === 'refine:continue');
+      nextStateSnapshot = nextState;
+      return withActionCards(nextState);
+    });
 
       if (handledRoute) {
         return;
@@ -160,14 +258,29 @@ const PlanningView: React.FC = () => {
         return;
       }
     },
-    [agentRegistry, program, showNotification, withActionCards]
+    [agentRegistry, program, promoteToWorksheet, showNotification, withActionCards]
   );
 
   if (planningState) {
     return (
       <div className="flex h-full flex-col bg-slate-50">
         <header className="border-b border-slate-200 bg-white px-6 py-4">
-          <h1 className="text-lg font-semibold text-slate-800">Planning</h1>
+          <div className="flex items-center gap-4">
+            {projectId && (
+              <button
+                onClick={() => navigate(`/project/${projectId}`)}
+                className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium"
+                title="Back to Project"
+              >
+                <ChevronRightIcon className="h-4 w-4 rotate-180" />
+                Back
+              </button>
+            )}
+            <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
+              <FlowerIcon className="h-6 w-6" />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-800">Planning</h1>
+          </div>
         </header>
         <div className="flex-1 min-h-0">
           <PlanningRunnerView
@@ -186,7 +299,22 @@ const PlanningView: React.FC = () => {
   return (
     <div className="flex h-full flex-col bg-slate-50">
       <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <h1 className="text-lg font-semibold text-slate-800">Planning</h1>
+        <div className="flex items-center gap-4">
+          {projectId && (
+            <button
+              onClick={() => navigate(`/project/${projectId}`)}
+              className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium"
+              title="Back to Project"
+            >
+              <ChevronRightIcon className="h-4 w-4 rotate-180" />
+              Back
+            </button>
+          )}
+          <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
+            <FlowerIcon className="h-6 w-6" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800">Planning</h1>
+        </div>
       </header>
       <div className="flex flex-1 min-h-0">
         <main className="flex-1 flex items-center justify-center px-6 py-10">

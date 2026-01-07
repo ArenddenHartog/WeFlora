@@ -629,7 +629,9 @@ const MainContent: React.FC<MainContentProps> = ({
                     <Route path="/sessions" element={<GlobalWorkspace view="research_history" {...sharedProps} />} />
                     <Route path="/chat" element={<GlobalWorkspace view="chat" {...sharedProps} />} />
                     <Route path="/planning" element={<PlanningRoute />} />
+                    <Route path="/planning/:runId" element={<PlanningRoute />} />
                     <Route path="/planning/run/:runId" element={<PlanningRoute />} />
+                    <Route path="/project/:projectId/planning" element={<PlanningRoute />} />
                     <Route path="/files" element={<GlobalWorkspace view="knowledge_base" {...sharedProps} />} />
                     <Route path="/prompts" element={<GlobalWorkspace view="prompts" {...sharedProps} />} />
                 </Route>

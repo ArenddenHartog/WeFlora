@@ -18,7 +18,10 @@ export const buildPatchesForInputs = (inputs: ActionCardInput[], formValues: Rec
     });
 
 export const shouldDisableRefine = (inputs: ActionCardInput[], formValues: Record<string, unknown>) =>
-  inputs.some((input) => input.required && (formValues[input.id] === undefined || formValues[input.id] === ''));
+  inputs.some((input) => {
+    const isRequired = input.severity === 'required' || input.required;
+    return isRequired && (formValues[input.id] === undefined || formValues[input.id] === '');
+  });
 
 export const buildSuggestedActionSubmitArgs = (card: ActionCard, action: ActionCardSuggestedAction) => ({
   cardId: card.id,

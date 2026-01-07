@@ -105,6 +105,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       // Normalize project domain routes so sidebar selection reflects the active domain.
       // - /projects (hub) and /project/:id/* (workspace) both count as "Projects"
       if (path === '/projects') return location.pathname.startsWith('/projects') || location.pathname.startsWith('/project/');
+      if (path === '/planning') return location.pathname.startsWith('/planning') || location.pathname.endsWith('/planning');
       // Keep "Sessions" active while viewing a session opened from /sessions (even though the detail UI lives on /).
       if (path === '/sessions') return location.pathname.startsWith('/sessions') || (sessionOpenOrigin === 'sessions' && Boolean(activeThreadId) && location.pathname === '/');
       return location.pathname.startsWith(path);

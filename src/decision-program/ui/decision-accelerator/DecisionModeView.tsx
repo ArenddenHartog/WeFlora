@@ -5,7 +5,7 @@ import RightSidebarStepper from './RightSidebarStepper';
 import DraftMatrixTable from './DraftMatrixTable';
 import ActionCards from './ActionCards';
 import { useUI } from '../../../../contexts/UIContext';
-import { buildWorksheetTableFromDraftMatrix, toCitationsPayload } from '../../orchestrator/evidenceToCitations';
+import { toCitationsPayload } from '../../orchestrator/evidenceToCitations';
 
 export interface DecisionModeViewProps {
   program: DecisionProgram;
@@ -35,14 +35,14 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
   onCancelRun,
   onOpenCitations,
   onSubmitCard,
-  onPromoteToWorksheet,
   labels,
   stepperTitle,
   stepperSubtitle,
   className
 }) => {
   const actionCardsRef = useRef<HTMLDivElement>(null);
-  const { openEvidencePanel, setCitationsFilter, openDestinationModal, showNotification } = useUI();
+  const matrixRef = useRef<HTMLDivElement>(null);
+  const { openEvidencePanel, setCitationsFilter, showNotification } = useUI();
   const [localMatrix, setLocalMatrix] = useState(state.draftMatrix);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
@@ -129,36 +129,6 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
     setSelectedRowIds((prev) => (prev.includes(rowId) ? prev.filter((id) => id !== rowId) : [...prev, rowId]));
   };
 
-  const handlePromoteToWorksheet = () => {
-    if (!visibleMatrix) return;
-    const hasEvidence = visibleMatrix.rows.some((row) => row.cells.some((cell) => (cell.evidence ?? []).length > 0));
-    const includeCitations = hasEvidence ? window.confirm('Include citations column?') : false;
-    const { columns, rows } = buildWorksheetTableFromDraftMatrix(visibleMatrix, {
-      rowIds: selectedRowIds.length > 0 ? selectedRowIds : undefined,
-      includeCitations
-    });
-    const payload = {
-      schemaVersion: 'v0.2' as const,
-      mode: 'general_research' as const,
-      responseType: 'answer' as const,
-      data: { summary: labels?.promotionSummary ?? 'Decision matrix promotion', highlights: [] },
-      tables: [
-        {
-          title: visibleMatrix.title ?? 'Draft Matrix',
-          columns,
-          rows
-        }
-      ]
-    };
-    openDestinationModal('worksheet', {
-      id: `decision-${visibleMatrix.id}-${Date.now()}`,
-      sender: 'ai',
-      text: labels?.promotionMessage ?? 'Decision Matrix promoted to Worksheet.',
-      floraGPT: payload
-    });
-    onPromoteToWorksheet?.({ matrixId: visibleMatrix.id, rowIds: selectedRowIds.length ? selectedRowIds : undefined });
-  };
-
   return (
     <div className={`flex h-full bg-slate-50 ${className ?? ''}`}>
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -179,18 +149,21 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
 
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {visibleMatrix ? (
-            <DraftMatrixTable
-              matrix={visibleMatrix}
-              onOpenCitations={handleOpenCitations}
-              onToggleColumnPinned={handleToggleColumnPinned}
-              onToggleColumnVisible={handleToggleColumnVisible}
-              onAddColumn={handleAddColumn}
-              suggestedColumns={suggestedColumns}
-              selectedRowIds={selectedRowIds}
-              onToggleRowSelected={handleToggleRowSelected}
-              onPromoteToWorksheet={handlePromoteToWorksheet}
-              showCellRationale
-            />
+            <div ref={matrixRef}>
+              <DraftMatrixTable
+                matrix={visibleMatrix}
+                onOpenCitations={handleOpenCitations}
+                onToggleColumnPinned={handleToggleColumnPinned}
+                onToggleColumnVisible={handleToggleColumnVisible}
+                onAddColumn={handleAddColumn}
+                suggestedColumns={suggestedColumns}
+                selectedRowIds={selectedRowIds}
+                onToggleRowSelected={handleToggleRowSelected}
+                onPromoteToWorksheet={undefined}
+                showCellRationale
+                showConfidence
+              />
+            </div>
           ) : (
             <div className="border border-dashed border-slate-200 rounded-xl p-6 bg-white text-center text-sm text-slate-500">
               No draft matrix yet. Start the run or resolve missing inputs.
@@ -217,6 +190,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
         steps={stepsVM}
         onCancelRun={onCancelRun}
         onResolveBlocked={() => actionCardsRef.current?.scrollIntoView({ behavior: 'smooth' })}
+        onViewRationale={() => matrixRef.current?.scrollIntoView({ behavior: 'smooth' })}
         headerTitle={stepperTitle}
         headerSubtitle={stepperSubtitle}
         showDebug={false}

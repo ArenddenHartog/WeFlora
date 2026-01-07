@@ -2,13 +2,15 @@ import type { ActionCard, ActionCardInput, ActionCardSuggestedAction, ExecutionS
 import {
   buildRefineInputsFromPointers,
   getInputSpec,
+  listMissingPointersBySeverity,
   pointerGroupOrder
 } from './pointerInputRegistry.ts';
 
 export const buildActionCards = (state: ExecutionState): ActionCard[] => {
   const blockedStep = state.steps.find((step) => step.status === 'blocked');
-  const missing = blockedStep?.blockingMissingInputs ?? [];
-  const refineInputs: ActionCardInput[] = buildRefineInputsFromPointers(missing);
+  const missingRequired = blockedStep?.blockingMissingInputs ?? listMissingPointersBySeverity(state, 'required');
+  const missingRecommended = listMissingPointersBySeverity(state, 'recommended');
+  const refineInputs: ActionCardInput[] = buildRefineInputsFromPointers([...missingRequired, ...missingRecommended]);
 
   const groupLabels: Record<string, string> = {
     site: 'site conditions',
@@ -18,7 +20,7 @@ export const buildActionCards = (state: ExecutionState): ActionCard[] => {
     supply: 'supply availability'
   };
   const missingGroups = pointerGroupOrder.filter((group) =>
-    missing.some((pointer) => getInputSpec(pointer)?.group === group)
+    missingRequired.some((pointer) => getInputSpec(pointer)?.group === group)
   );
   const topGroups = missingGroups.slice(0, 3).map((group) => groupLabels[group]);
   const refineDescription =
@@ -27,11 +29,11 @@ export const buildActionCards = (state: ExecutionState): ActionCard[] => {
       : 'Confirm the remaining site, regulatory, and supply constraints.';
 
   const inputsByPointer = new Map(refineInputs.map((input) => [input.pointer, input]));
-  const refineSuggestedActions: ActionCardSuggestedAction[] = missing.map((pointer) => ({
+  const refineSuggestedActions: ActionCardSuggestedAction[] = missingRequired.map((pointer) => ({
     label: `Provide ${inputsByPointer.get(pointer)?.label ?? pointer}`,
     action: `resolve:${pointer}`
   }));
-  const hasDefaults = missing.some((pointer) => getInputSpec(pointer)?.defaultValue !== undefined);
+  const hasDefaults = [...missingRequired, ...missingRecommended].some((pointer) => getInputSpec(pointer)?.defaultValue !== undefined);
   if (hasDefaults) {
     refineSuggestedActions.unshift({ label: 'Apply safe defaults', action: 'refine:apply-defaults' });
   }

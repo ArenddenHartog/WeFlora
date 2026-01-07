@@ -4,6 +4,7 @@ export type RunStatus = 'idle' | 'running' | 'blocked' | 'done' | 'error' | 'can
 export type StepStatus = 'queued' | 'running' | 'done' | 'blocked' | 'error' | 'skipped';
 export type ActionCardType = 'deepen' | 'refine' | 'next_step';
 export type ActionInputType = 'text' | 'select' | 'number' | 'boolean';
+export type ActionInputSeverity = 'required' | 'recommended' | 'optional';
 
 export interface DecisionProgram {
   id: string;
@@ -89,10 +90,12 @@ export interface ActionCardInput {
   pointer: string;
   label: string;
   type: ActionInputType;
+  severity?: ActionInputSeverity;
   required?: boolean;
   placeholder?: string;
   options?: string[];
   helpText?: string;
+  impactNote?: string;
 }
 
 export interface ActionCardSuggestedAction {

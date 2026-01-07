@@ -166,6 +166,10 @@
       "type": "string",
       "enum": ["text", "select", "number", "boolean"]
     },
+    "ActionInputSeverity": {
+      "type": "string",
+      "enum": ["required", "recommended", "optional"]
+    },
     "ActionCardInput": {
       "type": "object",
       "required": ["id", "pointer", "label", "type"],
@@ -175,10 +179,12 @@
         "pointer": { "type": "string" },
         "label": { "type": "string" },
         "type": { "$ref": "#/definitions/ActionInputType" },
+        "severity": { "$ref": "#/definitions/ActionInputSeverity" },
         "required": { "type": "boolean" },
         "placeholder": { "type": "string" },
         "options": { "type": "array", "items": { "type": "string" } },
-        "helpText": { "type": "string" }
+        "helpText": { "type": "string" },
+        "impactNote": { "type": "string" }
       },
       "allOf": [
         {
