@@ -6,6 +6,12 @@ import DraftMatrixTable from './DraftMatrixTable';
 import ActionCards from './ActionCards';
 import { useUI } from '../../../../contexts/UIContext';
 import { toCitationsPayload } from '../../orchestrator/evidenceToCitations';
+import ReasoningTimeline from './ReasoningTimeline';
+import ValidationDrawer from './ValidationDrawer';
+import { buildPatchesForInputs } from './actionCardUtils';
+import { getByPointer } from '../../runtime/pointers';
+import { splitInputsBySeverity } from './validationUtils';
+import { showMatrixColumn, toggleMatrixColumnPinned, toggleMatrixColumnVisible } from './draftMatrixUtils';
 
 export interface DecisionModeViewProps {
   program: DecisionProgram;
@@ -45,6 +51,9 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
   const { openEvidencePanel, setCitationsFilter, showNotification } = useUI();
   const [localMatrix, setLocalMatrix] = useState(state.draftMatrix);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [matrixDensity, setMatrixDensity] = useState<'comfortable' | 'compact'>('comfortable');
+  const [isValidationOpen, setIsValidationOpen] = useState(false);
+  const [validationValues, setValidationValues] = useState<Record<string, string | number | boolean>>({});
 
   useEffect(() => {
     setLocalMatrix((prev) => {
@@ -74,6 +83,27 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
     () => visibleMatrix?.columns.filter((column) => column.visible === false) ?? [],
     [visibleMatrix]
   );
+  const refineCard = useMemo(() => state.actionCards.find((card) => card.type === 'refine'), [state.actionCards]);
+  const refineInputs = useMemo(() => refineCard?.inputs ?? [], [refineCard]);
+  const { required: requiredInputs, recommended: recommendedInputs, optional: optionalInputs } = useMemo(
+    () => splitInputsBySeverity(refineInputs),
+    [refineInputs]
+  );
+
+  useEffect(() => {
+    if (!refineCard) return;
+    setValidationValues((prev) => {
+      const next = { ...prev };
+      refineInputs.forEach((input) => {
+        if (next[input.id] !== undefined) return;
+        const existingValue = getByPointer(state, input.pointer);
+        if (existingValue !== undefined) {
+          next[input.id] = existingValue as string | number | boolean;
+        }
+      });
+      return next;
+    });
+  }, [refineCard, refineInputs, state]);
 
   const handleOpenCitations = (args: { rowId: string; columnId: string; evidence?: EvidenceRef[] }) => {
     const evidence = args.evidence ?? [];
@@ -91,6 +121,21 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
     onOpenCitations?.(args);
   };
 
+  const handleOpenStepCitations = (args: { evidence?: EvidenceRef[]; label?: string }) => {
+    const evidence = args.evidence ?? [];
+    const payload = toCitationsPayload(evidence, { selectedDocs: state.context.selectedDocs });
+    if (payload.sourceIds.length === 0) {
+      showNotification('No citations available for this step.', 'error');
+      return;
+    }
+    setCitationsFilter({ sourceIds: payload.sourceIds });
+    openEvidencePanel({
+      label: args.label ?? 'Step citations',
+      sources: payload.sourceIds,
+      generatedAt: new Date().toISOString()
+    });
+  };
+
   const updateMatrix = (updater: (matrix: NonNullable<ExecutionState['draftMatrix']>) => NonNullable<ExecutionState['draftMatrix']>) => {
     setLocalMatrix((prev) => {
       if (!prev) return prev;
@@ -99,30 +144,15 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
   };
 
   const handleToggleColumnPinned = (columnId: string) => {
-    updateMatrix((matrix) => ({
-      ...matrix,
-      columns: matrix.columns.map((column) =>
-        column.id === columnId ? { ...column, pinned: !column.pinned } : column
-      )
-    }));
+    updateMatrix((matrix) => toggleMatrixColumnPinned(matrix, columnId));
   };
 
   const handleToggleColumnVisible = (columnId: string) => {
-    updateMatrix((matrix) => ({
-      ...matrix,
-      columns: matrix.columns.map((column) =>
-        column.id === columnId ? { ...column, visible: column.visible === false ? true : false } : column
-      )
-    }));
+    updateMatrix((matrix) => toggleMatrixColumnVisible(matrix, columnId));
   };
 
   const handleAddColumn = (columnId: string) => {
-    updateMatrix((matrix) => ({
-      ...matrix,
-      columns: matrix.columns.map((column) =>
-        column.id === columnId ? { ...column, visible: true, pinned: column.pinned ?? false } : column
-      )
-    }));
+    updateMatrix((matrix) => showMatrixColumn(matrix, columnId));
   };
 
   const handleToggleRowSelected = (rowId: string) => {
@@ -148,6 +178,14 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          <ReasoningTimeline
+            runId={state.runId}
+            steps={stepsVM}
+            logs={state.logs}
+            evidenceIndex={state.evidenceIndex}
+            onOpenCitations={(args) => handleOpenStepCitations({ evidence: args.evidence, label: 'Step citations' })}
+          />
+
           {visibleMatrix ? (
             <div ref={matrixRef}>
               <DraftMatrixTable
@@ -156,10 +194,12 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
                 onToggleColumnPinned={handleToggleColumnPinned}
                 onToggleColumnVisible={handleToggleColumnVisible}
                 onAddColumn={handleAddColumn}
+                onDensityChange={setMatrixDensity}
                 suggestedColumns={suggestedColumns}
                 selectedRowIds={selectedRowIds}
                 onToggleRowSelected={handleToggleRowSelected}
                 onPromoteToWorksheet={undefined}
+                density={matrixDensity}
                 showCellRationale
                 showConfidence
               />
@@ -176,8 +216,9 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
               cards={state.actionCards}
               blockedStepId={state.steps.find((step) => step.status === 'blocked')?.stepId}
               onSubmitCard={onSubmitCard}
+              onOpenValidation={() => setIsValidationOpen(true)}
               layout="grid"
-              showTypeBadges
+              showTypeBadges={false}
             />
           </div>
         </div>
@@ -188,13 +229,54 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
         status={state.status}
         currentStepId={state.currentStepId}
         steps={stepsVM}
+        logs={state.logs}
+        evidenceIndex={state.evidenceIndex}
         onCancelRun={onCancelRun}
-        onResolveBlocked={() => actionCardsRef.current?.scrollIntoView({ behavior: 'smooth' })}
-        onViewRationale={() => matrixRef.current?.scrollIntoView({ behavior: 'smooth' })}
+        onResolveBlocked={() => setIsValidationOpen(true)}
+        onOpenCitations={(args) => handleOpenStepCitations({ evidence: args.evidence, label: `Step citations • ${args.stepId}` })}
         headerTitle={stepperTitle}
         headerSubtitle={stepperSubtitle}
         showDebug={false}
       />
+
+      {refineCard && (
+        <ValidationDrawer
+          isOpen={isValidationOpen}
+          title="Resolve inputs"
+          requiredInputs={requiredInputs}
+          recommendedInputs={recommendedInputs}
+          optionalInputs={optionalInputs}
+          values={validationValues}
+          onChange={(inputId, value) => setValidationValues((prev) => ({ ...prev, [inputId]: value }))}
+          onApply={() => {
+            if (!refineCard) return;
+            const patches = buildPatchesForInputs(refineInputs, validationValues);
+            onSubmitCard({
+              cardId: refineCard.id,
+              cardType: 'refine',
+              input: {
+                action: 'refine:continue',
+                patches
+              }
+            });
+            setIsValidationOpen(false);
+          }}
+          onApplyDefaults={
+            refineCard.suggestedActions?.some((action) => action.action === 'refine:apply-defaults')
+              ? () => {
+                  onSubmitCard({
+                    cardId: refineCard.id,
+                    cardType: 'refine',
+                    input: { action: 'refine:apply-defaults' }
+                  });
+                  setIsValidationOpen(false);
+                }
+              : undefined
+          }
+          onClose={() => setIsValidationOpen(false)}
+          canProceedWithMissingRecommended
+        />
+      )}
     </div>
   );
 };

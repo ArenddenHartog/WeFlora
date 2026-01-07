@@ -64,6 +64,7 @@
         "startedAt": { "type": "string" },
         "endedAt": { "type": "string" },
         "blockingMissingInputs": { "type": "array", "items": { "type": "string" } },
+        "reasoningSummary": { "type": "array", "items": { "type": "string" } },
         "error": {
           "type": "object",
           "additionalProperties": false,
@@ -233,6 +234,13 @@
               "data": { "type": "object" },
               "timestamp": { "type": "string" }
             }
+          }
+        },
+        "evidenceIndex": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/EvidenceRef" }
           }
         }
       }
