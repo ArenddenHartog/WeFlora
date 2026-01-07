@@ -1,5 +1,6 @@
 import React from 'react';
 import type { SkillTemplateId } from './services/skillTemplates';
+import type { ExecutionState, RunStatus } from './src/decision-program/types';
 
 export type SkillOutputType = 'text' | 'badge' | 'score' | 'currency' | 'quantity' | 'enum' | 'range';
 
@@ -155,6 +156,16 @@ export interface Thread {
     messages: ChatMessage[];
     contextSnapshot?: ContextItem[]; // Context used when thread started
     isPinned?: boolean;
+}
+
+export interface PlanningRun {
+    runId: string;
+    programId: string;
+    executionState: ExecutionState;
+    status: RunStatus;
+    projectId?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 // -- Species DB Types --

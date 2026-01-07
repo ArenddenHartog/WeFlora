@@ -2,11 +2,14 @@ import type { ActionCardInput, ExecutionLogEntry, ExecutionState, PointerPatch }
 import { hasPointer } from '../runtime/pointers.ts';
 
 export type PointerInputGroup = 'site' | 'regulatory' | 'equity' | 'species' | 'supply';
+export type PointerInputSeverity = 'required' | 'recommended' | 'optional';
 
 export type PointerInputSpec = {
   pointer: string;
   input: ActionCardInput;
   group: PointerInputGroup;
+  severity: PointerInputSeverity;
+  impactNote?: string;
   defaultValue?: string | number | boolean;
   priority: number;
 };
@@ -41,6 +44,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/site/locationType',
     group: 'site',
+    severity: 'required',
     priority: 10,
     input: makeInput('/context/site/locationType', {
       label: 'Location type',
@@ -54,6 +58,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/site/geo/locationHint',
     group: 'site',
+    severity: 'required',
     priority: 20,
     input: makeInput('/context/site/geo/locationHint', {
       label: 'Location hint',
@@ -66,6 +71,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/site/soil/type',
     group: 'site',
+    severity: 'required',
     priority: 30,
     input: makeInput('/context/site/soil/type', {
       label: 'Soil type',
@@ -79,6 +85,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/site/soil/moisture',
     group: 'site',
+    severity: 'required',
     priority: 40,
     input: makeInput('/context/site/soil/moisture', {
       label: 'Soil moisture',
@@ -92,6 +99,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/site/soil/compaction',
     group: 'site',
+    severity: 'required',
     priority: 50,
     input: makeInput('/context/site/soil/compaction', {
       label: 'Soil compaction',
@@ -105,6 +113,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/site/light',
     group: 'site',
+    severity: 'required',
     priority: 60,
     input: makeInput('/context/site/light', {
       label: 'Light exposure',
@@ -118,6 +127,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/site/space/rootingVolumeClass',
     group: 'site',
+    severity: 'required',
     priority: 70,
     input: makeInput('/context/site/space/rootingVolumeClass', {
       label: 'Rooting volume class',
@@ -131,6 +141,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/site/space/crownClearanceClass',
     group: 'site',
+    severity: 'required',
     priority: 80,
     input: makeInput('/context/site/space/crownClearanceClass', {
       label: 'Crown clearance class',
@@ -144,6 +155,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/site/stressors/drought',
     group: 'site',
+    severity: 'required',
     priority: 90,
     input: makeInput('/context/site/stressors/drought', {
       label: 'Drought stress',
@@ -157,6 +169,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/site/stressors/heat',
     group: 'site',
+    severity: 'required',
     priority: 100,
     input: makeInput('/context/site/stressors/heat', {
       label: 'Heat stress',
@@ -170,6 +183,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/regulatory/setting',
     group: 'regulatory',
+    severity: 'required',
     priority: 10,
     input: makeInput('/context/regulatory/setting', {
       label: 'Regulatory setting',
@@ -183,6 +197,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/regulatory/constraints/utilityConflicts',
     group: 'regulatory',
+    severity: 'required',
     priority: 20,
     input: makeInput('/context/regulatory/constraints/utilityConflicts', {
       label: 'Utility conflicts',
@@ -195,6 +210,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/regulatory/constraints/setbacksKnown',
     group: 'regulatory',
+    severity: 'required',
     priority: 30,
     input: makeInput('/context/regulatory/constraints/setbacksKnown', {
       label: 'Setbacks confirmed',
@@ -207,12 +223,13 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/equity/priority',
     group: 'equity',
+    severity: 'recommended',
     priority: 10,
     defaultValue: 'neutral',
     input: makeInput('/context/equity/priority', {
       label: 'Equity priority',
       type: 'select',
-      required: true,
+      required: false,
       placeholder: 'Select equity focus',
       options: ['neutral', 'prioritizeHeat', 'prioritizeEquity', 'both'],
       helpText: 'Default is neutral unless the program explicitly prioritizes heat or equity outcomes.'
@@ -221,6 +238,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/species/goals/primaryGoal',
     group: 'species',
+    severity: 'required',
     priority: 10,
     input: makeInput('/context/species/goals/primaryGoal', {
       label: 'Primary species goal',
@@ -234,6 +252,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/species/constraints/allergiesOrToxicityConcern',
     group: 'species',
+    severity: 'required',
     priority: 20,
     input: makeInput('/context/species/constraints/allergiesOrToxicityConcern', {
       label: 'Allergies or toxicity concern',
@@ -246,12 +265,13 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/species/diversity/rule',
     group: 'species',
+    severity: 'recommended',
     priority: 30,
     defaultValue: '10-20-30',
     input: makeInput('/context/species/diversity/rule', {
       label: 'Diversity rule',
       type: 'select',
-      required: true,
+      required: false,
       placeholder: 'Select diversity rule',
       options: ['10-20-30', 'none', 'localPolicy'],
       helpText: 'Default is 10-20-30 to reduce monoculture risk unless policy says otherwise.'
@@ -260,6 +280,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/supply/availabilityRequired',
     group: 'supply',
+    severity: 'required',
     priority: 10,
     input: makeInput('/context/supply/availabilityRequired', {
       label: 'Availability requirement',
@@ -273,6 +294,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/site/stripWidthM',
     group: 'site',
+    severity: 'optional',
     priority: 110,
     input: makeInput('/context/site/stripWidthM', {
       label: 'Planting strip width (m)',
@@ -285,6 +307,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/site/soil/ph',
     group: 'site',
+    severity: 'optional',
     priority: 120,
     input: makeInput('/context/site/soil/ph', {
       label: 'Soil pH',
@@ -297,6 +320,7 @@ export const STREET_TREE_POINTER_INPUT_SPECS: PointerInputSpec[] = [
   {
     pointer: '/context/species/constraints/invasivesConcern',
     group: 'species',
+    severity: 'optional',
     priority: 40,
     input: makeInput('/context/species/constraints/invasivesConcern', {
       label: 'Invasives concern',
@@ -331,14 +355,19 @@ export const buildRefineInputsFromPointers = (pointers: string[]): ActionCardInp
         pointer,
         label: labelFromPointer(pointer),
         type: 'text',
+        severity: 'required',
         required: true,
         placeholder: 'Provide value',
-        helpText: 'Provide a value for this missing input.'
+        helpText: 'Provide a value for this missing input.',
+        impactNote: 'Required to continue the planning run.'
       };
     }
     return {
       ...spec.input,
-      id: idFromPointer(pointer)
+      id: idFromPointer(pointer),
+      severity: spec.severity,
+      required: spec.severity === 'required',
+      impactNote: spec.impactNote ?? spec.input.helpText
     };
   });
 };
@@ -370,3 +399,9 @@ export const buildDefaultsLogEntry = (args: { runId: string; pointers: string[] 
 });
 
 export const pointerGroupOrder = groupOrder;
+
+export const getPointersBySeverity = (severity: PointerInputSeverity): string[] =>
+  STREET_TREE_POINTER_INPUT_SPECS.filter((spec) => spec.severity === severity).map((spec) => spec.pointer);
+
+export const listMissingPointersBySeverity = (state: ExecutionState, severity: PointerInputSeverity): string[] =>
+  getPointersBySeverity(severity).filter((pointer) => !hasPointer(state, pointer));

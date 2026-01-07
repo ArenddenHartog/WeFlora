@@ -4,7 +4,7 @@ import { supabase } from '../services/supabaseClient';
 import { useAuth } from './AuthContext';
 import { useProject } from './ProjectContext';
 import { useUI } from './UIContext';
-import type { Chat, ChatMessage, Thread, ContextItem } from '../types';
+import type { Chat, ChatMessage, Thread, ContextItem, PlanningRun } from '../types';
 import { aiService } from '../services/aiService';
 import { serializeMatrix, serializeReport } from '../utils/serializers';
 import { FileSheetIcon } from '../components/icons';
@@ -27,6 +27,8 @@ interface ChatContextType {
     setChats: React.Dispatch<React.SetStateAction<{ [projectId: string]: Chat[] }>>;
     threads: Thread[];
     setThreads: React.Dispatch<React.SetStateAction<Thread[]>>;
+    planningRuns: PlanningRun[];
+    setPlanningRuns: React.Dispatch<React.SetStateAction<PlanningRun[]>>;
     activeThreadId: string | null;
     setActiveThreadId: (id: string | null) => void;
     messages: ChatMessage[]; 
@@ -43,6 +45,9 @@ interface ChatContextType {
     // Entity Chat Actions (Sidebars)
     entityThreads: { [entityId: string]: ChatMessage[] };
     sendEntityMessage: (entityId: string, text: string, contextData?: string, files?: File[]) => Promise<void>;
+
+    // Planning Runs
+    upsertPlanningRun: (run: PlanningRun) => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -79,6 +84,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Global/Main Chat State
     const [chats, setChats] = useState<{ [projectId: string]: Chat[] }>({});
     const [threads, setThreads] = useState<Thread[]>([]);
+    const [planningRuns, setPlanningRuns] = useState<PlanningRun[]>([]);
     const [messages, setMessages] = useState<ChatMessage[]>([]); 
     const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
     
@@ -91,6 +97,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     useEffect(() => {
         if (!user) {
             setThreads([]);
+            setPlanningRuns([]);
             setMessages([]);
             setActiveThreadId(null);
             setChats({});
@@ -123,7 +130,30 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setThreads(threadsWithMsgs);
             }
         };
+        const fetchPlanningRuns = async () => {
+            const userId = (await supabase.auth.getUser()).data.user?.id;
+            if (!userId) return;
+            const { data } = await supabase
+                .from('planning_runs')
+                .select('*')
+                .eq('user_id', userId)
+                .order('updated_at', { ascending: false });
+            if (data) {
+                setPlanningRuns(
+                    data.map((row: any) => ({
+                        runId: row.run_id,
+                        programId: row.program_id,
+                        executionState: row.execution_state,
+                        status: row.status,
+                        projectId: row.project_id,
+                        createdAt: row.created_at,
+                        updatedAt: row.updated_at
+                    }))
+                );
+            }
+        };
         fetchThreads();
+        fetchPlanningRuns();
     }, [user]);
 
     useEffect(() => {
@@ -206,6 +236,26 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setMessages([]);
         }
     }, [activeThreadId, showNotification]);
+
+    const upsertPlanningRun = useCallback(async (run: PlanningRun) => {
+        if (!user) return;
+        setPlanningRuns((prev) => {
+            const next = prev.filter((entry) => entry.runId !== run.runId);
+            return [run, ...next];
+        });
+        const userId = (await supabase.auth.getUser()).data.user?.id;
+        if (!userId) return;
+        const payload = {
+            run_id: run.runId,
+            program_id: run.programId,
+            execution_state: run.executionState,
+            status: run.status,
+            project_id: run.projectId ?? null,
+            user_id: userId,
+            updated_at: new Date().toISOString()
+        };
+        await supabase.from('planning_runs').upsert(payload, { onConflict: 'run_id' });
+    }, [user]);
 
     // --- Main Global Chat ---
     const sendMessage = async (
@@ -536,11 +586,13 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         <ChatContext.Provider value={{
             chats, setChats,
             threads, setThreads,
+            planningRuns, setPlanningRuns,
             activeThreadId, setActiveThreadId,
             messages, setMessages,
             isGenerating,
             createThread, addMessageToThread, sendMessage, togglePinThread, deleteThread,
-            entityThreads, sendEntityMessage
+            entityThreads, sendEntityMessage,
+            upsertPlanningRun
         }}>
             {children}
         </ChatContext.Provider>

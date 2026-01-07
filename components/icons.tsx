@@ -48,6 +48,16 @@ export const FlowerIcon: React.FC<IconProps> = ({ className }) => (
   </svg>
 );
 
+export const PlanningIcon: React.FC<IconProps> = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M7 8h10" />
+    <path d="M7 12h6" />
+    <path d="M7 16h8" />
+    <path d="M16 11l2 2 3-3" />
+  </svg>
+);
+
 export const SearchIcon: React.FC<IconProps> = ({ className }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

@@ -1,11 +1,12 @@
 
 import React, { useMemo, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { PinnedProject, RecentItem, PromptTemplate, KnowledgeItem, ChatMessage, Thread, ProjectFile, Report, Matrix, ContextItem } from '../types';
 import ChatInput from './ChatInput';
 import { 
     ClockIcon, MenuIcon, TableIcon, PlusIcon, FolderIcon, FileTextIcon, 
     SparklesIcon, LogoIcon, RefreshIcon, CopyIcon, CheckIcon, BookmarkIcon,
-    ArrowUpIcon, TrendingUpIcon, ChevronRightIcon
+    ArrowUpIcon, TrendingUpIcon, ChevronRightIcon, PlanningIcon
 } from './icons'; 
 import { MessageRenderer, CitationsChip } from './MessageRenderer';
 
@@ -40,6 +41,7 @@ const HomeView: React.FC<HomeViewProps> = ({
     const activeThread = threads.find(t => t.id === activeThreadId);
     const messages = useMemo(() => activeThread?.messages || [], [activeThread?.messages]);
     const chatScrollRef = useRef<HTMLDivElement>(null);
+    const navigate = useNavigate();
 
     // Auto-scroll logic for thread view
     useEffect(() => {
@@ -69,6 +71,19 @@ const HomeView: React.FC<HomeViewProps> = ({
                         </div>
                         <p className="text-slate-500 text-lg">Automate species research, project analysis, and policy checks with FloraGPT</p>
                     </header>
+
+                    <div className="w-full max-w-3xl flex flex-col items-center gap-2 mb-6">
+                        <button
+                            onClick={() => navigate('/planning?autostart=1')}
+                            className="w-full max-w-2xl bg-weflora-teal text-white rounded-2xl px-6 py-4 font-semibold text-sm shadow-md hover:bg-weflora-dark transition-colors relative flex items-center"
+                        >
+                            <span className="absolute left-5 flex items-center">
+                                <PlanningIcon className="h-5 w-5" />
+                            </span>
+                            <span className="w-full text-center">Start Automated Planning Flow</span>
+                        </button>
+                        <p className="text-xs text-slate-400">Or just ask</p>
+                    </div>
         
                     <div className="w-full max-w-3xl mb-12 relative z-10">
                         <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 p-1">

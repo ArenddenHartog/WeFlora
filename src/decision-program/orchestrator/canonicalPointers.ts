@@ -12,11 +12,14 @@ export const STREET_TREE_SHORTLIST_REQUIRED_POINTERS = [
   '/context/regulatory/setting',
   '/context/regulatory/constraints/utilityConflicts',
   '/context/regulatory/constraints/setbacksKnown',
-  '/context/equity/priority',
   '/context/species/goals/primaryGoal',
   '/context/species/constraints/allergiesOrToxicityConcern',
-  '/context/species/diversity/rule',
   '/context/supply/availabilityRequired'
+];
+
+export const STREET_TREE_SHORTLIST_RECOMMENDED_POINTERS = [
+  '/context/equity/priority',
+  '/context/species/diversity/rule'
 ];
 
 export const STREET_TREE_SHORTLIST_OPTIONAL_POINTERS = [

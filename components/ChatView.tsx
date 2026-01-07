@@ -19,6 +19,7 @@ import { runAgentStep } from '../src/decision-program/orchestrator/runAgentStep'
 import { buildAgentRegistry } from '../src/decision-program/agents/registry';
 import { setByPointer } from '../src/decision-program/runtime/pointers';
 import { buildRouteLogEntry, handleRouteAction } from '../src/decision-program/ui/decision-accelerator/routeHandlers';
+import { useChat } from '../contexts/ChatContext';
 import { 
     MenuIcon, ArrowUpIcon, RefreshIcon, CopyIcon, 
     FileTextIcon, TableIcon, CheckCircleIcon, CircleIcon,
@@ -46,6 +47,7 @@ const ChatView: React.FC<ChatViewProps> = ({
     onRegenerateMessage, onOpenMenu, variant = 'full',
     onContinueInReport, onContinueInWorksheet, contextProjectId, draftKey
 }) => {
+    const { upsertPlanningRun } = useChat();
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
     const [highlightedFileName, setHighlightedFileName] = useState<string | null>(null);
@@ -72,6 +74,25 @@ const ChatView: React.FC<ChatViewProps> = ({
     }, [defaultDecisionContext, program]);
     const [decisionState, setDecisionState] = useState<ExecutionState>(initialDecisionState);
     const [viewMode, setViewMode] = useState<'chat' | 'decision'>('chat');
+    const evidenceCount = useMemo(() => {
+        if (!decisionState.draftMatrix) return 0;
+        return decisionState.draftMatrix.rows.reduce((total, row) => {
+            return total + row.cells.reduce((cellTotal, cell) => cellTotal + (cell.evidence?.length ?? 0), 0);
+        }, 0);
+    }, [decisionState.draftMatrix]);
+
+    useEffect(() => {
+        const timeout = window.setTimeout(() => {
+            upsertPlanningRun({
+                runId: decisionState.runId,
+                programId: decisionState.programId,
+                executionState: decisionState,
+                status: decisionState.status,
+                projectId: contextProjectId ?? null
+            });
+        }, 600);
+        return () => window.clearTimeout(timeout);
+    }, [contextProjectId, decisionState, upsertPlanningRun]);
 
     // Auto-scroll
     useEffect(() => {
@@ -138,6 +159,16 @@ const ChatView: React.FC<ChatViewProps> = ({
                 startedAt && endedAt
                     ? new Date(endedAt).getTime() - new Date(startedAt).getTime()
                     : undefined;
+            const relatedLogs = decisionState.logs.filter((entry) => entry.data?.stepId === step.id);
+            const summary =
+                relatedLogs[relatedLogs.length - 1]?.message ??
+                (stepState?.status === 'blocked'
+                    ? 'Waiting for missing required inputs.'
+                    : stepState?.status === 'done'
+                        ? 'Completed with current inputs.'
+                        : stepState?.status === 'running'
+                            ? 'Executing agents and gathering evidence.'
+                            : 'Queued for execution.');
             return {
                 stepId: step.id,
                 title: step.title,
@@ -148,10 +179,12 @@ const ChatView: React.FC<ChatViewProps> = ({
                 endedAt,
                 durationMs,
                 blockingMissingInputs: stepState?.blockingMissingInputs,
-                error: stepState?.error
+                error: stepState?.error,
+                summary,
+                evidenceCount
             };
         });
-    }, [decisionState.steps, program.steps]);
+    }, [decisionState.logs, decisionState.steps, evidenceCount, program.steps]);
 
     const handleSubmitActionCard = useCallback(
         async ({ cardId, cardType, input }: { cardId: string; cardType: 'deepen' | 'refine' | 'next_step'; input?: Record<string, unknown> }) => {
@@ -203,20 +236,20 @@ const ChatView: React.FC<ChatViewProps> = ({
                     }
                 }
 
-                if (cardType === 'refine' && action === 'refine:apply-defaults') {
-                    const card = prev.actionCards.find(candidate => candidate.id === cardId);
-                    const pointers = card?.inputs?.map((candidate) => candidate.pointer) ?? [];
-                    const { patches: defaultPatches, appliedPointers } = buildDefaultPatchesForPointers(prev, pointers);
-                    if (appliedPointers.length > 0) {
-                        patches = defaultPatches;
+            if (cardType === 'refine' && action === 'refine:apply-defaults') {
+                const card = prev.actionCards.find(candidate => candidate.id === cardId);
+                const pointers = card?.inputs?.map((candidate) => candidate.pointer) ?? [];
+                const { patches: defaultPatches, appliedPointers } = buildDefaultPatchesForPointers(prev, pointers);
+                if (appliedPointers.length > 0) {
+                    patches = defaultPatches;
                         nextState = {
                             ...nextState,
                             logs: [...nextState.logs, buildDefaultsLogEntry({ runId: nextState.runId, pointers: appliedPointers })]
                         };
                     } else {
                         patches = [];
-                    }
                 }
+            }
 
                 patches.forEach((patch) => {
                     try {
@@ -234,10 +267,10 @@ const ChatView: React.FC<ChatViewProps> = ({
                     nextState.context = { ...nextState.context, ...contextPatch };
                 }
 
-                resumeRequested = cardType === 'refine' && patches.length > 0;
-                nextStateSnapshot = nextState;
-                return withActionCards(nextState);
-            });
+            resumeRequested = cardType === 'refine' && (patches.length > 0 || action === 'refine:continue');
+            nextStateSnapshot = nextState;
+            return withActionCards(nextState);
+        });
 
             if (handledRoute && action) {
                 return { navigation: { kind: action.replace('route:', '') as 'worksheet' | 'report' } };
@@ -436,6 +469,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                             sender: 'ai',
                             text: `Planning Matrix promoted (${payload.rowIds?.length ?? 'all'} rows).`
                         } as ChatMessage)}
+                        projectId={contextProjectId ?? null}
                     />
                 )}
 

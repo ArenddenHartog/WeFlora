@@ -1,5 +1,6 @@
 import React from 'react';
 import type { DraftMatrix, DraftMatrixColumn, DraftMatrixRow, EvidenceRef } from '../../types';
+import { InfoIcon } from '../../../../components/icons';
 import { getBadgeClass, getSeverity } from './severity';
 
 type _DraftMatrixColumn = DraftMatrixColumn;
@@ -44,7 +45,7 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
   onToggleRowSelected,
   onPromoteToWorksheet,
   density = 'comfortable',
-  showColumnWhy = true,
+  showColumnWhy = false,
   showCellRationale = false,
   showConfidence = false,
   className
@@ -53,6 +54,7 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
   const rowPadding = density === 'compact' ? 'py-2' : 'py-3';
   const availableColumns = (suggestedColumns ?? matrix.columns.filter((column) => column.visible === false)) ?? [];
   const [isAddOpen, setIsAddOpen] = React.useState(false);
+  const [expandedCells, setExpandedCells] = React.useState<Record<string, boolean>>({});
   const badgeBaseClass = 'text-[10px] font-semibold px-2 py-0.5 rounded-full';
 
   const parseNumeric = (value: CellValue) => {
@@ -123,6 +125,15 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
                 <th key={column.id} className="text-left px-3 py-2 font-semibold">
                   <div className="flex items-center gap-2">
                     <span>{column.label}</span>
+                    {column.why && (
+                      <button
+                        type="button"
+                        title={column.why}
+                        className="text-slate-400 hover:text-slate-600"
+                      >
+                        <InfoIcon className="h-3 w-3" />
+                      </button>
+                    )}
                     {onToggleColumnPinned && (
                       <button
                         onClick={() => onToggleColumnPinned(column.id)}
@@ -166,18 +177,33 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
                     const cell = row.cells.find((entry) => entry.columnId === column.id);
                     const numericValue = parseNumeric(cell?.value ?? null);
                     const isScore = column.kind === 'score' && numericValue !== null;
+                    const isScoreColumn = column.kind === 'score';
                     const scoreSeverity = isScore ? getSeverity(numericValue) : 'unknown';
                     const confidenceSeverity =
                       cell?.confidence !== undefined ? getSeverity(cell.confidence) : 'unknown';
+                    const cellKey = `${row.id}-${column.id}`;
+                    const isExpanded = expandedCells[cellKey];
+                    const isLongText = typeof cell?.value === 'string' && cell.value.length > 80;
+                    const clampStyle =
+                      !isExpanded && isLongText
+                        ? {
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical' as const,
+                            overflow: 'hidden'
+                          }
+                        : undefined;
                     return (
                       <td key={`${row.id}-${column.id}`} className={`px-3 ${rowPadding}`}>
-                        <div className="flex items-center gap-2">
+                        <div className={`flex items-start gap-2 ${isScoreColumn ? 'rounded-md px-2 py-1 bg-slate-50' : ''}`}>
                           {isScore ? (
                             <span className={`${badgeBaseClass} ${getBadgeClass(scoreSeverity)}`}>
                               {cell?.value ?? '—'}
                             </span>
                           ) : (
-                            <span>{cell?.value ?? '—'}</span>
+                            <span className="block" style={clampStyle}>
+                              {cell?.value ?? '—'}
+                            </span>
                           )}
                           {cell?.evidence && cell.evidence.length > 0 && onOpenCitations && (
                             <button
@@ -188,10 +214,21 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
                             </button>
                           )}
                         </div>
+                        {isLongText && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedCells((prev) => ({ ...prev, [cellKey]: !prev[cellKey] }))
+                            }
+                            className="mt-1 text-[10px] text-weflora-teal"
+                          >
+                            {isExpanded ? 'Collapse' : 'Expand'}
+                          </button>
+                        )}
                         {showCellRationale && cell?.rationale && (
                           <p className="text-[10px] text-slate-400 mt-1">{cell.rationale}</p>
                         )}
-                        {showConfidence && cell?.confidence !== undefined && (
+                        {(showConfidence || cell?.confidence !== undefined) && cell?.confidence !== undefined && (
                           <div className="mt-1">
                             <span className={`${badgeBaseClass} ${getBadgeClass(confidenceSeverity)}`}>
                               Confidence {Math.round(cell.confidence * 100)}%
