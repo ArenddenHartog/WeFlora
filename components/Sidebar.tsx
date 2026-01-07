@@ -6,7 +6,7 @@ import {
   PlusIcon, FolderIcon, HomeIcon, XIcon, CheckIcon, 
   SettingsIcon, UsersIcon, LogOutIcon, ChevronUpIcon,
   DatabaseIcon, TableIcon, ChatBubbleIcon, SidebarCloseIcon, LogoIcon, FileTextIcon, HistoryIcon, MessageSquareIcon,
-  SparklesIcon, UserPlusIcon
+  SparklesIcon, UserPlusIcon, FlowerIcon
 } from './icons';
 import BaseModal from './BaseModal';
 import { useData } from '../contexts/DataContext';
@@ -196,6 +196,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                       if(window.innerWidth < 768) onClose(); 
                   }} 
                   activeOverride={!isSessionsThread && isActive('/')}
+               />
+               <NavItem 
+                  icon={FlowerIcon} 
+                  label="Planning" 
+                  path="/planning"
+                  onClick={() => { navigate('/planning'); if(window.innerWidth < 768) onClose(); }} 
                />
                <NavItem 
                   icon={MessageSquareIcon} 

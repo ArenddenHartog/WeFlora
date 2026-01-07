@@ -38,6 +38,16 @@ export const WeFloraAskIcon: React.FC<IconProps> = ({ className }) => (
   </svg>
 );
 
+export const FlowerIcon: React.FC<IconProps> = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="3" fill="#22c55e" />
+    <circle cx="12" cy="4.5" r="3" fill="#22c55e" />
+    <circle cx="12" cy="19.5" r="3" fill="#22c55e" />
+    <circle cx="4.5" cy="12" r="3" fill="#22c55e" />
+    <circle cx="19.5" cy="12" r="3" fill="#22c55e" />
+  </svg>
+);
+
 export const SearchIcon: React.FC<IconProps> = ({ className }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

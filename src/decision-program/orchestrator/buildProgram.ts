@@ -3,8 +3,8 @@ import { STREET_TREE_SHORTLIST_REQUIRED_POINTERS } from './canonicalPointers.ts'
 
 export const buildProgram = (): DecisionProgram => ({
   id: 'street-tree-decision-program',
-  title: 'Street Tree Decision Program',
-  description: 'Multi-phase decision program for street tree shortlists.',
+  title: 'Street Tree Planning Program',
+  description: 'Multi-phase planning program for street tree shortlists.',
   version: 'v0.1',
   steps: [
     {
