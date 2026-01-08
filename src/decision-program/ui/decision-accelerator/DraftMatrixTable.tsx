@@ -362,8 +362,10 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
                             {rowEvidence.length > 0 ? (
                               <ul className="space-y-1">
                                 {rowEvidence.map(({ columnId, entry }) => (
-                                  <li key={`${columnId}-${entry.sourceId}`} className="flex items-center gap-2">
-                                    <span className="flex-1 truncate">{entry.note ?? entry.locationHint ?? entry.sourceId}</span>
+                                  <li key={`${columnId}-${entry.sourceId}-${entry.evidenceItemId ?? ''}`} className="flex items-center gap-2">
+                                    <span className="flex-1 truncate">
+                                      {entry.claim ?? entry.note ?? entry.locationHint ?? entry.sourceId}
+                                    </span>
                                     <button
                                       type="button"
                                       onClick={() => onOpenCitations?.({ rowId: row.id, columnId, evidence: [entry] })}

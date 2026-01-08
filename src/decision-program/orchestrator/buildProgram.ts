@@ -8,6 +8,15 @@ export const buildProgram = (): DecisionProgram => ({
   version: 'v0.1',
   steps: [
     {
+      id: 'site:strategic-site-regulatory-analysis',
+      title: 'Strategic site & regulatory analysis',
+      kind: 'agent',
+      phase: 'site',
+      agentRef: 'site-regulatory-analysis',
+      requiredPointers: [],
+      producesPointers: ['/derivedConstraints', '/context/site/constraints']
+    },
+    {
       id: 'site:derive-site-constraints',
       title: 'Derive site constraints',
       kind: 'agent',

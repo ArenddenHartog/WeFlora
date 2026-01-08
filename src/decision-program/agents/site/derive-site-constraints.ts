@@ -6,9 +6,12 @@ export const deriveSiteConstraints: Agent = {
   phase: 'site',
   requiredPointers: [],
   producesPointers: ['/context/site/constraints'],
-  run: async ({ context }) => {
+  run: async ({ context, state }) => {
     const selectedDocs = context.selectedDocs ?? [];
-    if (selectedDocs.length === 0) {
+    const derivedSummary = state.derivedConstraints?.meta?.derivedFrom?.length
+      ? 'Derived from strategic site & regulatory analysis.'
+      : undefined;
+    if (selectedDocs.length === 0 && !derivedSummary) {
       return { patches: [] };
     }
     return {
@@ -16,8 +19,8 @@ export const deriveSiteConstraints: Agent = {
         {
           pointer: '/context/site/constraints',
           value: {
-            source: 'selectedDocs',
-            summary: 'Derived constraints from selected docs metadata.'
+            source: derivedSummary ? 'strategic_analysis' : 'selectedDocs',
+            summary: derivedSummary ?? 'Derived constraints from selected docs metadata.'
           }
         }
       ]

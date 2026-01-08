@@ -84,7 +84,98 @@
         "sourceType": { "type": "string" },
         "locationHint": { "type": "string" },
         "pointer": { "type": "string" },
-        "note": { "type": "string" }
+        "note": { "type": "string" },
+        "claim": { "type": "string" },
+        "citations": { "type": "array", "items": { "$ref": "#/definitions/Citation" } },
+        "evidenceItemId": { "type": "string" }
+      }
+    },
+    "EvidenceSource": {
+      "type": "object",
+      "required": ["id", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "fileId": { "type": "string" },
+        "url": { "type": "string" },
+        "pageStart": { "type": "number" },
+        "pageEnd": { "type": "number" },
+        "quote": { "type": "string" },
+        "retrievedAt": { "type": "string" }
+      }
+    },
+    "Citation": {
+      "type": "object",
+      "required": ["sourceId"],
+      "additionalProperties": false,
+      "properties": {
+        "sourceId": { "type": "string" },
+        "locator": { "type": "object" },
+        "confidence": { "type": "number" }
+      }
+    },
+    "EvidenceItem": {
+      "type": "object",
+      "required": ["id", "kind", "claim", "citations"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "type": "string" },
+        "claim": { "type": "string" },
+        "citations": { "type": "array", "items": { "$ref": "#/definitions/Citation" } }
+      }
+    },
+    "ArtifactRef": {
+      "type": "object",
+      "required": ["id", "kind", "label", "href"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "type": "string" },
+        "label": { "type": "string" },
+        "href": { "type": "string" }
+      }
+    },
+    "TimelineEntry": {
+      "type": "object",
+      "required": ["id", "summary", "keyFindings", "evidence", "status", "createdAt"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "stepId": { "type": "string" },
+        "phase": { "type": "string" },
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "keyFindings": { "type": "array", "items": { "type": "string" } },
+        "evidence": { "type": "array", "items": { "$ref": "#/definitions/EvidenceItem" } },
+        "artifacts": { "type": "array", "items": { "$ref": "#/definitions/ArtifactRef" } },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "DerivedConstraints": {
+      "type": "object",
+      "required": ["regulatory", "site", "equity", "biophysical", "meta"],
+      "additionalProperties": false,
+      "properties": {
+        "regulatory": { "type": "object", "additionalProperties": true },
+        "site": { "type": "object", "additionalProperties": true },
+        "equity": { "type": "object", "additionalProperties": true },
+        "biophysical": { "type": "object", "additionalProperties": true },
+        "meta": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "DerivedInput": {
+      "type": "object",
+      "required": ["pointer", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "pointer": { "type": "string" },
+        "value": {},
+        "confidence": { "type": "number" },
+        "evidenceItemIds": { "type": "array", "items": { "type": "string" } },
+        "timelineEntryId": { "type": "string" }
       }
     },
     "DraftMatrixColumn": {
@@ -242,6 +333,14 @@
             "type": "array",
             "items": { "$ref": "#/definitions/EvidenceRef" }
           }
+        },
+        "evidenceSources": { "type": "array", "items": { "$ref": "#/definitions/EvidenceSource" } },
+        "evidenceItems": { "type": "array", "items": { "$ref": "#/definitions/EvidenceItem" } },
+        "timelineEntries": { "type": "array", "items": { "$ref": "#/definitions/TimelineEntry" } },
+        "derivedConstraints": { "$ref": "#/definitions/DerivedConstraints" },
+        "derivedInputs": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/DerivedInput" }
         }
       }
     }

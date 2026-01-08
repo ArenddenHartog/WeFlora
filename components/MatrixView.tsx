@@ -16,6 +16,7 @@ import ColumnSettingsModal from './ColumnSettingsModal';
 import { MessageRenderer } from './MessageRenderer';
 import { useUI } from '../contexts/UIContext';
 import { SKILL_TEMPLATES } from '../services/skillTemplates';
+import { executeSkillTemplate } from '../services/skills/executeSkillTemplate';
 import type { SkillRowContext } from '../services/skills/types';
 import type { WorksheetSelectionSnapshot } from '../src/floragpt/worksheet/types';
 
@@ -644,29 +645,16 @@ const MatrixView: React.FC<MatrixViewProps> = ({
                     params[p.key] = skillConfig.params?.[p.key] !== undefined ? skillConfig.params[p.key] : p.defaultValue;
                 });
 
-                const compiledPrompt = template.buildPrompt({
+                const result = await executeSkillTemplate({
+                    templateId: template.id,
                     row: rowContext,
                     params,
+                    contextFiles,
                     attachedFileNames: fileNames,
                     projectContext
                 });
 
-                const result = await aiService.runSkillCell({
-                    prompt: compiledPrompt,
-                    outputType: template.outputType,
-                    validator: (raw) => template.validate(raw, params),
-                    contextFiles,
-                    evidenceRequired: template.evidenceRequired,
-                    noGuessing: template.noGuessing,
-                    allowedEnums: template.allowedEnums,
-                    allowedUnits: template.allowedUnits,
-                    allowedPeriods: template.allowedPeriods,
-                    allowedCurrencies: template.allowedCurrencies,
-                    defaultUnit: template.defaultUnit,
-                    defaultPeriod: params.period ?? template.defaultPeriod
-                });
-
-                if (!result.ok) return { ok: false, error: result.error || result.reasoning };
+                if (!result.ok) return { ok: false, error: result.error };
 
                 return {
                     ok: true,

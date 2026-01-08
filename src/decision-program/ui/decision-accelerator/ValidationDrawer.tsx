@@ -1,6 +1,6 @@
 import React from 'react';
 import BaseModal from '../../../../components/BaseModal';
-import type { ActionCardInput } from '../../types';
+import type { ActionCardInput, DerivedInput } from '../../types';
 import {
   groupInputsByCategory,
   hasMissingOptionalInputs,
@@ -15,12 +15,14 @@ export interface ValidationDrawerProps {
   recommendedInputs: ActionCardInput[];
   optionalInputs?: ActionCardInput[];
   values: Record<string, string | number | boolean>;
+  derivedInputs?: Record<string, DerivedInput>;
   onChange: (inputId: string, value: string | number | boolean) => void;
   onSave: () => void;
   onSaveAndContinue: () => void;
   onClose: () => void;
   canProceedWithMissingRecommended: boolean;
   onApplyDefaults?: () => void;
+  onViewEvidence?: (entryId: string) => void;
 }
 
 const ValidationDrawer: React.FC<ValidationDrawerProps> = ({
@@ -30,21 +32,43 @@ const ValidationDrawer: React.FC<ValidationDrawerProps> = ({
   recommendedInputs,
   optionalInputs,
   values,
+  derivedInputs,
   onChange,
   onSave,
   onSaveAndContinue,
   onClose,
   canProceedWithMissingRecommended,
-  onApplyDefaults
+  onApplyDefaults,
+  onViewEvidence
 }) => {
   const missingRequired = hasMissingRequiredInputs(requiredInputs, values);
   const missingRecommended = hasMissingRecommendedInputs(recommendedInputs, values);
   const missingOptional = optionalInputs ? hasMissingOptionalInputs(optionalInputs, values) : false;
   const disableContinue = missingRequired || (!canProceedWithMissingRecommended && missingRecommended);
 
-  const renderInputField = (input: ActionCardInput) => (
+  const renderInputField = (input: ActionCardInput) => {
+    const derived = derivedInputs?.[input.pointer];
+    return (
     <label key={input.id} className="block text-xs text-slate-600 space-y-1">
-      <span className="font-semibold">{input.label}</span>
+      <div className="flex items-center justify-between">
+        <span className="font-semibold">{input.label}</span>
+        {derived && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+              Derived
+            </span>
+            {derived.timelineEntryId && onViewEvidence && (
+              <button
+                type="button"
+                onClick={() => onViewEvidence(derived.timelineEntryId!)}
+                className="text-[10px] font-semibold text-weflora-teal hover:text-weflora-dark"
+              >
+                View evidence
+              </button>
+            )}
+          </div>
+        )}
+      </div>
       {input.type === 'select' ? (
         <select
           value={(values[input.id] as string | undefined) ?? ''}
@@ -92,7 +116,8 @@ const ValidationDrawer: React.FC<ValidationDrawerProps> = ({
         <p className="text-[10px] text-slate-500">{input.impactNote}</p>
       )}
     </label>
-  );
+    );
+  };
 
   const renderGroupedInputs = (inputs: ActionCardInput[]) =>
     groupInputsByCategory(inputs).map(({ group, label, inputs: grouped }) => (

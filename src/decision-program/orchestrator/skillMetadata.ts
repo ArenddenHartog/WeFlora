@@ -1,5 +1,5 @@
 import type { DraftMatrixColumn } from '../types.ts';
-import { getSkillTemplate } from '../../../services/skillTemplates';
+import { getSkillTemplate } from '../../../services/skillTemplates.ts';
 
 export const buildSkillMetadata = (skillId?: string): DraftMatrixColumn['skillMetadata'] => {
   if (!skillId) return undefined;
