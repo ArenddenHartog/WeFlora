@@ -4,11 +4,16 @@ import type { ExecutionState } from '../../src/decision-program/types';
 import PlanningRunnerView from './PlanningRunnerView';
 import { buildProgram } from '../../src/decision-program/orchestrator/buildProgram';
 import { buildActionCards } from '../../src/decision-program/orchestrator/buildActionCards';
-import { buildDefaultPatchesForPointers, buildDefaultsLogEntry } from '../../src/decision-program/orchestrator/pointerInputRegistry';
+import {
+  buildDefaultPatchesForPointers,
+  buildDefaultsLogEntry,
+  getInputSpec
+} from '../../src/decision-program/orchestrator/pointerInputRegistry';
 import { planRun } from '../../src/decision-program/orchestrator/planRun';
 import { runAgentStep } from '../../src/decision-program/orchestrator/runAgentStep';
+import { getImpactedStepIds } from '../../src/decision-program/orchestrator/impactAnalysis';
 import { buildAgentRegistry } from '../../src/decision-program/agents/registry';
-import { setByPointer } from '../../src/decision-program/runtime/pointers';
+import { getByPointer, setByPointer } from '../../src/decision-program/runtime/pointers';
 import { buildRouteLogEntry, handleRouteAction } from '../../src/decision-program/ui/decision-accelerator/routeHandlers';
 import { promoteDraftMatrixToWorksheet } from '../../utils/draftMatrixPromotion';
 import RightSidebarStepper from '../../src/decision-program/ui/decision-accelerator/RightSidebarStepper';
@@ -41,6 +46,11 @@ const PlanningView: React.FC = () => {
   );
   const [planningState, setPlanningState] = useState<ExecutionState | null>(null);
   const [isStarting, setIsStarting] = useState(false);
+  const [inputChangeNotice, setInputChangeNotice] = useState<{
+    changedInputs: string[];
+    impactedSteps: string[];
+    impactedStepIds: string[];
+  } | null>(null);
 
   useEffect(() => {
     if (!planningRunId) return;
@@ -73,6 +83,7 @@ const PlanningView: React.FC = () => {
     setIsStarting(true);
     const planned = withActionCards(planRun(program, defaultPlanningContext));
     setPlanningState(planned);
+    setInputChangeNotice(null);
     navigate(`/planning/${planned.runId}`);
     const stepped = await runAgentStep(planned, program, agentRegistry);
     setPlanningState(withActionCards(stepped));
@@ -81,18 +92,24 @@ const PlanningView: React.FC = () => {
 
   const stepsVM = useMemo(() => {
     const evidenceIndex = planningState?.evidenceIndex ?? {};
-    if (!planningState) {
-      return program.steps.map((step) => ({
-        stepId: step.id,
-        title: step.title,
-        kind: step.kind,
-        agentRef: step.agentRef,
-        status: 'queued' as const,
-        summary: 'Waiting to start this step.',
-        evidenceCount: 0
-      }));
+    if (!planningState || planningState.status === 'idle') {
+      return [];
     }
-    return program.steps.map(step => {
+
+    const lastActiveIndex = program.steps.reduce((acc, step, index) => {
+      const stepState = planningState.steps.find((candidate) => candidate.stepId === step.id);
+      if (!stepState) return acc;
+      if (stepState.status !== 'queued') return index;
+      if (planningState.currentStepId === step.id) return index;
+      return acc;
+    }, -1);
+
+    const visibleSteps =
+      planningState.status === 'done'
+        ? program.steps
+        : program.steps.slice(0, lastActiveIndex + 1);
+
+    return visibleSteps.map(step => {
       const stepState = planningState.steps.find(candidate => candidate.stepId === step.id);
       const startedAt = stepState?.startedAt;
       const endedAt = stepState?.endedAt;
@@ -114,6 +131,7 @@ const PlanningView: React.FC = () => {
         stepId: step.id,
         title: step.title,
         kind: step.kind,
+        phase: step.phase,
         agentRef: step.agentRef,
         status: (stepState?.status ?? 'queued') as any,
         startedAt,
@@ -123,7 +141,8 @@ const PlanningView: React.FC = () => {
         error: stepState?.error,
         summary,
         reasoningSummary: stepState?.reasoningSummary,
-        evidenceCount: evidenceIndex[step.id]?.length ?? 0
+        evidenceCount: evidenceIndex[step.id]?.length ?? 0,
+        producesPointers: step.producesPointers
       };
     });
   }, [planningState, program.steps]);
@@ -167,6 +186,10 @@ const PlanningView: React.FC = () => {
 
       let handledRoute = false;
       let nextStateSnapshot: ExecutionState | null = null;
+      let changedPointers: string[] = [];
+      let impactedStepIds: string[] = [];
+      let impactedStepTitles: string[] = [];
+      let changedInputs: string[] = [];
 
       setPlanningState((prev) => {
         if (!prev) return prev;
@@ -192,23 +215,27 @@ const PlanningView: React.FC = () => {
           }
         }
 
-      if (cardType === 'refine' && action === 'refine:apply-defaults') {
-        const card = prev.actionCards.find(candidate => candidate.id === cardId);
-        const pointers = card?.inputs?.map((candidate) => candidate.pointer) ?? [];
-        const { patches: defaultPatches, appliedPointers } = buildDefaultPatchesForPointers(prev, pointers);
-        if (appliedPointers.length > 0) {
-          patches = defaultPatches;
+        if (cardType === 'refine' && action === 'refine:apply-defaults') {
+          const card = prev.actionCards.find(candidate => candidate.id === cardId);
+          const pointers = card?.inputs?.map((candidate) => candidate.pointer) ?? [];
+          const { patches: defaultPatches, appliedPointers } = buildDefaultPatchesForPointers(prev, pointers);
+          if (appliedPointers.length > 0) {
+            patches = defaultPatches;
             nextState = {
               ...nextState,
               logs: [...nextState.logs, buildDefaultsLogEntry({ runId: nextState.runId, pointers: appliedPointers })]
             };
           } else {
             patches = [];
+          }
         }
-      }
 
         patches.forEach((patch) => {
           try {
+            const existing = getByPointer(nextState, patch.pointer);
+            if (existing !== patch.value) {
+              changedPointers.push(patch.pointer);
+            }
             setByPointer(nextState, patch.pointer, patch.value);
           } catch (error) {
             console.error('planning_program_patch_failed', {
@@ -223,6 +250,16 @@ const PlanningView: React.FC = () => {
           nextState.context = { ...nextState.context, ...contextPatch };
         }
 
+        if (changedPointers.length > 0) {
+          impactedStepIds = getImpactedStepIds(program, changedPointers);
+          impactedStepTitles = impactedStepIds
+            .map((stepId) => program.steps.find((step) => step.id === stepId)?.title)
+            .filter(Boolean) as string[];
+          changedInputs = changedPointers.map(
+            (pointer) => getInputSpec(pointer)?.input.label ?? pointer
+          );
+        }
+
       nextStateSnapshot = nextState;
       return withActionCards(nextState);
     });
@@ -234,14 +271,33 @@ const PlanningView: React.FC = () => {
         const shouldResume =
           cardType === 'refine' &&
           (resumeRequested || action === 'refine:continue' || action === 'refine:apply-defaults');
-        if (!shouldResume) return;
-        const resumeState =
+        if (!shouldResume) {
+          if (changedPointers.length > 0 && impactedStepTitles.length > 0) {
+            setInputChangeNotice({
+              changedInputs,
+              impactedSteps: impactedStepTitles,
+              impactedStepIds
+            });
+          }
+          return;
+        }
+
+        const resumeStateBase =
           nextStateSnapshot.status === 'done'
             ? {
                 ...nextStateSnapshot,
                 status: 'running',
-                steps: nextStateSnapshot.steps.map((step) =>
-                  step.status === 'done'
+                steps: nextStateSnapshot.steps.map((step) => ({ ...step }))
+              }
+            : nextStateSnapshot;
+
+        const resumeState =
+          impactedStepIds.length > 0
+            ? {
+                ...resumeStateBase,
+                status: 'running',
+                steps: resumeStateBase.steps.map((step) =>
+                  impactedStepIds.includes(step.stepId)
                     ? {
                         ...step,
                         status: 'queued',
@@ -252,7 +308,9 @@ const PlanningView: React.FC = () => {
                     : step
                 )
               }
-            : nextStateSnapshot;
+            : resumeStateBase;
+
+        setInputChangeNotice(null);
         const stepped = await runAgentStep(resumeState, program, agentRegistry);
         setPlanningState(withActionCards(stepped));
         return;
@@ -260,6 +318,34 @@ const PlanningView: React.FC = () => {
     },
     [agentRegistry, program, promoteToWorksheet, showNotification, withActionCards]
   );
+
+  const handleRerunImpactedSteps = useCallback(async () => {
+    if (!planningState || !inputChangeNotice) return;
+    const impactedStepIds = inputChangeNotice.impactedStepIds;
+    const resumeState = {
+      ...planningState,
+      status: 'running',
+      steps: planningState.steps.map((step) =>
+        impactedStepIds.includes(step.stepId)
+          ? {
+              ...step,
+              status: 'queued',
+              startedAt: undefined,
+              endedAt: undefined,
+              error: undefined
+            }
+          : step
+      )
+    };
+    setInputChangeNotice(null);
+    setPlanningState(withActionCards(resumeState));
+    const stepped = await runAgentStep(resumeState, program, agentRegistry);
+    setPlanningState(withActionCards(stepped));
+  }, [agentRegistry, inputChangeNotice, planningState, program, withActionCards]);
+
+  const handleKeepResults = useCallback(() => {
+    setInputChangeNotice(null);
+  }, []);
 
   const showBackButton = Boolean(projectId) || location.key !== 'default';
 
@@ -292,6 +378,13 @@ const PlanningView: React.FC = () => {
             stepsVM={stepsVM}
             onStartRun={startPlanningRun}
             onSubmitCard={handleSubmitActionCard}
+            inputChangeNotice={
+              inputChangeNotice
+                ? { changedInputs: inputChangeNotice.changedInputs, impactedSteps: inputChangeNotice.impactedSteps }
+                : null
+            }
+            onRerunImpactedSteps={handleRerunImpactedSteps}
+            onKeepCurrentResults={handleKeepResults}
           />
         </div>
       </div>

@@ -25,6 +25,7 @@ export type WorksheetDraftColumnSpec = {
   label: string;
   skillId?: string;
   skillArgs?: Record<string, unknown>;
+  skillMetadata?: DraftMatrixColumn['skillMetadata'];
 };
 
 const orderVisibleColumns = (columns: DraftMatrixColumn[]) => {
@@ -38,8 +39,9 @@ export const buildWorksheetColumnSpecsFromDraftMatrix = (matrix: DraftMatrix): W
   orderVisibleColumns(matrix.columns).map((column) => ({
     id: column.id,
     label: column.label,
-    skillId: column.skillId,
-    skillArgs: column.skillArgs
+    skillId: column.skillMetadata?.skillId ?? column.skillId,
+    skillArgs: column.skillArgs,
+    skillMetadata: column.skillMetadata
   }));
 
 export const buildWorksheetTableFromDraftMatrix = (

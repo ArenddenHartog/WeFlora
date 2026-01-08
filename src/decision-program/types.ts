@@ -55,6 +55,11 @@ export interface DraftMatrixColumn {
   visible?: boolean;
   skillId?: string;
   skillArgs?: Record<string, unknown>;
+  skillMetadata?: {
+    kind: 'skill';
+    skillId: string;
+    inputContract?: Record<string, unknown>;
+  };
 }
 
 export interface DraftMatrixCell {

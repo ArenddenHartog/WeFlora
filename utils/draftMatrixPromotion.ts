@@ -16,7 +16,8 @@ export const promoteDraftMatrixToWorksheet = (
 
   const worksheetColumns = labels.map((label, index) => {
     const spec = columnSpecs[index];
-    const template = spec?.skillId ? getSkillTemplate(spec.skillId) : undefined;
+    const skillId = spec?.skillMetadata?.skillId ?? spec?.skillId;
+    const template = skillId ? getSkillTemplate(skillId) : undefined;
     const baseColumn: MatrixColumn = {
       id: `col-${index + 1}`,
       title: label,

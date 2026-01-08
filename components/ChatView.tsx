@@ -184,7 +184,24 @@ const ChatView: React.FC<ChatViewProps> = ({
     }, [agentRegistry, defaultDecisionContext, program, withActionCards]);
 
     const stepsVM = useMemo(() => {
-        return program.steps.map(step => {
+        if (decisionState.status === 'idle') {
+            return [];
+        }
+
+        const lastActiveIndex = program.steps.reduce((acc, step, index) => {
+            const stepState = decisionState.steps.find(candidate => candidate.stepId === step.id);
+            if (!stepState) return acc;
+            if (stepState.status !== 'queued') return index;
+            if (decisionState.currentStepId === step.id) return index;
+            return acc;
+        }, -1);
+
+        const visibleSteps =
+            decisionState.status === 'done'
+                ? program.steps
+                : program.steps.slice(0, lastActiveIndex + 1);
+
+        return visibleSteps.map(step => {
             const stepState = decisionState.steps.find(candidate => candidate.stepId === step.id);
             const startedAt = stepState?.startedAt;
             const endedAt = stepState?.endedAt;
@@ -193,19 +210,12 @@ const ChatView: React.FC<ChatViewProps> = ({
                     ? new Date(endedAt).getTime() - new Date(startedAt).getTime()
                     : undefined;
             const relatedLogs = decisionState.logs.filter((entry) => entry.data?.stepId === step.id);
-            const summary =
-                relatedLogs[relatedLogs.length - 1]?.message ??
-                (stepState?.status === 'blocked'
-                    ? 'Waiting for missing required inputs.'
-                    : stepState?.status === 'done'
-                        ? 'Completed with current inputs.'
-                        : stepState?.status === 'running'
-                            ? 'Executing agents and gathering evidence.'
-                            : 'Queued for execution.');
+            const summary = relatedLogs[relatedLogs.length - 1]?.message;
             return {
                 stepId: step.id,
                 title: step.title,
                 kind: step.kind,
+                phase: step.phase,
                 agentRef: step.agentRef,
                 status: (stepState?.status ?? 'queued') as any,
                 startedAt,
@@ -214,10 +224,12 @@ const ChatView: React.FC<ChatViewProps> = ({
                 blockingMissingInputs: stepState?.blockingMissingInputs,
                 error: stepState?.error,
                 summary,
-                evidenceCount
+                reasoningSummary: stepState?.reasoningSummary,
+                evidenceCount,
+                producesPointers: step.producesPointers
             };
         });
-    }, [decisionState.logs, decisionState.steps, evidenceCount, program.steps]);
+    }, [decisionState.currentStepId, decisionState.logs, decisionState.status, decisionState.steps, evidenceCount, program.steps]);
 
     const handleSubmitActionCard = useCallback(
         async ({ cardId, cardType, input }: { cardId: string; cardType: 'deepen' | 'refine' | 'next_step'; input?: Record<string, unknown> }) => {
