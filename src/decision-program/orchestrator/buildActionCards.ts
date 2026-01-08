@@ -38,36 +38,46 @@ export const buildActionCards = (state: ExecutionState): ActionCard[] => {
     refineSuggestedActions.unshift({ label: 'Apply safe defaults', action: 'refine:apply-defaults' });
   }
 
-  return [
-    {
-      id: 'action-deepen',
-      type: 'deepen',
-      title: 'Deepen the evidence',
-      description:
-        'Review the strongest candidates and drill into supporting evidence and risks before final selection.',
-      suggestedActions: [
-        { label: 'Review top risks', action: 'open-risk-summary' },
-        { label: 'Show evidence map', action: 'open-evidence-map' }
-      ]
-    },
-    {
-      id: 'action-refine',
-      type: 'refine',
-      title: 'Refine the missing constraints',
-      description: refineDescription,
-      inputs: refineInputs,
-      suggestedActions: refineSuggestedActions
-    },
-    {
-      id: 'action-next-step',
-      type: 'next_step',
-      title: 'Route to the next step',
-      description:
-        'Would you like to promote this shortlist to a Worksheet or draft a Report for stakeholder review?',
-      suggestedActions: [
-        { label: 'Promote to Worksheet', action: 'route:worksheet' },
-        { label: 'Draft Report', action: 'route:report' }
-      ]
-    }
-  ];
+  const deepenCard: ActionCard = {
+    id: 'action-deepen',
+    type: 'deepen',
+    title: 'Review the evidence',
+    description:
+      'Inspect key findings, evidence highlights, and risks before final selection.',
+    suggestedActions: [
+      { label: 'Review top risks', action: 'open-risk-summary' },
+      { label: 'Show evidence map', action: 'open-evidence-map' }
+    ]
+  };
+
+  const refineCard: ActionCard = {
+    id: 'action-refine',
+    type: 'refine',
+    title: 'Resolve missing inputs',
+    description: refineDescription,
+    inputs: refineInputs,
+    suggestedActions: refineSuggestedActions
+  };
+
+  const nextStepCard: ActionCard = {
+    id: 'action-next-step',
+    type: 'next_step',
+    title: 'Move to delivery',
+    description:
+      'Promote this shortlist to a Worksheet or draft a Report for stakeholder review.',
+    suggestedActions: [
+      { label: 'Promote to Worksheet', action: 'route:worksheet' },
+      { label: 'Draft Report', action: 'route:report' }
+    ]
+  };
+
+  if (missingRequired.length > 0) {
+    return [refineCard];
+  }
+
+  if (state.status === 'done') {
+    return [deepenCard, nextStepCard];
+  }
+
+  return [refineCard, deepenCard].slice(0, 2);
 };

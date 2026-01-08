@@ -1,6 +1,7 @@
 import type { DraftMatrix, DraftMatrixColumn, ExecutionContext, ExecutionState } from '../types.ts';
 import { getByPointer } from '../runtime/pointers.ts';
 import { minimalDraftColumns } from './buildDraftMatrix.ts';
+import { buildSkillMetadata } from './skillMetadata.ts';
 
 export type DynamicColumnRule = {
   id: string;
@@ -29,7 +30,8 @@ const heatToleranceColumn: DraftMatrixColumn = {
   kind: 'trait',
   datatype: 'string',
   why: 'Tracks fit for elevated heat stress conditions.',
-  skillId: 'heat_resilience'
+  skillId: 'heat_resilience',
+  skillMetadata: buildSkillMetadata('heat_resilience')
 };
 
 const droughtToleranceColumn: DraftMatrixColumn = {
@@ -38,7 +40,8 @@ const droughtToleranceColumn: DraftMatrixColumn = {
   kind: 'trait',
   datatype: 'string',
   why: 'Shows resilience under low-water conditions.',
-  skillId: 'drought_resilience'
+  skillId: 'drought_resilience',
+  skillMetadata: buildSkillMetadata('drought_resilience')
 };
 
 const compactionToleranceColumn: DraftMatrixColumn = {
@@ -80,7 +83,8 @@ const overallScoreColumn: DraftMatrixColumn = {
   kind: 'score',
   datatype: 'number',
   why: 'Composite score based on site fit and constraints.',
-  skillId: 'overall_fit'
+  skillId: 'overall_fit',
+  skillMetadata: buildSkillMetadata('overall_fit')
 };
 
 export const STREET_TREE_DYNAMIC_COLUMN_RULES: DynamicColumnRule[] = [

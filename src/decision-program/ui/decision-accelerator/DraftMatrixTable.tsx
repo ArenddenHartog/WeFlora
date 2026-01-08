@@ -57,6 +57,7 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
   const availableColumns = (suggestedColumns ?? matrix.columns.filter((column) => column.visible === false)) ?? [];
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [expandedCells, setExpandedCells] = React.useState<Record<string, boolean>>({});
+  const [expandedRowId, setExpandedRowId] = React.useState<string | null>(null);
   const badgeBaseClass = 'text-[10px] font-semibold px-2 py-0.5 rounded-full';
   const isScoreColumn = (column: DraftMatrixColumn) =>
     column.kind === 'score' || /score|confidence|fit/i.test(column.id);
@@ -80,6 +81,18 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
       return Number.isNaN(parsed) ? null : parsed;
     }
     return null;
+  };
+
+  const buildRowEvidence = (row: DraftMatrixRow) =>
+    row.cells
+      .flatMap((cell) => (cell.evidence ?? []).map((entry) => ({ columnId: cell.columnId, entry })))
+      .slice(0, 6);
+
+  const getRowRationale = (row: DraftMatrixRow) => {
+    const keyReasonCell = row.cells.find((cell) => cell.columnId === 'keyReason');
+    if (keyReasonCell?.value) return String(keyReasonCell.value);
+    const noteCell = row.cells.find((cell) => typeof cell.value === 'string' && cell.value.length > 0);
+    return noteCell?.value ? String(noteCell.value) : 'No summary provided yet.';
   };
 
   return (
@@ -203,85 +216,176 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
           <tbody>
             {matrix.rows.map((row) => {
               const isSelected = selectedRowIds?.includes(row.id);
+              const isRowExpanded = expandedRowId === row.id;
+              const rowEvidence = buildRowEvidence(row);
+              const rowFlags = row.cells
+                .flatMap((cell) => cell.flags ?? [])
+                .filter((flag, index, arr) => arr.indexOf(flag) === index);
               return (
-                <tr key={row.id} className={`border-b border-slate-100 ${isSelected ? 'bg-weflora-mint/10' : ''}`}>
-                  {onToggleRowSelected && (
-                    <td className={`px-3 ${rowPadding}`}>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(isSelected)}
-                        onChange={() => onToggleRowSelected(row.id)}
-                        className="rounded border-slate-300 text-weflora-teal"
-                      />
-                    </td>
-                  )}
-                  {visibleColumns.map((column) => {
-                    const cell = row.cells.find((entry) => entry.columnId === column.id);
-                    const numericValue = parseNumeric(cell?.value ?? null);
-                    const scoreColumn = isScoreColumn(column);
-                    const isScore = scoreColumn && numericValue !== null;
-                    const scoreSeverity = isScore ? getScoreBand(numericValue) : 'unknown';
-                    const confidenceSeverity =
-                      cell?.confidence !== undefined ? getScoreBand(cell.confidence) : 'unknown';
-                    const cellKey = `${row.id}-${column.id}`;
-                    const isExpanded = expandedCells[cellKey];
-                    const isLongText = typeof cell?.value === 'string' && cell.value.length > 80;
-                    const clampStyle =
-                      !isExpanded && isLongText
-                        ? {
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical' as const,
-                            overflow: 'hidden'
-                          }
-                        : undefined;
-                    return (
-                      <td key={`${row.id}-${column.id}`} className={`px-3 ${rowPadding}`}>
-                        <div className={`flex items-start gap-2 ${scoreColumn ? 'rounded-md px-2 py-1 bg-slate-50' : ''}`}>
-                          {isScore ? (
-                            <span className={`${badgeBaseClass} ${getScoreBadgeClass(scoreSeverity)}`}>
-                              {cell?.value ?? '—'}
-                            </span>
-                          ) : (
-                            <span className="block" style={clampStyle}>
-                              {cell?.value ?? '—'}
-                            </span>
-                          )}
-                          {cell?.evidence && cell.evidence.length > 0 && onOpenCitations && (
-                            <button
-                              onClick={() => onOpenCitations(buildCellCitationsArgs(row.id, column.id, cell.evidence))}
-                              className="text-weflora-teal hover:text-weflora-dark"
-                              aria-label="Open citations"
-                            >
-                              <BookIcon className="h-3 w-3" />
-                            </button>
-                          )}
-                        </div>
-                        {isLongText && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setExpandedCells((prev) => ({ ...prev, [cellKey]: !prev[cellKey] }))
-                            }
-                            className="mt-1 text-[10px] text-weflora-teal"
-                          >
-                            {isExpanded ? 'Collapse' : 'Expand'}
-                          </button>
-                        )}
-                        {showCellRationale && cell?.rationale && (
-                          <p className="text-[10px] text-slate-400 mt-1">{cell.rationale}</p>
-                        )}
-                        {(showConfidence || cell?.confidence !== undefined) && cell?.confidence !== undefined && (
-                          <div className="mt-1">
-                            <span className={`${badgeBaseClass} ${getBadgeClass(confidenceSeverity)}`}>
-                              Confidence {Math.round(cell.confidence * 100)}%
-                            </span>
-                          </div>
-                        )}
+                <React.Fragment key={row.id}>
+                  <tr className={`border-b border-slate-100 ${isSelected ? 'bg-weflora-mint/10' : ''}`}>
+                    {onToggleRowSelected && (
+                      <td className={`px-3 ${rowPadding}`}>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(isSelected)}
+                          onChange={() => onToggleRowSelected(row.id)}
+                          className="rounded border-slate-300 text-weflora-teal"
+                        />
                       </td>
-                    );
-                  })}
-                </tr>
+                    )}
+                    {visibleColumns.map((column, columnIndex) => {
+                      const cell = row.cells.find((entry) => entry.columnId === column.id);
+                      const numericValue = parseNumeric(cell?.value ?? null);
+                      const scoreColumn = isScoreColumn(column);
+                      const isScore = scoreColumn && numericValue !== null;
+                      const scoreSeverity = isScore ? getScoreBand(numericValue) : 'unknown';
+                      const confidenceSeverity =
+                        cell?.confidence !== undefined ? getScoreBand(cell.confidence) : 'unknown';
+                      const cellKey = `${row.id}-${column.id}`;
+                      const isExpanded = expandedCells[cellKey];
+                      const isLongText = typeof cell?.value === 'string' && cell.value.length > 80;
+                      const clampStyle =
+                        !isExpanded && isLongText
+                          ? {
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical' as const,
+                              overflow: 'hidden'
+                            }
+                          : undefined;
+                      return (
+                        <td key={`${row.id}-${column.id}`} className={`px-3 ${rowPadding}`}>
+                          <div className={`flex items-start gap-2 ${scoreColumn ? 'rounded-md px-2 py-1 bg-slate-50' : ''}`}>
+                            <div className="flex-1 space-y-1">
+                              <p style={clampStyle} className="text-xs text-slate-700">
+                                {cell?.value ?? '—'}
+                              </p>
+                              {columnIndex === 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedRowId(isRowExpanded ? null : row.id)}
+                                  className="text-[10px] text-weflora-teal hover:text-weflora-dark"
+                                >
+                                  {isRowExpanded ? 'Hide rationale' : 'View rationale'}
+                                </button>
+                              )}
+                              {showCellRationale && cell?.rationale && (
+                                <p className="text-[10px] text-slate-400">{cell.rationale}</p>
+                              )}
+                              {isLongText && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setExpandedCells((prev) => ({ ...prev, [cellKey]: !prev[cellKey] }))
+                                  }
+                                  className="text-[10px] text-slate-400 hover:text-slate-600"
+                                >
+                                  {isExpanded ? 'Show less' : 'Show more'}
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex flex-col gap-1 items-end">
+                              {isScore && (
+                                <div className="relative group">
+                                  <span className={`${badgeBaseClass} ${getScoreBadgeClass(scoreSeverity)}`}>
+                                    {numericValue}
+                                  </span>
+                                  <div className="absolute right-0 top-6 hidden w-48 rounded-lg border border-slate-200 bg-white p-2 text-[10px] text-slate-600 shadow-lg group-hover:block">
+                                    <p className="font-semibold text-slate-700 mb-1">Score context</p>
+                                    <p>{cell?.rationale ?? 'Based on current constraints.'}</p>
+                                    {cell?.flags && cell.flags.length > 0 && (
+                                      <p className="mt-1 text-slate-500">
+                                        Influenced by: {cell.flags.slice(0, 3).join(', ')}
+                                      </p>
+                                    )}
+                                    {cell?.evidence && cell.evidence.length > 0 && onOpenCitations && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          onOpenCitations(buildCellCitationsArgs(row.id, column.id, cell.evidence))
+                                        }
+                                        className="mt-2 text-weflora-teal hover:text-weflora-dark"
+                                      >
+                                        View citations
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              {showConfidence && cell?.confidence !== undefined && (
+                                <span className={`${badgeBaseClass} ${getBadgeClass(confidenceSeverity)}`}>
+                                  {Math.round(cell.confidence * 100)}% conf
+                                </span>
+                              )}
+                              {cell?.evidence && cell.evidence.length > 0 && onOpenCitations && (
+                                <button
+                                  onClick={() => onOpenCitations(buildCellCitationsArgs(row.id, column.id, cell.evidence))}
+                                  className="text-[10px] text-slate-400 hover:text-slate-600 inline-flex items-center gap-1"
+                                >
+                                  <BookIcon className="h-3 w-3" />
+                                  {cell.evidence.length}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  {isRowExpanded && (
+                    <tr className="bg-white">
+                      <td colSpan={(onToggleRowSelected ? 1 : 0) + visibleColumns.length} className="px-6 py-4">
+                        <div className="grid gap-4 md:grid-cols-3 text-xs text-slate-600">
+                          <div className="space-y-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Fit summary</p>
+                            <p>{getRowRationale(row)}</p>
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Score breakdown</p>
+                            <ul className="space-y-1">
+                              {visibleColumns
+                                .filter((column) => isScoreColumn(column))
+                                .map((column) => {
+                                  const cell = row.cells.find((entry) => entry.columnId === column.id);
+                                  return (
+                                    <li key={column.id} className="flex items-center justify-between gap-2">
+                                      <span>{column.label}</span>
+                                      <span className="font-semibold text-slate-700">{cell?.value ?? '-'}</span>
+                                    </li>
+                                  );
+                                })}
+                            </ul>
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Evidence & risks</p>
+                            {rowEvidence.length > 0 ? (
+                              <ul className="space-y-1">
+                                {rowEvidence.map(({ columnId, entry }) => (
+                                  <li key={`${columnId}-${entry.sourceId}`} className="flex items-center gap-2">
+                                    <span className="flex-1 truncate">{entry.note ?? entry.locationHint ?? entry.sourceId}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => onOpenCitations?.({ rowId: row.id, columnId, evidence: [entry] })}
+                                      className="text-weflora-teal hover:text-weflora-dark"
+                                    >
+                                      Cite
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-slate-400">No evidence snippets yet.</p>
+                            )}
+                            {rowFlags.length > 0 && (
+                              <p className="text-[11px] text-rose-600">Known risks: {rowFlags.slice(0, 3).join(', ')}</p>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               );
             })}
           </tbody>

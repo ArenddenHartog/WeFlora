@@ -38,27 +38,18 @@ export interface ActionCardsProps {
   className?: string;
 }
 
-const typeBadgeStyles: Record<ActionCardType, string> = {
-  deepen: 'bg-indigo-50 text-indigo-700',
-  refine: 'bg-amber-50 text-amber-700',
-  next_step: 'bg-emerald-50 text-emerald-700'
-};
-
-const typeCardStyles: Record<ActionCardType, { header: string; border: string; accent: string }> = {
+const typeCardStyles: Record<ActionCardType, { border: string; accent: string }> = {
   deepen: {
-    header: 'bg-indigo-50 text-indigo-900',
-    border: 'border-indigo-100',
-    accent: 'text-indigo-600'
+    border: 'border-weflora-mint/60',
+    accent: 'text-weflora-teal'
   },
   refine: {
-    header: 'bg-amber-50 text-amber-900',
-    border: 'border-amber-100',
-    accent: 'text-amber-600'
+    border: 'border-weflora-mint/60',
+    accent: 'text-weflora-teal'
   },
   next_step: {
-    header: 'bg-emerald-50 text-emerald-900',
-    border: 'border-emerald-100',
-    accent: 'text-emerald-600'
+    border: 'border-weflora-mint/60',
+    accent: 'text-weflora-teal'
   }
 };
 
@@ -68,7 +59,7 @@ const ActionCards: React.FC<ActionCardsProps> = ({
   onDismissCard,
   onRunSuggestedAction,
   contextSummary,
-  layout = 'grid',
+  layout = 'stack',
   showTypeBadges = true,
   className
 }) => {
@@ -115,8 +106,8 @@ const ActionCards: React.FC<ActionCardsProps> = ({
     <section className={`space-y-4 ${className ?? ''}`}>
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-slate-800">Action Cards</h3>
-          <p className="text-xs text-slate-500">Refinements and next actions</p>
+          <h3 className="text-sm font-semibold text-slate-800">Next best actions</h3>
+          <p className="text-xs text-slate-500">Choose the next move in the planning flow.</p>
         </div>
         {contextSummary && (
           <div className="text-xs text-slate-500">
@@ -125,8 +116,8 @@ const ActionCards: React.FC<ActionCardsProps> = ({
         )}
       </div>
 
-      <div className={layout === 'grid' ? 'grid gap-4 md:grid-cols-3' : 'space-y-3'}>
-        {cards.map((card) => {
+      <div className={layout === 'grid' ? 'grid gap-4 md:grid-cols-2' : 'space-y-3'}>
+        {cards.slice(0, 2).map((card) => {
           const cardStyle = typeCardStyles[card.type];
           const hasSuggestedActions = Boolean(card.suggestedActions?.length);
           const isRefineCard = card.type === 'refine';
@@ -208,84 +199,74 @@ const ActionCards: React.FC<ActionCardsProps> = ({
           );
 
           return (
-            <div
-              key={card.id}
-              className={`rounded-2xl border ${cardStyle.border} bg-white shadow-sm overflow-hidden`}
-            >
-              <div className={`px-4 py-3 ${cardStyle.header}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h4 className="text-sm font-semibold">{card.title}</h4>
-                    <p className="text-xs opacity-80 mt-1">{card.description}</p>
-                  </div>
-                  {showTypeBadges && (
-                    <span
-                      className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-white/70 ${typeBadgeStyles[card.type]}`}
-                    >
-                      {card.type}
-                    </span>
-                  )}
-                </div>
+            <div key={card.id} className={`rounded-2xl border ${cardStyle.border} bg-white px-4 py-4 space-y-3`}>
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-slate-800">{card.title}</h4>
+                {showTypeBadges && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-weflora-mint/40 text-weflora-teal">
+                    {card.type.replace('_', ' ')}
+                  </span>
+                )}
               </div>
+              <p className="text-xs text-slate-600">{card.description}</p>
 
-              <div className="px-4 py-4 space-y-4">
-                {inputs.length > 0 && !isRefineCard && renderInputs(inputs)}
+              {inputs.length > 0 && !isRefineCard && renderInputs(inputs)}
 
-                {isRefineCard && (
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3 text-xs text-slate-600 space-y-1">
-                    <p className="font-semibold text-slate-700">Resolve inputs to continue planning.</p>
-                    <p>{requiredInputs.length} required · {recommendedInputs.length + optionalInputs.length} recommended</p>
-                  </div>
-                )}
-
-                {showSuggestedActions && (
-                  <div className="flex flex-wrap gap-2">
-                    {card.suggestedActions?.map((action) => (
-                      <button
-                        key={action.label}
-                        onClick={() => {
-                          handleSuggestedAction(card, action);
-                        }}
-                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-weflora-teal text-white hover:bg-weflora-dark"
-                      >
-                        {action.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center gap-2 pt-2">
-                  {isRefineCard && (
-                    <button
-                      onClick={() => onOpenValidation?.(card.id)}
-                      className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-weflora-teal text-white hover:bg-weflora-dark"
-                    >
-                      Resolve inputs
-                    </button>
-                  )}
-                  {!hasSuggestedActions && !isRefineCard && (
-                    <button
-                      onClick={() =>
-                        onSubmitCard({
-                          cardId: card.id,
-                          cardType: card.type,
-                          input: card.inputs ? { patches: buildPatches(card.inputs) } : undefined
-                        })
-                      }
-                      className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-weflora-teal text-white hover:bg-weflora-dark"
-                    >
-                      Use Card
-                    </button>
-                  )}
-                  {onDismissCard && (
-                    <button
-                      onClick={() => onDismissCard(card.id)}
-                      className="text-xs text-slate-400 hover:text-slate-600"
-                    >
-                      Dismiss
-                    </button>
-                  )}
+              {isRefineCard && (
+                <div className="rounded-xl border border-weflora-mint/50 bg-weflora-mint/20 px-3 py-3 text-xs text-slate-600 space-y-1">
+                  <p className="font-semibold text-slate-700">Resolve inputs to continue planning.</p>
+                  <p>{requiredInputs.length} required · {recommendedInputs.length + optionalInputs.length} recommended</p>
                 </div>
+              )}
+
+              {showSuggestedActions && (
+                <div className="space-y-2">
+                  {card.suggestedActions?.map((action) => (
+                    <button
+                      key={action.label}
+                      onClick={() => {
+                        handleSuggestedAction(card, action);
+                      }}
+                      className="w-full flex items-center justify-between rounded-lg border border-weflora-mint/60 px-3 py-2 text-xs text-weflora-teal hover:bg-weflora-mint/20"
+                    >
+                      <span>{action.label}</span>
+                      <span className={`${cardStyle.accent}`}>{'→'}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2 pt-2">
+                {isRefineCard && (
+                  <button
+                    onClick={() => onOpenValidation?.(card.id)}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-weflora-mint/60 text-weflora-teal hover:bg-weflora-mint/20"
+                  >
+                    Resolve inputs
+                  </button>
+                )}
+                {!hasSuggestedActions && !isRefineCard && (
+                  <button
+                    onClick={() =>
+                      onSubmitCard({
+                        cardId: card.id,
+                        cardType: card.type,
+                        input: card.inputs ? { patches: buildPatches(card.inputs) } : undefined
+                      })
+                    }
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-weflora-teal text-white hover:bg-weflora-dark"
+                  >
+                    Use Card
+                  </button>
+                )}
+                {onDismissCard && (
+                  <button
+                    onClick={() => onDismissCard(card.id)}
+                    className="text-xs text-slate-400 hover:text-slate-600"
+                  >
+                    Dismiss
+                  </button>
+                )}
               </div>
             </div>
           );

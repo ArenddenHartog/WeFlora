@@ -1,5 +1,5 @@
 import React from 'react';
-import type { EvidenceRef, ExecutionLogEntry } from '../../types';
+import type { EvidenceRef, ExecutionLogEntry, Phase } from '../../types';
 import type { StepperStepViewModel } from './RightSidebarStepper';
 import { buildReasoningTimelineItems } from './reasoningUtils';
 
@@ -11,72 +11,117 @@ export interface ReasoningTimelineProps {
   className?: string;
 }
 
-const ReasoningTimeline: React.FC<ReasoningTimelineProps> = ({ steps, logs, evidenceIndex, onOpenCitations, className }) => {
-  const [expandedItems, setExpandedItems] = React.useState<Record<string, boolean>>({});
+const phaseOrder: Phase[] = ['site', 'species', 'supply'];
+
+const ReasoningTimeline: React.FC<ReasoningTimelineProps> = ({
+  steps,
+  logs,
+  evidenceIndex,
+  onOpenCitations,
+  className
+}) => {
+  const [expandedEvidence, setExpandedEvidence] = React.useState<Record<string, boolean>>({});
   const items = buildReasoningTimelineItems(steps, logs, evidenceIndex);
+  const grouped = items.reduce<Record<string, typeof items>>((acc, item) => {
+    const phase = item.phase ?? 'site';
+    acc[phase] = acc[phase] ?? [];
+    acc[phase].push(item);
+    return acc;
+  }, {});
 
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-white p-4 space-y-4 ${className ?? ''}`}>
+    <section className={`space-y-6 ${className ?? ''}`} id="planning-timeline">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-slate-800">Reasoning timeline</h3>
-          <p className="text-xs text-slate-500">Narrated findings and rationale</p>
+          <p className="text-xs text-slate-500">Findings, evidence, and artifacts as the run unfolds.</p>
         </div>
       </div>
 
-      <div className="space-y-3">
-        {items.length === 0 && (
-          <div className="rounded-xl border border-dashed border-slate-200 p-4 text-xs text-slate-500">
-            Findings will appear here as the run progresses.
-          </div>
-        )}
-        {items.map((item) => {
-          const isExpanded = expandedItems[item.id];
+      {items.length === 0 && (
+        <div className="text-xs text-slate-400">Findings will appear here as the run progresses.</div>
+      )}
+
+      <div className="space-y-10">
+        {phaseOrder.map((phase) => {
+          const phaseItems = grouped[phase] ?? [];
+          if (phaseItems.length === 0) return null;
           return (
-            <div key={item.id} className="rounded-xl border border-slate-100 px-4 py-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold text-slate-700">{item.title}</p>
-                  <p className="text-[11px] text-slate-600 mt-1">{item.summary}</p>
-                </div>
-                {item.details && item.details.length > 0 && (
-                  <button
-                    onClick={() =>
-                      setExpandedItems((prev) => ({
-                        ...prev,
-                        [item.id]: !prev[item.id]
-                      }))
-                    }
-                    className="text-[10px] text-slate-400 hover:text-slate-600"
-                  >
-                    {isExpanded ? 'Hide' : 'Explain'}
-                  </button>
-                )}
-              </div>
+            <div key={phase} className="space-y-4" id={`timeline-${phase}`}>
+              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{phase}</h4>
+              <div className="space-y-6 border-l border-slate-200 pl-6">
+                {phaseItems.map((item) => {
+                  const isEvidenceExpanded = expandedEvidence[item.id];
+                  return (
+                    <div key={item.id} className="space-y-3" id={`timeline-${item.stepId ?? item.id}`}>
+                      <div className="space-y-2">
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold text-slate-800">{item.title}</p>
+                          <p className="text-[11px] text-slate-600">{item.summary}</p>
+                        </div>
+                        {item.findings.length > 0 && (
+                          <ul className="text-[11px] text-slate-600 list-disc list-inside space-y-1">
+                            {item.findings.slice(0, 5).map((finding) => (
+                              <li key={finding}>{finding}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
 
-              <div className="mt-3 flex items-center gap-2">
-                {item.evidence && item.evidence.length > 0 && (
-                  <button
-                    onClick={() => onOpenCitations?.({ evidence: item.evidence })}
-                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
-                  >
-                    Sources · {item.evidence.length}
-                  </button>
-                )}
-              </div>
+                      {(item.evidence?.length ?? 0) > 0 && (
+                        <div className="space-y-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedEvidence((prev) => ({
+                                ...prev,
+                                [item.id]: !prev[item.id]
+                              }))
+                            }
+                            className="text-[11px] font-semibold text-slate-500 hover:text-slate-700"
+                          >
+                            Sources ({item.evidence?.length ?? 0}) · {isEvidenceExpanded ? 'Hide citations' : 'View citations'}
+                          </button>
+                          {isEvidenceExpanded && (
+                            <div className="space-y-2">
+                              <button
+                                type="button"
+                                onClick={() => onOpenCitations?.({ evidence: item.evidence })}
+                                className="text-[11px] font-semibold text-weflora-teal hover:text-weflora-dark"
+                              >
+                                Open citations panel
+                              </button>
+                              <ul className="space-y-1 text-[11px] text-slate-500">
+                                {item.evidence?.slice(0, 4).map((entry) => (
+                                  <li key={`${entry.sourceId}-${entry.locationHint ?? ''}`}>
+                                    {entry.note ?? entry.locationHint ?? entry.sourceId}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
-              {isExpanded && item.details && item.details.length > 0 && (
-                <div className="mt-3 border-t border-slate-100 pt-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
-                    Explanation
-                  </p>
-                  <ul className="space-y-1 text-[11px] text-slate-600 list-disc list-inside">
-                    {item.details.map((detail) => (
-                      <li key={detail}>{detail}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                      {item.artifacts && item.artifacts.length > 0 && (
+                        <div className="text-[11px] text-slate-500">
+                          Artifacts:{' '}
+                          {item.artifacts.map((artifact, index) => (
+                            <a
+                              key={artifact.href}
+                              href={artifact.href}
+                              className="text-weflora-teal hover:text-weflora-dark"
+                            >
+                              {artifact.label}
+                              {index < item.artifacts.length - 1 ? ', ' : ''}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           );
         })}

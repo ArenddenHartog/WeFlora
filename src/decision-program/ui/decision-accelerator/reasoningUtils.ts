@@ -1,34 +1,58 @@
-import type { EvidenceRef, ExecutionLogEntry } from '../../types';
+import type { EvidenceRef, ExecutionLogEntry, Phase } from '../../types';
 import type { StepperStepViewModel } from './RightSidebarStepper';
 
 export type ReasoningTimelineItem = {
   id: string;
+  stepId?: string;
+  phase?: Phase;
   title: string;
   summary: string;
+  findings: string[];
   evidence?: EvidenceRef[];
+  artifacts?: Array<{ label: string; href: string }>;
   details?: string[];
 };
 
-const LOG_RULES: Array<{ match: RegExp; title: string; summary: string }> = [
+const LOG_RULES: Array<{ match: RegExp; title: string; summary: string; findings: string[] }> = [
   {
     match: /Execution state created/i,
     title: 'Initialized planning context',
-    summary: 'Captured the baseline inputs and prepared the planning workspace.'
+    summary: 'Captured the baseline inputs and prepared the planning workspace.',
+    findings: [
+      'Captured baseline inputs for site, regulatory, equity, species, and supply context.',
+      'Prepared the run workspace for live planning updates.',
+      'Ready to begin site analysis and shortlist generation.'
+    ]
   },
   {
     match: /Applied safe defaults/i,
     title: 'Applied recommended defaults',
-    summary: 'Filled recommended inputs so the analysis can continue with clear baselines.'
+    summary: 'Filled recommended inputs so the analysis can continue with clear baselines.',
+    findings: [
+      'Applied defaults for missing recommended inputs.',
+      'Kept the planning run moving without blocking required fields.',
+      'Documented assumptions for transparency in downstream steps.'
+    ]
   },
   {
     match: /Agent patch application failed/i,
     title: 'Encountered an update issue',
-    summary: 'One of the updates failed while recording outputs. Review inputs and retry.'
+    summary: 'One of the updates failed while recording outputs. Review inputs and retry.',
+    findings: [
+      'A step output failed to record correctly.',
+      'Review the latest inputs to resolve the update issue.',
+      'Re-run the impacted step once the issue is addressed.'
+    ]
   },
   {
     match: /Agent not found/i,
     title: 'Analysis capability unavailable',
-    summary: 'A required planning capability is missing for this step.'
+    summary: 'A required planning capability is missing for this step.',
+    findings: [
+      'A skill needed for this step is unavailable.',
+      'Outputs for this phase are incomplete until the capability is restored.',
+      'Review configuration or rerun when the capability is available.'
+    ]
   }
 ];
 
@@ -40,6 +64,7 @@ const normalizeSummary = (value?: string) => {
   if (/queued for execution/i.test(trimmed)) return '';
   if (/executing agents/i.test(trimmed)) return '';
   if (/completed with current inputs/i.test(trimmed)) return '';
+  if (/agent completed/i.test(trimmed)) return '';
   return trimmed;
 };
 
@@ -75,6 +100,39 @@ const collectLogDetails = (logs: ExecutionLogEntry[]) =>
     .filter((message, index, arr) => arr.indexOf(message) === index)
     .slice(0, 4);
 
+const buildArtifacts = (pointers: string[] = []) => {
+  const mapping: Record<string, { label: string; href: string }> = {
+    '/draftMatrix': { label: 'View draft matrix', href: '#draft-matrix' },
+    '/context/site/constraints': { label: 'View site constraints', href: '#planning-inputs' },
+    '/context/species/diversityCheck': { label: 'View diversity check', href: '#planning-inputs' },
+    '/context/supply/availabilityStatus': { label: 'View supply status', href: '#planning-inputs' }
+  };
+  return pointers.map((pointer) => mapping[pointer]).filter(Boolean) as Array<{ label: string; href: string }>;
+};
+
+const buildFallbackFindings = (step: StepperStepViewModel): string[] => {
+  const base = step.title.toLowerCase();
+  if (step.producesPointers?.includes('/draftMatrix')) {
+    return [
+      `Updated the draft matrix during ${base}.`,
+      'Connected site constraints to shortlist selection.',
+      'Prepared outputs for the next planning phase.'
+    ];
+  }
+  if (step.producesPointers?.includes('/context/site/constraints')) {
+    return [
+      'Summarized site conditions into usable constraints.',
+      'Flagged risks that shape species viability.',
+      'Documented constraints for downstream filtering.'
+    ];
+  }
+  return [
+    `Recorded new outcomes from ${base}.`,
+    'Captured key constraints and signals for downstream work.',
+    'Prepared the next planning step with updated context.'
+  ];
+};
+
 export const buildReasoningTimelineItems = (
   steps: StepperStepViewModel[],
   logs: ExecutionLogEntry[],
@@ -88,7 +146,8 @@ export const buildReasoningTimelineItems = (
       items.push({
         id: `log-${entry.timestamp}`,
         title: match.title,
-        summary: match.summary
+        summary: match.summary,
+        findings: match.findings
       });
     }
   });
@@ -99,23 +158,40 @@ export const buildReasoningTimelineItems = (
     const details = collectLogDetails(stepLogs);
     const summaryFromStep = normalizeSummary(step.summary);
     const reasoning = step.reasoningSummary ?? [];
+    const artifacts = buildArtifacts(step.producesPointers ?? []);
+    const findings = reasoning.length > 0 ? reasoning.slice(0, 5) : details.slice(0, 5);
+    const fallbackFindings = buildFallbackFindings(step);
+    const resolvedFindings = findings.length > 0 ? findings : fallbackFindings;
+    const summary =
+      summaryFromStep ||
+      (step.status === 'blocked'
+        ? 'Awaiting required inputs to continue this analysis.'
+        : `Captured the latest outcomes from ${step.title.toLowerCase()}.`);
 
     reasoning.forEach((item, index) => {
       items.push({
         id: `${step.stepId}-reason-${index}`,
+        stepId: step.stepId,
+        phase: step.phase,
         title: item,
-        summary: summaryFromStep || 'Documented the evidence and constraints that informed this finding.',
+        summary,
+        findings: resolvedFindings,
         evidence,
+        artifacts,
         details
       });
     });
 
-    if (reasoning.length === 0 && step.status === 'done') {
+    if (reasoning.length === 0 && (step.status === 'done' || step.status === 'running' || step.status === 'blocked')) {
       items.push({
         id: `${step.stepId}-outcome`,
-        title: formatOutcomeTitle(step.title),
-        summary: summaryFromStep || 'Synthesized inputs into an actionable planning outcome.',
+        stepId: step.stepId,
+        phase: step.phase,
+        title: step.status === 'done' ? formatOutcomeTitle(step.title) : step.title,
+        summary,
+        findings: resolvedFindings,
         evidence,
+        artifacts,
         details
       });
     }

@@ -23,6 +23,12 @@ export interface DecisionModeViewProps {
   onSubmitCard: (args: { cardId: string; cardType: 'deepen' | 'refine' | 'next_step'; input?: Record<string, unknown> }) =>
     Promise<any>;
   onPromoteToWorksheet?: (payload: { matrixId: string; rowIds?: string[] }) => void;
+  inputChangeNotice?: {
+    changedInputs: string[];
+    impactedSteps: string[];
+  } | null;
+  onRerunImpactedSteps?: () => void;
+  onKeepCurrentResults?: () => void;
   labels?: {
     startRun?: string;
     promotionSummary?: string;
@@ -39,6 +45,9 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
   onStartRun,
   onOpenCitations,
   onSubmitCard,
+  inputChangeNotice,
+  onRerunImpactedSteps,
+  onKeepCurrentResults,
   labels,
   stepperTitle,
   className
@@ -168,11 +177,18 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
     setSelectedRowIds((prev) => (prev.includes(rowId) ? prev.filter((id) => id !== rowId) : [...prev, rowId]));
   };
 
+  const handleStepSelect = (stepId: string) => {
+    const element = document.getElementById(`timeline-${stepId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   return (
     <div className={`flex h-full bg-slate-50 ${className ?? ''}`}>
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
-          <div className="text-xs text-slate-500">Planning inputs and outputs</div>
+          <div className="text-xs text-slate-500">Live planning workspace</div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsValidationOpen(true)}
@@ -185,20 +201,47 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
                 onClick={onStartRun}
                 className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-weflora-teal text-white hover:bg-weflora-dark"
               >
-                {labels?.startRun ?? 'Start Decision Run'}
+                {labels?.startRun ?? 'Start Planning'}
               </button>
             )}
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          <div id="planning-inputs" />
+          {inputChangeNotice && (
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+              <p className="text-xs text-slate-700">
+                Inputs changed: <span className="font-semibold">{inputChangeNotice.changedInputs.join(', ')}</span>
+              </p>
+              <p className="text-[11px] text-slate-500 mt-1">
+                This affects: {inputChangeNotice.impactedSteps.join(' → ')} → downstream steps
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => onRerunImpactedSteps?.()}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-weflora-teal text-white hover:bg-weflora-dark"
+                >
+                  Re-run impacted steps
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onKeepCurrentResults?.()}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                >
+                  Keep current results
+                </button>
+              </div>
+            </div>
+          )}
           {(missingRequiredInputs.length > 0 || missingRecommendedInputs.length > 0) && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+            <section className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-800">Missing inputs</h3>
                   <p className="text-xs text-slate-500">
-                    Provide the remaining inputs to keep the plan precise.
+                    Add the remaining inputs to keep the plan precise.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -227,33 +270,31 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
               </div>
 
               {missingRequiredInputs.length === 0 && missingRecommendedInputs.length > 0 && (
-                <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+                <div className="text-[11px] text-amber-700">
                   Continuing with partial inputs may reduce specificity.
                 </div>
               )}
 
               <div className="space-y-2">
                 {[...missingRequiredInputs, ...missingRecommendedInputs].map((input) => (
-                  <div key={input.id} className="rounded-xl border border-slate-100 px-3 py-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-xs font-semibold text-slate-700">{input.label}</p>
-                        {input.helpText && <p className="text-[11px] text-slate-500 mt-1">{input.helpText}</p>}
-                      </div>
-                      <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          input.severity === 'required'
-                            ? 'bg-rose-50 text-rose-700'
-                            : 'bg-amber-50 text-amber-700'
-                        }`}
-                      >
-                        {input.severity === 'required' ? 'Required' : 'Recommended'}
-                      </span>
+                  <div key={input.id} className="flex items-center justify-between text-xs text-slate-600">
+                    <div>
+                      <p className="font-semibold text-slate-700">{input.label}</p>
+                      {input.helpText && <p className="text-[11px] text-slate-500 mt-1">{input.helpText}</p>}
                     </div>
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                        input.severity === 'required'
+                          ? 'bg-rose-50 text-rose-700'
+                          : 'bg-amber-50 text-amber-700'
+                      }`}
+                    >
+                      {input.severity === 'required' ? 'Required' : 'Recommended'}
+                    </span>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
           <ReasoningTimeline
@@ -264,7 +305,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
           />
 
           {visibleMatrix ? (
-            <div ref={matrixRef}>
+            <div ref={matrixRef} id="draft-matrix">
               <DraftMatrixTable
                 matrix={visibleMatrix}
                 onOpenCitations={handleOpenCitations}
@@ -294,7 +335,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
               blockedStepId={state.steps.find((step) => step.status === 'blocked')?.stepId}
               onSubmitCard={onSubmitCard}
               onOpenValidation={() => setIsValidationOpen(true)}
-              layout="grid"
+              layout="stack"
               showTypeBadges={false}
             />
           </div>
@@ -303,7 +344,9 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
 
       <RightSidebarStepper
         steps={stepsVM}
+        logs={state.logs}
         headerTitle={stepperTitle}
+        onStepSelect={handleStepSelect}
       />
 
       {refineCard && (
