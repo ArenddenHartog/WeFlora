@@ -1,4 +1,4 @@
-import type { EvidenceRef, ExecutionLogEntry, Phase } from '../../types';
+import type { EvidenceItem, EvidenceRef, ExecutionLogEntry, Phase, TimelineEntry } from '../../types';
 import type { StepperStepViewModel } from './RightSidebarStepper';
 
 export type ReasoningTimelineItem = {
@@ -7,10 +7,12 @@ export type ReasoningTimelineItem = {
   phase?: Phase;
   title: string;
   summary: string;
-  findings: string[];
-  evidence?: EvidenceRef[];
+  keyFindings: string[];
+  evidence?: EvidenceItem[];
+  evidenceRefs?: EvidenceRef[];
   artifacts?: Array<{ label: string; href: string }>;
   details?: string[];
+  status?: TimelineEntry['status'];
 };
 
 const LOG_RULES: Array<{ match: RegExp; title: string; summary: string; findings: string[] }> = [
@@ -103,7 +105,8 @@ const collectLogDetails = (logs: ExecutionLogEntry[]) =>
 const buildArtifacts = (pointers: string[] = []) => {
   const mapping: Record<string, { label: string; href: string }> = {
     '/draftMatrix': { label: 'View draft matrix', href: '#draft-matrix' },
-    '/context/site/constraints': { label: 'View site constraints', href: '#planning-inputs' },
+    '/context/site/constraints': { label: 'View site constraints', href: '#planning-constraints' },
+    '/derivedConstraints': { label: 'View constraints', href: '#planning-constraints' },
     '/context/species/diversityCheck': { label: 'View diversity check', href: '#planning-inputs' },
     '/context/supply/availabilityStatus': { label: 'View supply status', href: '#planning-inputs' }
   };
@@ -147,13 +150,13 @@ export const buildReasoningTimelineItems = (
         id: `log-${entry.timestamp}`,
         title: match.title,
         summary: match.summary,
-        findings: match.findings
+        keyFindings: match.findings
       });
     }
   });
 
   steps.forEach((step) => {
-    const evidence = evidenceIndex?.[step.stepId] ?? [];
+    const evidenceRefs = evidenceIndex?.[step.stepId] ?? [];
     const stepLogs = logs.filter((entry) => entry.data?.stepId === step.stepId);
     const details = collectLogDetails(stepLogs);
     const summaryFromStep = normalizeSummary(step.summary);
@@ -175,8 +178,8 @@ export const buildReasoningTimelineItems = (
         phase: step.phase,
         title: item,
         summary,
-        findings: resolvedFindings,
-        evidence,
+        keyFindings: resolvedFindings,
+        evidenceRefs,
         artifacts,
         details
       });
@@ -189,8 +192,8 @@ export const buildReasoningTimelineItems = (
         phase: step.phase,
         title: step.status === 'done' ? formatOutcomeTitle(step.title) : step.title,
         summary,
-        findings: resolvedFindings,
-        evidence,
+        keyFindings: resolvedFindings,
+        evidenceRefs,
         artifacts,
         details
       });
@@ -198,4 +201,27 @@ export const buildReasoningTimelineItems = (
   });
 
   return items;
+};
+
+export const mergeTimelineEntries = (
+  timelineEntries: TimelineEntry[] | undefined,
+  fallbackItems: ReasoningTimelineItem[]
+): ReasoningTimelineItem[] => {
+  if (!timelineEntries || timelineEntries.length === 0) {
+    return fallbackItems;
+  }
+
+  const mapped = timelineEntries.map((entry) => ({
+    id: entry.id,
+    stepId: entry.stepId,
+    phase: entry.phase,
+    title: entry.title ?? entry.summary,
+    summary: entry.summary,
+    keyFindings: entry.keyFindings,
+    evidence: entry.evidence,
+    artifacts: entry.artifacts,
+    status: entry.status
+  }));
+
+  return [...mapped, ...fallbackItems.filter((item) => !item.stepId)];
 };

@@ -37,12 +37,122 @@ export interface StepState {
   reasoningSummary?: string[];
 }
 
+export interface EvidenceSource {
+  id: string;
+  title: string;
+  fileId?: string;
+  url?: string;
+  pageStart?: number;
+  pageEnd?: number;
+  quote?: string;
+  retrievedAt?: string;
+}
+
+export interface CitationLocator {
+  page?: number;
+  section?: string;
+  row?: string;
+}
+
+export interface Citation {
+  sourceId: string;
+  locator?: CitationLocator;
+  confidence?: number;
+}
+
+export type EvidenceKind = 'regulatory' | 'equity' | 'biophysical' | 'site';
+
+export interface EvidenceItem {
+  id: string;
+  kind: EvidenceKind;
+  claim: string;
+  citations: Citation[];
+}
+
+export interface ArtifactRef {
+  id: string;
+  kind: 'constraints' | 'shortlist' | 'scoring' | 'map' | 'supplyStatus';
+  label: string;
+  href: string;
+}
+
+export interface TimelineEntry {
+  id: string;
+  stepId?: string;
+  phase?: Phase;
+  title?: string;
+  summary: string;
+  keyFindings: string[];
+  evidence: EvidenceItem[];
+  artifacts?: ArtifactRef[];
+  status: 'running' | 'done' | 'needs_input' | 'error';
+  createdAt: string;
+}
+
+export interface DerivedConstraints {
+  regulatory: {
+    setting?: string | null;
+    saltToleranceRequired?: boolean | null;
+    protectedZone?: boolean | null;
+    permitNeeded?: boolean | null;
+    maxHeightClass?: string | null;
+    notes?: string | null;
+  };
+  site: {
+    lightExposure?: string | null;
+    soilType?: string | null;
+    moisture?: string | null;
+    compactionRisk?: string | null;
+    rootingVolumeClass?: string | null;
+    crownClearanceClass?: string | null;
+    utilitiesPresent?: boolean | null;
+    setbacksKnown?: boolean | null;
+  };
+  equity: {
+    priorityZones?: string | null;
+    heatVulnerability?: string | null;
+    asthmaBurden?: string | null;
+    underservedFlag?: boolean | null;
+  };
+  biophysical: {
+    canopyCover?: number | null;
+    lstClass?: string | null;
+    distanceToPaved?: string | null;
+    floodRisk?: string | null;
+  };
+  meta: {
+    derivedFrom: EvidenceItem[];
+    confidenceByField?: Record<string, number>;
+  };
+}
+
+export interface DerivedInput {
+  pointer: string;
+  value: unknown;
+  confidence?: number;
+  evidenceItemIds?: string[];
+  timelineEntryId?: string;
+}
+
+export interface EvidenceFileRef {
+  id: string;
+  title?: string;
+  fileId?: string;
+  url?: string;
+  content?: string;
+  file?: File;
+  sourceType?: string;
+}
+
 export interface EvidenceRef {
   sourceId: string;
   sourceType?: string;
   locationHint?: string;
   pointer?: string;
   note?: string;
+  claim?: string;
+  citations?: Citation[];
+  evidenceItemId?: string;
 }
 
 export interface DraftMatrixColumn {
@@ -123,7 +233,7 @@ export interface ExecutionContext {
   equity: Record<string, unknown>;
   species: Record<string, unknown>;
   supply: Record<string, unknown>;
-  selectedDocs?: Array<Record<string, unknown>>;
+  selectedDocs?: EvidenceFileRef[];
 }
 
 export interface ExecutionLogEntry {
@@ -146,4 +256,9 @@ export interface ExecutionState {
   actionCards: ActionCard[];
   logs: ExecutionLogEntry[];
   evidenceIndex?: Record<string, EvidenceRef[]>;
+  evidenceSources?: EvidenceSource[];
+  evidenceItems?: EvidenceItem[];
+  timelineEntries?: TimelineEntry[];
+  derivedConstraints?: DerivedConstraints;
+  derivedInputs?: Record<string, DerivedInput>;
 }

@@ -1,9 +1,9 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { MatrixColumn, DiscoveredStructure, ContextItem, MatrixRow, Matrix, MatrixColumnType, Report, ProjectInsights, MemorySummary } from '../types';
-import { SkillOutputType, SkillValidationResult } from './skillTemplates';
-import { buildSystemInstruction } from './skills/systemPolicy';
-import { buildRetryInstruction, getOutputFormatHint } from './skills/outputFormats';
-import { getValidatorForOutputType } from './skills/validators';
+import type { MatrixColumn, DiscoveredStructure, ContextItem, MatrixRow, Matrix, MatrixColumnType, Report, ProjectInsights, MemorySummary } from '../types.ts';
+import type { SkillOutputType, SkillValidationResult } from './skillTemplates.ts';
+import { buildSystemInstruction } from './skills/systemPolicy.ts';
+import { buildRetryInstruction, getOutputFormatHint } from './skills/outputFormats.ts';
+import { getValidatorForOutputType } from './skills/validators.ts';
 
 // Initialize the SDK
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GOOGLE_API_KEY });

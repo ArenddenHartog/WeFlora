@@ -30,7 +30,7 @@ const PlanningView: React.FC = () => {
   const agentRegistry = useMemo(() => buildAgentRegistry(), []);
   const { showNotification } = useUI();
   const { planningRuns, upsertPlanningRun } = useChat();
-  const { createMatrix } = useProject();
+  const { createMatrix, files } = useProject();
   const planningRunId = params.runId;
   const projectId = params.projectId ?? null;
   const defaultPlanningContext = useMemo(
@@ -44,6 +44,33 @@ const PlanningView: React.FC = () => {
     }),
     []
   );
+
+  const buildSelectedDocs = useCallback(async () => {
+    if (!projectId) return [] as any[];
+    const projectFiles = files?.[projectId] ?? [];
+    const selectedDocs = await Promise.all(
+      projectFiles.map(async (file) => {
+        const content =
+          file.file &&
+          (file.file.type.includes('text') ||
+            file.file.type.includes('csv') ||
+            file.file.type.includes('json') ||
+            file.name.endsWith('.txt') ||
+            file.name.endsWith('.csv') ||
+            file.name.endsWith('.json'))
+            ? await file.file.text()
+            : undefined;
+        return {
+          id: file.id,
+          title: file.name,
+          fileId: file.id,
+          file: file.file,
+          content
+        };
+      })
+    );
+    return selectedDocs;
+  }, [files, projectId]);
   const [planningState, setPlanningState] = useState<ExecutionState | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [inputChangeNotice, setInputChangeNotice] = useState<{
@@ -81,14 +108,20 @@ const PlanningView: React.FC = () => {
 
   const startPlanningRun = useCallback(async () => {
     setIsStarting(true);
-    const planned = withActionCards(planRun(program, defaultPlanningContext));
+    const selectedDocs = await buildSelectedDocs();
+    const planned = withActionCards(
+      planRun(program, {
+        ...defaultPlanningContext,
+        selectedDocs
+      })
+    );
     setPlanningState(planned);
     setInputChangeNotice(null);
     navigate(`/planning/${planned.runId}`);
     const stepped = await runAgentStep(planned, program, agentRegistry);
     setPlanningState(withActionCards(stepped));
     setIsStarting(false);
-  }, [agentRegistry, defaultPlanningContext, program, withActionCards, navigate]);
+  }, [agentRegistry, buildSelectedDocs, defaultPlanningContext, program, withActionCards, navigate]);
 
   const stepsVM = useMemo(() => {
     const evidenceIndex = planningState?.evidenceIndex ?? {};

@@ -18,7 +18,11 @@ const cloneState = (state: ExecutionState): ExecutionState => ({
   ...state,
   steps: state.steps.map((step) => ({ ...step })),
   context: { ...state.context },
-  logs: [...state.logs]
+  logs: [...state.logs],
+  evidenceSources: state.evidenceSources ? [...state.evidenceSources] : undefined,
+  evidenceItems: state.evidenceItems ? [...state.evidenceItems] : undefined,
+  timelineEntries: state.timelineEntries ? [...state.timelineEntries] : undefined,
+  derivedInputs: state.derivedInputs ? { ...state.derivedInputs } : undefined
 });
 
 const pushLog = (state: ExecutionState, entry: { level: 'info' | 'warn' | 'error'; message: string; data?: Record<string, unknown> }) => {
@@ -44,6 +48,10 @@ export const createExecutionState = (
     })),
     context: ensureContextSlots(initialContext),
     actionCards: [],
+    evidenceSources: [],
+    evidenceItems: [],
+    timelineEntries: [],
+    derivedInputs: {},
     logs: [
       {
         level: 'info',

@@ -8,6 +8,7 @@ import { useUI } from '../../../../contexts/UIContext';
 import { toCitationsPayload } from '../../orchestrator/evidenceToCitations';
 import ReasoningTimeline from './ReasoningTimeline';
 import ValidationDrawer from './ValidationDrawer';
+import DerivedConstraintsPanel from './DerivedConstraintsPanel';
 import { buildPatchesForInputs } from './actionCardUtils';
 import { getByPointer } from '../../runtime/pointers';
 import { getMissingInputs, splitInputsBySeverity } from './validationUtils';
@@ -60,6 +61,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
   const [matrixDensity, setMatrixDensity] = useState<'comfortable' | 'compact'>('comfortable');
   const [isValidationOpen, setIsValidationOpen] = useState(false);
   const [validationValues, setValidationValues] = useState<Record<string, string | number | boolean>>({});
+  const [focusedEntryId, setFocusedEntryId] = useState<string | null>(null);
 
   useEffect(() => {
     setLocalMatrix((prev) => {
@@ -107,6 +109,15 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
   const missingRecommendedInputs = useMemo(
     () => missingRefineInputs.filter((input) => input.severity === 'recommended'),
     [missingRefineInputs]
+  );
+  const derivedInputs = useMemo(() => state.derivedInputs ?? {}, [state.derivedInputs]);
+  const derivedInputEntries = useMemo(
+    () =>
+      Object.values(derivedInputs).map((entry) => ({
+        ...entry,
+        label: allInputs.find((input) => input.pointer === entry.pointer)?.label ?? entry.pointer
+      })),
+    [allInputs, derivedInputs]
   );
 
   useEffect(() => {
@@ -235,13 +246,15 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
               </div>
             </div>
           )}
-          {(missingRequiredInputs.length > 0 || missingRecommendedInputs.length > 0) && (
+          {(missingRequiredInputs.length > 0 || missingRecommendedInputs.length > 0 || derivedInputEntries.length > 0) && (
             <section className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-800">Missing inputs</h3>
                   <p className="text-xs text-slate-500">
-                    Add the remaining inputs to keep the plan precise.
+                    {missingRequiredInputs.length > 0 || missingRecommendedInputs.length > 0
+                      ? 'Add the remaining inputs to keep the plan precise.'
+                      : 'Derived inputs were pulled from uploaded evidence.'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -294,13 +307,51 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
                   </div>
                 ))}
               </div>
+
+              {derivedInputEntries.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Derived from evidence</p>
+                  <div className="space-y-2">
+                    {derivedInputEntries.map((entry) => (
+                      <div key={entry.pointer} className="flex items-center justify-between text-xs text-slate-600">
+                        <div>
+                          <p className="font-semibold text-slate-700">{entry.label}</p>
+                          <p className="text-[11px] text-slate-500 mt-1">Value: {String(entry.value)}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                            Derived
+                          </span>
+                          {entry.timelineEntryId && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFocusedEntryId(entry.timelineEntryId ?? null);
+                                document.getElementById('planning-timeline')?.scrollIntoView({ behavior: 'smooth' });
+                              }}
+                              className="text-[10px] font-semibold text-weflora-teal hover:text-weflora-dark"
+                            >
+                              View evidence
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </section>
           )}
+
+          <DerivedConstraintsPanel derivedConstraints={state.derivedConstraints} />
 
           <ReasoningTimeline
             steps={stepsVM}
             logs={state.logs}
             evidenceIndex={state.evidenceIndex}
+            evidenceSources={state.evidenceSources}
+            timelineEntries={state.timelineEntries}
+            focusedEntryId={focusedEntryId}
             onOpenCitations={(args) => handleOpenStepCitations({ evidence: args.evidence, label: 'Sources' })}
           />
 
@@ -357,6 +408,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
           recommendedInputs={recommendedInputs}
           optionalInputs={optionalInputs}
           values={validationValues}
+          derivedInputs={derivedInputs}
           onChange={(inputId, value) => setValidationValues((prev) => ({ ...prev, [inputId]: value }))}
           onSave={() => {
             if (!refineCard) return;
@@ -399,6 +451,10 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
           }
           onClose={() => setIsValidationOpen(false)}
           canProceedWithMissingRecommended
+          onViewEvidence={(entryId) => {
+            setFocusedEntryId(entryId);
+            document.getElementById('planning-timeline')?.scrollIntoView({ behavior: 'smooth' });
+          }}
         />
       )}
     </div>

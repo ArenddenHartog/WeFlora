@@ -1,5 +1,5 @@
 // services/skillTemplates.ts
-import type { SkillOutputType } from "../types";
+import type { SkillOutputType } from "../types.ts";
 import type { SkillRowContext } from "./skills/types.ts";
 import {
   validateBadge,
@@ -25,7 +25,8 @@ export type SkillTemplateId =
   | "co2_calculator"
   | "pruning_urgency"
   | "zoning_check"
-  | "planting_spec_snippet";
+  | "planting_spec_snippet"
+  | "site_regulatory_analysis";
 
 export type SkillParamType = "string" | "number" | "boolean" | "select" | "multiselect";
 
@@ -401,6 +402,27 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
       `Write planting spec for ${row.speciesScientific || row.rowLabel}.`,
       `Output format: "<text> — reason".`
     ].join("\n"),
+    validate: (raw) => validateText(raw)
+  },
+
+  site_regulatory_analysis: {
+    id: "site_regulatory_analysis",
+    name: "Strategic Site & Regulatory Analysis",
+    description: "Extract site, regulatory, equity, and biophysical constraints with citations.",
+    category: "Siting",
+    outputType: "text",
+    params: [{ key: "locationHint", type: "string", label: "Location hint", defaultValue: "" }],
+    buildPrompt: ({ params, attachedFileNames, projectContext }) => {
+      const location = params.locationHint || projectContext || "Unspecified location";
+      return [
+        `You are analyzing project documents for: ${location}.`,
+        `Files available: ${attachedFileNames.length ? attachedFileNames.join(", ") : "(none)"}.`,
+        "Extract grounded constraints using only evidence in the documents.",
+        "Return JSON with keys: summary, keyFindings (array), derivedConstraints, evidenceItems (array).",
+        "Each evidenceItem must include claim and citations with sourceId + locator.page if available.",
+        "If information is missing, set null and note uncertainty in keyFindings."
+      ].join("\n");
+    },
     validate: (raw) => validateText(raw)
   }
 };

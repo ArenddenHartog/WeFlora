@@ -8,13 +8,21 @@ export const generateCandidates: Agent = {
   phase: 'species',
   requiredPointers: STREET_TREE_SHORTLIST_REQUIRED_POINTERS,
   producesPointers: ['/draftMatrix'],
-  run: async ({ context }) => {
-    const evidence = (context.selectedDocs ?? []).map((doc, index) => ({
+  run: async ({ context, state }) => {
+    const evidenceFromDocs = (context.selectedDocs ?? []).map((doc, index) => ({
       sourceId: String((doc as any)?.sourceId ?? (doc as any)?.id ?? (doc as any)?.name ?? (doc as any)?.title ?? `doc-${index + 1}`),
       sourceType: 'project',
       locationHint: 'selected doc',
       note: 'Used as input'
     }));
+    const evidenceItems = state.evidenceItems ?? [];
+    const evidenceFromAnalysis = evidenceItems.slice(0, 3).map((item) => ({
+      sourceId: item.citations[0]?.sourceId ?? item.id,
+      claim: item.claim,
+      citations: item.citations,
+      evidenceItemId: item.id
+    }));
+    const evidence = evidenceFromAnalysis.length > 0 ? evidenceFromAnalysis : evidenceFromDocs;
     const rows = [
       {
         id: 'row-1',
