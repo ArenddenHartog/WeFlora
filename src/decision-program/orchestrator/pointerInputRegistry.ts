@@ -372,6 +372,15 @@ export const buildRefineInputsFromPointers = (pointers: string[]): ActionCardInp
   });
 };
 
+export const buildRegistryInputs = (): ActionCardInput[] =>
+  STREET_TREE_POINTER_INPUT_SPECS.map((spec) => ({
+    ...spec.input,
+    id: spec.input.id,
+    severity: spec.severity,
+    required: spec.severity === 'required',
+    impactNote: spec.impactNote ?? spec.input.helpText
+  }));
+
 export const buildDefaultPatchesForPointers = (
   state: ExecutionState,
   pointers: string[]

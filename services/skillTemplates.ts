@@ -15,10 +15,12 @@ export type SkillTemplateId =
   | "compliance_policy"
   | "water_demand"
   | "heat_resilience"
+  | "drought_resilience"
   | "pest_susceptibility"
   | "native_invasive"
   | "maintenance_cost"
   | "maintenance_schedule"
+  | "overall_fit"
   | "recommended_alternative"
   | "co2_calculator"
   | "pruning_urgency"
@@ -174,6 +176,25 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
     },
     validate: (raw) => validateScore(raw)
   },
+  drought_resilience: {
+    id: "drought_resilience",
+    name: "Drought Resilience Score",
+    description: "Score 0–100 with reason.",
+    category: "Resilience",
+    outputType: "score",
+    params: [],
+    buildPrompt: ({ row, attachedFileNames, projectContext }) => {
+      const species = row.speciesScientific ? row.speciesScientific : (row.rowLabel ?? "");
+      return [
+        buildSkillContextBlock({ row, attachedFileNames, projectContext }),
+        "",
+        `Assess drought resilience for species: ${species}`,
+        `Output format: "NN/100 — reason" (NN integer 0-100).`,
+        `Reason must cite key traits (water demand, rooting depth, drought hardiness).`
+      ].join("\n");
+    },
+    validate: (raw) => validateScore(raw)
+  },
 
   pest_susceptibility: {
     id: "pest_susceptibility",
@@ -266,6 +287,25 @@ export const SKILL_TEMPLATES: Record<SkillTemplateId, SkillTemplate> = {
       ].join("\n");
     },
     validate: (raw) => validateEnum(raw, ["Monthly","Quarterly","Seasonal","Annual","As-needed"])
+  },
+  overall_fit: {
+    id: "overall_fit",
+    name: "Overall Fit Score",
+    description: "Score overall species fit to site constraints and program goals.",
+    category: "Recommendations",
+    outputType: "score",
+    params: [],
+    buildPrompt: ({ row, attachedFileNames, projectContext }) => {
+      const species = row.speciesScientific ? row.speciesScientific : (row.rowLabel ?? "");
+      return [
+        buildSkillContextBlock({ row, attachedFileNames, projectContext }),
+        "",
+        `Score overall fit for: ${species}`,
+        `Output format: "NN/100 — reason" (NN integer 0-100).`,
+        `Reason must weigh site constraints, resilience, and program goals.`
+      ].join("\n");
+    },
+    validate: (raw) => validateScore(raw)
   },
 
   recommended_alternative: {

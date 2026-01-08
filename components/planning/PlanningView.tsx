@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import type { ExecutionState } from '../../src/decision-program/types';
 import PlanningRunnerView from './PlanningRunnerView';
 import { buildProgram } from '../../src/decision-program/orchestrator/buildProgram';
@@ -10,7 +10,7 @@ import { runAgentStep } from '../../src/decision-program/orchestrator/runAgentSt
 import { buildAgentRegistry } from '../../src/decision-program/agents/registry';
 import { setByPointer } from '../../src/decision-program/runtime/pointers';
 import { buildRouteLogEntry, handleRouteAction } from '../../src/decision-program/ui/decision-accelerator/routeHandlers';
-import { buildWorksheetTableFromDraftMatrix } from '../../src/decision-program/orchestrator/evidenceToCitations';
+import { promoteDraftMatrixToWorksheet } from '../../utils/draftMatrixPromotion';
 import RightSidebarStepper from '../../src/decision-program/ui/decision-accelerator/RightSidebarStepper';
 import { useUI } from '../../contexts/UIContext';
 import { useChat } from '../../contexts/ChatContext';
@@ -21,6 +21,7 @@ const PlanningView: React.FC = () => {
   const navigate = useNavigate();
   const params = useParams();
   const program = useMemo(() => buildProgram(), []);
+  const location = useLocation();
   const agentRegistry = useMemo(() => buildAgentRegistry(), []);
   const { showNotification } = useUI();
   const { planningRuns, upsertPlanningRun } = useChat();
@@ -133,24 +134,10 @@ const PlanningView: React.FC = () => {
       row.cells.some((cell) => (cell.evidence ?? []).length > 0)
     );
     const includeCitations = hasEvidence ? window.confirm('Include citations column?') : false;
-    const { columns, rows } = buildWorksheetTableFromDraftMatrix(planningState.draftMatrix, {
-      includeCitations
-    });
-    const worksheetColumns = columns.map((title, index) => ({
-      id: `col-${index + 1}`,
-      title,
-      type: 'text' as const,
-      width: 200,
-      isPrimaryKey: index === 0
-    }));
-    const worksheetRows = rows.map((row, rowIndex) => ({
-      id: `row-${Date.now()}-${rowIndex}`,
-      entityName: row[0] ?? '',
-      cells: worksheetColumns.reduce((acc, column, colIndex) => {
-        acc[column.id] = { columnId: column.id, value: row[colIndex] ?? '' };
-        return acc;
-      }, {} as Record<string, { columnId: string; value: string | number }>)
-    }));
+    const { columns: worksheetColumns, rows: worksheetRows } = promoteDraftMatrixToWorksheet(
+      planningState.draftMatrix,
+      { includeCitations }
+    );
     const created = await createMatrix({
       id: `mtx-${Date.now()}`,
       title: planningState.draftMatrix.title ?? 'Draft Matrix',
@@ -170,6 +157,7 @@ const PlanningView: React.FC = () => {
   const handleSubmitActionCard = useCallback(
     async ({ cardId, cardType, input }: { cardId: string; cardType: 'deepen' | 'refine' | 'next_step'; input?: Record<string, unknown> }) => {
       const action = typeof (input as any)?.action === 'string' ? ((input as any).action as string) : null;
+      const resumeRequested = Boolean((input as any)?.resume);
       let patches = Array.isArray((input as any)?.patches)
         ? ((input as any).patches as Array<{ pointer: string; value: unknown }>)
         : [];
@@ -177,7 +165,6 @@ const PlanningView: React.FC = () => {
         ? ((input as any).context as any)
         : null;
 
-      let resumeRequested = false;
       let handledRoute = false;
       let nextStateSnapshot: ExecutionState | null = null;
 
@@ -236,7 +223,6 @@ const PlanningView: React.FC = () => {
           nextState.context = { ...nextState.context, ...contextPatch };
         }
 
-      resumeRequested = cardType === 'refine' && (patches.length > 0 || action === 'refine:continue');
       nextStateSnapshot = nextState;
       return withActionCards(nextState);
     });
@@ -244,8 +230,30 @@ const PlanningView: React.FC = () => {
       if (handledRoute) {
         return;
       }
-      if (resumeRequested && nextStateSnapshot) {
-        const stepped = await runAgentStep(nextStateSnapshot, program, agentRegistry);
+      if (nextStateSnapshot) {
+        const shouldResume =
+          cardType === 'refine' &&
+          (resumeRequested || action === 'refine:continue' || action === 'refine:apply-defaults');
+        if (!shouldResume) return;
+        const resumeState =
+          nextStateSnapshot.status === 'done'
+            ? {
+                ...nextStateSnapshot,
+                status: 'running',
+                steps: nextStateSnapshot.steps.map((step) =>
+                  step.status === 'done'
+                    ? {
+                        ...step,
+                        status: 'queued',
+                        startedAt: undefined,
+                        endedAt: undefined,
+                        error: undefined
+                      }
+                    : step
+                )
+              }
+            : nextStateSnapshot;
+        const stepped = await runAgentStep(resumeState, program, agentRegistry);
         setPlanningState(withActionCards(stepped));
         return;
       }
@@ -253,25 +261,28 @@ const PlanningView: React.FC = () => {
     [agentRegistry, program, promoteToWorksheet, showNotification, withActionCards]
   );
 
+  const showBackButton = Boolean(projectId) || location.key !== 'default';
+
   if (planningState) {
     return (
       <div className="flex h-full flex-col bg-slate-50">
-        <header className="border-b border-slate-200 bg-white px-6 py-4">
-          <div className="flex items-center gap-4">
-            {projectId && (
+        <header className="flex-none h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30">
+          <div className="flex items-center gap-3">
+            {showBackButton && (
               <button
-                onClick={() => navigate(`/project/${projectId}`)}
+                onClick={() => (projectId ? navigate(`/project/${projectId}`) : navigate(-1))}
                 className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium"
-                title="Back to Project"
+                title="Back"
               >
                 <ChevronRightIcon className="h-4 w-4 rotate-180" />
                 Back
               </button>
             )}
-            <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
-              <FlowerIcon className="h-6 w-6" />
+            {showBackButton && <div className="h-6 w-px bg-slate-200 mx-2"></div>}
+            <div className="h-8 w-8 bg-weflora-mint/20 rounded-lg flex items-center justify-center text-weflora-teal">
+              <FlowerIcon className="h-5 w-5 text-weflora-teal" />
             </div>
-            <h1 className="text-2xl font-bold text-slate-800">Planning</h1>
+            <h1 className="text-lg font-bold text-slate-900">Planning</h1>
           </div>
         </header>
         <div className="flex-1 min-h-0">
@@ -281,7 +292,6 @@ const PlanningView: React.FC = () => {
             stepsVM={stepsVM}
             onStartRun={startPlanningRun}
             onSubmitCard={handleSubmitActionCard}
-            onCancelRun={() => setPlanningState(null)}
           />
         </div>
       </div>
@@ -290,22 +300,23 @@ const PlanningView: React.FC = () => {
 
   return (
     <div className="flex h-full flex-col bg-slate-50">
-      <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <div className="flex items-center gap-4">
-          {projectId && (
+      <header className="flex-none h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30">
+        <div className="flex items-center gap-3">
+          {showBackButton && (
             <button
-              onClick={() => navigate(`/project/${projectId}`)}
+              onClick={() => (projectId ? navigate(`/project/${projectId}`) : navigate(-1))}
               className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium"
-              title="Back to Project"
+              title="Back"
             >
               <ChevronRightIcon className="h-4 w-4 rotate-180" />
               Back
             </button>
           )}
-          <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
-            <FlowerIcon className="h-6 w-6" />
+          {showBackButton && <div className="h-6 w-px bg-slate-200 mx-2"></div>}
+          <div className="h-8 w-8 bg-weflora-mint/20 rounded-lg flex items-center justify-center text-weflora-teal">
+            <FlowerIcon className="h-5 w-5 text-weflora-teal" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">Planning</h1>
+          <h1 className="text-lg font-bold text-slate-900">Planning</h1>
         </div>
       </header>
       <div className="flex flex-1 min-h-0">

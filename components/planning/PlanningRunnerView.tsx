@@ -12,7 +12,6 @@ const PlanningRunnerView: React.FC<DecisionModeViewProps> = (props) => {
         promotionMessage: 'Planning Matrix promoted to Worksheet.'
       }}
       stepperTitle="Planning flow"
-      stepperSubtitle={`Run ${props.state.runId} · ${props.state.status}`}
     />
   );
 };

@@ -40,8 +40,11 @@ export const splitInputsBySeverity = (inputs: ActionCardInput[]) => {
   return { required, recommended, optional };
 };
 
-const isMissingValue = (value: unknown) =>
+export const isMissingValue = (value: unknown) =>
   value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
+
+export const getMissingInputs = (inputs: ActionCardInput[], values: Record<string, unknown>) =>
+  inputs.filter((input) => isMissingValue(values[input.id]));
 
 export const hasMissingRequiredInputs = (inputs: ActionCardInput[], values: Record<string, unknown>) =>
   inputs.some((input) => (input.severity === 'required' || input.required) && isMissingValue(values[input.id]));

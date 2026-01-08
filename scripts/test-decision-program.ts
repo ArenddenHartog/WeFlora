@@ -9,6 +9,7 @@ import { STREET_TREE_SHORTLIST_REQUIRED_POINTERS } from '../src/decision-program
 import { getInputSpec } from '../src/decision-program/orchestrator/pointerInputRegistry.ts';
 import { minimalDraftColumns } from '../src/decision-program/orchestrator/buildDraftMatrix.ts';
 import { captureConsole } from './test-utils/captureConsole.ts';
+import { buildReasoningTimelineItems } from '../src/decision-program/ui/decision-accelerator/reasoningUtils.ts';
 
 const program = buildProgram();
 const validation = validateDecisionProgram(program);
@@ -146,6 +147,12 @@ assert.ok(columnIds.includes('diversityCompliance'));
 assert.ok(columnIds.includes('overallScore'));
 assert.ok(!columnIds.includes('availabilityWindow'));
 assert.ok(!columnIds.includes('stockStatus'));
+const heatColumn = matrix?.columns.find((column) => column.id === 'heatTolerance');
+const droughtColumn = matrix?.columns.find((column) => column.id === 'droughtTolerance');
+const overallColumn = matrix?.columns.find((column) => column.id === 'overallScore');
+assert.equal(heatColumn?.skillId, 'heat_resilience');
+assert.equal(droughtColumn?.skillId, 'drought_resilience');
+assert.equal(overallColumn?.skillId, 'overall_fit');
 
 const nextStepCard = cards.find((card) => card.type === 'next_step');
 const nextActions = nextStepCard?.suggestedActions?.map((action) => action.action) ?? [];
@@ -167,3 +174,15 @@ blockedMissingPointers.forEach((pointer) => {
 });
 const resumedResult = await stepExecution(patchedState, program, registry);
 assert.ok(resumedResult.steps.every((step) => step.status === 'done'));
+
+const stepsVM = program.steps.map((step) => ({
+  stepId: step.id,
+  title: step.title,
+  kind: step.kind,
+  status: 'done' as const
+}));
+const timelineItems = buildReasoningTimelineItems(stepsVM, []);
+assert.ok(timelineItems.length > 0);
+stepsVM.forEach((step) => {
+  assert.ok(!timelineItems.some((item) => item.title === step.title));
+});

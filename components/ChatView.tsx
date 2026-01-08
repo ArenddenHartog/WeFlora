@@ -20,7 +20,7 @@ import { runAgentStep } from '../src/decision-program/orchestrator/runAgentStep'
 import { buildAgentRegistry } from '../src/decision-program/agents/registry';
 import { setByPointer } from '../src/decision-program/runtime/pointers';
 import { buildRouteLogEntry, handleRouteAction } from '../src/decision-program/ui/decision-accelerator/routeHandlers';
-import { buildWorksheetTableFromDraftMatrix } from '../src/decision-program/orchestrator/evidenceToCitations';
+import { promoteDraftMatrixToWorksheet } from '../utils/draftMatrixPromotion';
 import { useChat } from '../contexts/ChatContext';
 import { useProject } from '../contexts/ProjectContext';
 import { useUI } from '../contexts/UIContext';
@@ -156,24 +156,10 @@ const ChatView: React.FC<ChatViewProps> = ({
             row.cells.some((cell) => (cell.evidence ?? []).length > 0)
         );
         const includeCitations = hasEvidence ? window.confirm('Include citations column?') : false;
-        const { columns, rows } = buildWorksheetTableFromDraftMatrix(decisionState.draftMatrix, {
-            includeCitations
-        });
-        const worksheetColumns = columns.map((title, index) => ({
-            id: `col-${index + 1}`,
-            title,
-            type: 'text' as const,
-            width: 200,
-            isPrimaryKey: index === 0
-        }));
-        const worksheetRows = rows.map((row, rowIndex) => ({
-            id: `row-${Date.now()}-${rowIndex}`,
-            entityName: row[0] ?? '',
-            cells: worksheetColumns.reduce((acc, column, colIndex) => {
-                acc[column.id] = { columnId: column.id, value: row[colIndex] ?? '' };
-                return acc;
-            }, {} as Record<string, { columnId: string; value: string | number }>)
-        }));
+        const { columns: worksheetColumns, rows: worksheetRows } = promoteDraftMatrixToWorksheet(
+            decisionState.draftMatrix,
+            { includeCitations }
+        );
         const created = await createMatrix({
             id: `mtx-${Date.now()}`,
             title: decisionState.draftMatrix.title ?? 'Draft Matrix',
@@ -236,6 +222,7 @@ const ChatView: React.FC<ChatViewProps> = ({
     const handleSubmitActionCard = useCallback(
         async ({ cardId, cardType, input }: { cardId: string; cardType: 'deepen' | 'refine' | 'next_step'; input?: Record<string, unknown> }) => {
             const action = typeof (input as any)?.action === 'string' ? ((input as any).action as string) : null;
+            const resumeRequested = Boolean((input as any)?.resume);
             let patches = Array.isArray((input as any)?.patches)
                 ? ((input as any).patches as Array<{ pointer: string; value: unknown }>)
                 : [];
@@ -243,7 +230,6 @@ const ChatView: React.FC<ChatViewProps> = ({
                 ? ((input as any).context as any)
                 : null;
 
-            let resumeRequested = false;
             let handledRoute = false;
             let nextStateSnapshot: ExecutionState | null = null;
 
@@ -309,7 +295,6 @@ const ChatView: React.FC<ChatViewProps> = ({
                     nextState.context = { ...nextState.context, ...contextPatch };
                 }
 
-            resumeRequested = cardType === 'refine' && (patches.length > 0 || action === 'refine:continue');
             nextStateSnapshot = nextState;
             return withActionCards(nextState);
         });
@@ -322,8 +307,32 @@ const ChatView: React.FC<ChatViewProps> = ({
                 return { navigation: { kind: 'worksheet' } };
             }
 
-            if (resumeRequested && nextStateSnapshot) {
-                const stepped = await runAgentStep(nextStateSnapshot, program, agentRegistry);
+            if (nextStateSnapshot) {
+                const shouldResume =
+                    cardType === 'refine' &&
+                    (resumeRequested || action === 'refine:continue' || action === 'refine:apply-defaults');
+                if (!shouldResume) {
+                    return { patches, resumeRun: false };
+                }
+                const resumeState =
+                    nextStateSnapshot.status === 'done'
+                        ? {
+                            ...nextStateSnapshot,
+                            status: 'running',
+                            steps: nextStateSnapshot.steps.map((step) =>
+                                step.status === 'done'
+                                    ? {
+                                        ...step,
+                                        status: 'queued',
+                                        startedAt: undefined,
+                                        endedAt: undefined,
+                                        error: undefined
+                                    }
+                                    : step
+                            )
+                        }
+                        : nextStateSnapshot;
+                const stepped = await runAgentStep(resumeState, program, agentRegistry);
                 setDecisionState(withActionCards(stepped));
                 return { patches, resumeRun: true };
             }
@@ -504,7 +513,6 @@ const ChatView: React.FC<ChatViewProps> = ({
                         state={decisionState}
                         stepsVM={stepsVM}
                         onStartRun={startDecisionRun}
-                        onCancelRun={() => setViewMode('chat')}
                         onSubmitCard={handleSubmitActionCard}
                         onPromoteToWorksheet={(payload) => onContinueInWorksheet?.({
                             id: `decision-${payload.matrixId}`,
