@@ -1,7 +1,8 @@
 import React from 'react';
 import type { DraftMatrix, DraftMatrixColumn, DraftMatrixRow, EvidenceRef } from '../../types';
-import { InfoIcon } from '../../../../components/icons';
-import { getBadgeClass, getSeverity } from './severity';
+import { BookIcon, InfoIcon } from '../../../../components/icons';
+import { getBadgeClass, getScoreBand } from './severity';
+import { buildCellCitationsArgs } from './draftMatrixUtils';
 
 type _DraftMatrixColumn = DraftMatrixColumn;
 type _DraftMatrixRow = DraftMatrixRow;
@@ -23,6 +24,7 @@ export interface DraftMatrixTableProps {
   onToggleColumnPinned?: (columnId: string) => void;
   onToggleColumnVisible?: (columnId: string) => void;
   onAddColumn?: (columnId: string) => void;
+  onDensityChange?: (density: 'comfortable' | 'compact') => void;
   suggestedColumns?: DraftMatrixColumn[];
   selectedRowIds?: string[];
   onToggleRowSelected?: (rowId: string) => void;
@@ -40,6 +42,7 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
   onToggleColumnPinned,
   onToggleColumnVisible,
   onAddColumn,
+  onDensityChange,
   suggestedColumns,
   selectedRowIds,
   onToggleRowSelected,
@@ -55,6 +58,20 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [expandedCells, setExpandedCells] = React.useState<Record<string, boolean>>({});
   const badgeBaseClass = 'text-[10px] font-semibold px-2 py-0.5 rounded-full';
+  const isScoreColumn = (column: DraftMatrixColumn) =>
+    column.kind === 'score' || /score|confidence|fit/i.test(column.id);
+  const getScoreBadgeClass = (severity: ReturnType<typeof getScoreBand>) => {
+    switch (severity) {
+      case 'low':
+        return 'bg-rose-50 text-rose-700';
+      case 'medium':
+        return 'bg-amber-50 text-amber-700';
+      case 'high':
+        return 'bg-weflora-mint/40 text-weflora-teal';
+      default:
+        return 'bg-slate-100 text-slate-500';
+    }
+  };
 
   const parseNumeric = (value: CellValue) => {
     if (typeof value === 'number') return value;
@@ -121,7 +138,6 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
                           key={column.id}
                           onClick={() => {
                             onAddColumn(column.id);
-                            setIsAddOpen(false);
                             setIsSettingsOpen(false);
                           }}
                           className="w-full text-left px-3 py-2 text-xs text-slate-600 hover:bg-slate-50"
@@ -131,6 +147,26 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
                       ))}
                     </div>
                   </>
+                )}
+                {onDensityChange && (
+                  <div className="border-t border-slate-100 px-3 py-2 space-y-2">
+                    <div className="text-[10px] uppercase tracking-wide text-slate-400">Density</div>
+                    <div className="flex items-center gap-2">
+                      {(['comfortable', 'compact'] as const).map((option) => (
+                        <button
+                          key={option}
+                          onClick={() => onDensityChange(option)}
+                          className={`text-[10px] font-semibold px-2 py-1 rounded-full border ${
+                            density === option
+                              ? 'border-weflora-teal text-weflora-teal bg-weflora-mint/20'
+                              : 'border-slate-200 text-slate-500'
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
@@ -182,11 +218,11 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
                   {visibleColumns.map((column) => {
                     const cell = row.cells.find((entry) => entry.columnId === column.id);
                     const numericValue = parseNumeric(cell?.value ?? null);
-                    const isScore = column.kind === 'score' && numericValue !== null;
-                    const isScoreColumn = column.kind === 'score';
-                    const scoreSeverity = isScore ? getSeverity(numericValue) : 'unknown';
+                    const scoreColumn = isScoreColumn(column);
+                    const isScore = scoreColumn && numericValue !== null;
+                    const scoreSeverity = isScore ? getScoreBand(numericValue) : 'unknown';
                     const confidenceSeverity =
-                      cell?.confidence !== undefined ? getSeverity(cell.confidence) : 'unknown';
+                      cell?.confidence !== undefined ? getScoreBand(cell.confidence) : 'unknown';
                     const cellKey = `${row.id}-${column.id}`;
                     const isExpanded = expandedCells[cellKey];
                     const isLongText = typeof cell?.value === 'string' && cell.value.length > 80;
@@ -201,9 +237,9 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
                         : undefined;
                     return (
                       <td key={`${row.id}-${column.id}`} className={`px-3 ${rowPadding}`}>
-                        <div className={`flex items-start gap-2 ${isScoreColumn ? 'rounded-md px-2 py-1 bg-slate-50' : ''}`}>
+                        <div className={`flex items-start gap-2 ${scoreColumn ? 'rounded-md px-2 py-1 bg-slate-50' : ''}`}>
                           {isScore ? (
-                            <span className={`${badgeBaseClass} ${getBadgeClass(scoreSeverity)}`}>
+                            <span className={`${badgeBaseClass} ${getScoreBadgeClass(scoreSeverity)}`}>
                               {cell?.value ?? '—'}
                             </span>
                           ) : (
@@ -213,10 +249,11 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
                           )}
                           {cell?.evidence && cell.evidence.length > 0 && onOpenCitations && (
                             <button
-                              onClick={() => onOpenCitations({ rowId: row.id, columnId: column.id, evidence: cell.evidence })}
-                              className="text-[10px] text-weflora-teal"
+                              onClick={() => onOpenCitations(buildCellCitationsArgs(row.id, column.id, cell.evidence))}
+                              className="text-weflora-teal hover:text-weflora-dark"
+                              aria-label="Open citations"
                             >
-                              Cite
+                              <BookIcon className="h-3 w-3" />
                             </button>
                           )}
                         </div>

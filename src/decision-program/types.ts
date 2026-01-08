@@ -34,6 +34,7 @@ export interface StepState {
   endedAt?: string;
   blockingMissingInputs?: string[];
   error?: { message: string; code?: string };
+  reasoningSummary?: string[];
 }
 
 export interface EvidenceRef {
@@ -137,4 +138,5 @@ export interface ExecutionState {
   draftMatrix?: DraftMatrix;
   actionCards: ActionCard[];
   logs: ExecutionLogEntry[];
+  evidenceIndex?: Record<string, EvidenceRef[]>;
 }

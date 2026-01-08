@@ -25,6 +25,9 @@ export const getSeverity = (value?: number | null, thresholds: SeverityThreshold
   return 'high';
 };
 
+export const getScoreBand = (value?: number | null, thresholds: SeverityThresholds = DEFAULT_THRESHOLDS): Severity =>
+  getSeverity(value, thresholds);
+
 export const getBadgeClass = (severity: Severity) => {
   switch (severity) {
     case 'low':

@@ -1,5 +1,6 @@
 import React from 'react';
-import type { ExecutionState, DecisionStep, StepState, RunStatus } from '../../types';
+import type { ExecutionState, DecisionStep, StepState, RunStatus, EvidenceRef, ExecutionLogEntry } from '../../types';
+import { deriveReasoningCallouts } from './reasoningUtils';
 
 export type StepperStatus = 'queued' | 'running' | 'done' | 'blocked' | 'error' | 'skipped';
 
@@ -16,6 +17,7 @@ export interface StepperStepViewModel {
   error?: { message: string; code?: string };
   summary?: string;
   evidenceCount?: number;
+  reasoningSummary?: string[];
 }
 
 export interface RightSidebarStepperProps {
@@ -23,10 +25,12 @@ export interface RightSidebarStepperProps {
   status: RunStatus;
   currentStepId?: string;
   steps: StepperStepViewModel[];
+  logs?: ExecutionLogEntry[];
+  evidenceIndex?: Record<string, EvidenceRef[]>;
   onResolveBlocked?: (stepId: string) => void;
   onRerunStep?: (stepId: string) => void;
   onCancelRun?: () => void;
-  onViewRationale?: (stepId: string) => void;
+  onOpenCitations?: (args: { stepId: string; evidence?: EvidenceRef[] }) => void;
   headerTitle?: string;
   headerSubtitle?: string;
   showRunMeta?: boolean;
@@ -68,12 +72,14 @@ const RightSidebarStepper: React.FC<RightSidebarStepperProps> = ({
   onResolveBlocked,
   onRerunStep,
   onCancelRun,
-  onViewRationale,
+  onOpenCitations,
   headerTitle = 'Planning flow',
   headerSubtitle,
   showRunMeta = true,
   showDebug = false,
-  className
+  className,
+  logs = [],
+  evidenceIndex
 }) => {
   const [expandedSteps, setExpandedSteps] = React.useState<Record<string, boolean>>({});
   const grouped = steps.reduce<Record<string, StepperStepViewModel[]>>((acc, step) => {
@@ -84,7 +90,7 @@ const RightSidebarStepper: React.FC<RightSidebarStepperProps> = ({
   }, {});
 
   return (
-    <aside className={`w-80 border-l border-slate-200 bg-white p-4 space-y-4 sticky top-0 h-[calc(100vh-96px)] overflow-y-auto ${className ?? ''}`}>
+    <aside className={`planning-stepper-scroll w-80 border-l border-slate-200 bg-white p-4 space-y-4 sticky top-0 h-[calc(100vh-96px)] overflow-y-auto ${className ?? ''}`}>
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-slate-800">{headerTitle}</h3>
@@ -111,6 +117,8 @@ const RightSidebarStepper: React.FC<RightSidebarStepperProps> = ({
               <div className="space-y-3">
                 {phaseSteps.map((step) => {
                   const isExpanded = expandedSteps[step.stepId];
+                  const evidence = evidenceIndex?.[step.stepId] ?? [];
+                  const callouts = deriveReasoningCallouts(step, logs);
                   return (
                     <div key={step.stepId} className="rounded-lg border border-slate-100 p-3">
                       <div className="flex items-center justify-between">
@@ -137,63 +145,67 @@ const RightSidebarStepper: React.FC<RightSidebarStepperProps> = ({
                           </button>
                         </div>
                       </div>
-                    {step.blockingMissingInputs && step.blockingMissingInputs.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-[10px] text-amber-600 font-semibold">Missing inputs</p>
-                        <ul className="text-[10px] text-slate-500 list-disc list-inside">
-                          {step.blockingMissingInputs.map((missing) => (
-                            <li key={missing}>{missing}</li>
-                          ))}
-                        </ul>
-                        {onResolveBlocked && (
-                          <button
-                            onClick={() => onResolveBlocked(step.stepId)}
-                            className="mt-2 text-[10px] font-semibold text-amber-700"
-                          >
-                            Resolve
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {isExpanded && (
-                      <div className="mt-2 space-y-2">
-                        {step.summary && (
-                          <div>
-                            <p className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold">
-                              What I did
-                            </p>
-                            <p className="text-[11px] text-slate-600">{step.summary}</p>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                            {step.evidenceCount ?? 0} sources
-                          </span>
-                          {onViewRationale && (
+                      {step.blockingMissingInputs && step.blockingMissingInputs.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-[10px] text-amber-600 font-semibold">Missing inputs</p>
+                          <ul className="text-[10px] text-slate-500 list-disc list-inside">
+                            {step.blockingMissingInputs.map((missing) => (
+                              <li key={missing}>{missing}</li>
+                            ))}
+                          </ul>
+                          {onResolveBlocked && (
                             <button
-                              onClick={() => onViewRationale(step.stepId)}
-                              className="text-[10px] font-semibold text-weflora-teal"
+                              onClick={() => onResolveBlocked(step.stepId)}
+                              className="mt-2 text-[10px] font-semibold text-amber-700"
                             >
-                              View rationale
+                              Resolve
                             </button>
                           )}
                         </div>
-                      </div>
-                    )}
-                    {step.error && (
-                      <p className="text-[10px] text-rose-600 mt-2">{step.error.message}</p>
-                    )}
-                    {showDebug && step.durationMs !== undefined && (
-                      <p className="text-[10px] text-slate-400 mt-2">Duration {step.durationMs}ms</p>
-                    )}
-                    {onRerunStep && (
-                      <button
-                        onClick={() => onRerunStep(step.stepId)}
-                        className="mt-2 text-[10px] text-slate-400"
-                      >
-                        Rerun step
-                      </button>
-                    )}
+                      )}
+                      {isExpanded && (
+                        <div className="mt-2 space-y-2">
+                          {callouts.length > 0 && (
+                            <div>
+                              <p className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold">
+                                What I did
+                              </p>
+                              <ul className="text-[11px] text-slate-600 list-disc list-inside">
+                                {callouts.map((item) => (
+                                  <li key={item}>{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                              {step.evidenceCount ?? evidence.length} sources
+                            </span>
+                            {onOpenCitations && evidence.length > 0 && (
+                              <button
+                                onClick={() => onOpenCitations({ stepId: step.stepId, evidence })}
+                                className="text-[10px] font-semibold text-weflora-teal"
+                              >
+                                Open citations
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {step.error && (
+                        <p className="text-[10px] text-rose-600 mt-2">{step.error.message}</p>
+                      )}
+                      {showDebug && step.durationMs !== undefined && (
+                        <p className="text-[10px] text-slate-400 mt-2">Duration {step.durationMs}ms</p>
+                      )}
+                      {onRerunStep && (
+                        <button
+                          onClick={() => onRerunStep(step.stepId)}
+                          className="mt-2 text-[10px] text-slate-400"
+                        >
+                          Rerun step
+                        </button>
+                      )}
                     </div>
                   );
                 })}
