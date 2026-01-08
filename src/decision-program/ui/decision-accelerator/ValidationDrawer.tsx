@@ -16,7 +16,8 @@ export interface ValidationDrawerProps {
   optionalInputs?: ActionCardInput[];
   values: Record<string, string | number | boolean>;
   onChange: (inputId: string, value: string | number | boolean) => void;
-  onApply: () => void;
+  onSave: () => void;
+  onSaveAndContinue: () => void;
   onClose: () => void;
   canProceedWithMissingRecommended: boolean;
   onApplyDefaults?: () => void;
@@ -30,7 +31,8 @@ const ValidationDrawer: React.FC<ValidationDrawerProps> = ({
   optionalInputs,
   values,
   onChange,
-  onApply,
+  onSave,
+  onSaveAndContinue,
   onClose,
   canProceedWithMissingRecommended,
   onApplyDefaults
@@ -38,7 +40,7 @@ const ValidationDrawer: React.FC<ValidationDrawerProps> = ({
   const missingRequired = hasMissingRequiredInputs(requiredInputs, values);
   const missingRecommended = hasMissingRecommendedInputs(recommendedInputs, values);
   const missingOptional = optionalInputs ? hasMissingOptionalInputs(optionalInputs, values) : false;
-  const disableApply = missingRequired || (!canProceedWithMissingRecommended && missingRecommended);
+  const disableContinue = missingRequired || (!canProceedWithMissingRecommended && missingRecommended);
 
   const renderInputField = (input: ActionCardInput) => (
     <label key={input.id} className="block text-xs text-slate-600 space-y-1">
@@ -105,7 +107,7 @@ const ValidationDrawer: React.FC<ValidationDrawerProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={title}
-      subtitle="Update the required inputs to resume planning."
+      subtitle="Update inputs at any time to refine the planning run."
       size="lg"
       footer={
         <>
@@ -127,15 +129,22 @@ const ValidationDrawer: React.FC<ValidationDrawerProps> = ({
           )}
           <button
             type="button"
-            onClick={onApply}
-            disabled={disableApply}
+            onClick={onSave}
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={onSaveAndContinue}
+            disabled={disableContinue}
             className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${
-              disableApply
+              disableContinue
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 : 'bg-weflora-teal text-white hover:bg-weflora-dark'
             }`}
           >
-            Continue planning
+            Save & Continue
           </button>
         </>
       }
@@ -143,7 +152,7 @@ const ValidationDrawer: React.FC<ValidationDrawerProps> = ({
       <div className="space-y-4">
         {(missingRecommended || missingOptional) && (
           <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
-            Results may be less specific without the recommended inputs.
+            Continuing with partial inputs may reduce specificity.
           </div>
         )}
 

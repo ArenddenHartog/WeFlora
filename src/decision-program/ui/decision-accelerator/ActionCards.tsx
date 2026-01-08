@@ -63,7 +63,6 @@ const typeCardStyles: Record<ActionCardType, { header: string; border: string; a
 };
 
 const ActionCards: React.FC<ActionCardsProps> = ({
-  runId,
   cards,
   onSubmitCard,
   onDismissCard,
@@ -117,7 +116,7 @@ const ActionCards: React.FC<ActionCardsProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-slate-800">Action Cards</h3>
-          <p className="text-xs text-slate-500">Run {runId}</p>
+          <p className="text-xs text-slate-500">Refinements and next actions</p>
         </div>
         {contextSummary && (
           <div className="text-xs text-slate-500">

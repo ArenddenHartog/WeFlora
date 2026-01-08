@@ -28,7 +28,8 @@ const heatToleranceColumn: DraftMatrixColumn = {
   label: 'Heat Tolerance',
   kind: 'trait',
   datatype: 'string',
-  why: 'Tracks fit for elevated heat stress conditions.'
+  why: 'Tracks fit for elevated heat stress conditions.',
+  skillId: 'heat_resilience'
 };
 
 const droughtToleranceColumn: DraftMatrixColumn = {
@@ -36,7 +37,8 @@ const droughtToleranceColumn: DraftMatrixColumn = {
   label: 'Drought Tolerance',
   kind: 'trait',
   datatype: 'string',
-  why: 'Shows resilience under low-water conditions.'
+  why: 'Shows resilience under low-water conditions.',
+  skillId: 'drought_resilience'
 };
 
 const compactionToleranceColumn: DraftMatrixColumn = {
@@ -77,7 +79,8 @@ const overallScoreColumn: DraftMatrixColumn = {
   label: 'Overall Fit Score',
   kind: 'score',
   datatype: 'number',
-  why: 'Composite score based on site fit and constraints.'
+  why: 'Composite score based on site fit and constraints.',
+  skillId: 'overall_fit'
 };
 
 export const STREET_TREE_DYNAMIC_COLUMN_RULES: DynamicColumnRule[] = [

@@ -53,6 +53,8 @@ export interface DraftMatrixColumn {
   why?: string;
   pinned?: boolean;
   visible?: boolean;
+  skillId?: string;
+  skillArgs?: Record<string, unknown>;
 }
 
 export interface DraftMatrixCell {

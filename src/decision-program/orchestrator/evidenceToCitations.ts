@@ -20,12 +20,27 @@ export const toCitationsPayload = (
   };
 };
 
+export type WorksheetDraftColumnSpec = {
+  id: string;
+  label: string;
+  skillId?: string;
+  skillArgs?: Record<string, unknown>;
+};
+
 const orderVisibleColumns = (columns: DraftMatrixColumn[]) => {
   const visible = columns.filter((column) => column.visible !== false);
   const pinned = visible.filter((column) => column.pinned);
   const unpinned = visible.filter((column) => !column.pinned);
   return [...pinned, ...unpinned];
 };
+
+export const buildWorksheetColumnSpecsFromDraftMatrix = (matrix: DraftMatrix): WorksheetDraftColumnSpec[] =>
+  orderVisibleColumns(matrix.columns).map((column) => ({
+    id: column.id,
+    label: column.label,
+    skillId: column.skillId,
+    skillArgs: column.skillArgs
+  }));
 
 export const buildWorksheetTableFromDraftMatrix = (
   matrix: DraftMatrix,

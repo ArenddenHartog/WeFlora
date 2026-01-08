@@ -72,25 +72,24 @@ const HomeView: React.FC<HomeViewProps> = ({
                         <p className="text-slate-500 text-lg">Automate species research, project analysis, and policy checks with FloraGPT</p>
                     </header>
 
-                    <div className="w-full max-w-3xl flex flex-col items-center gap-2 mb-6">
-                        <button
-                            onClick={() => navigate('/planning')}
-                            className="w-full max-w-2xl bg-weflora-teal text-white rounded-2xl px-6 py-4 font-semibold text-sm shadow-md hover:bg-weflora-dark transition-colors relative flex items-center"
-                        >
-                            <span className="absolute left-5 flex items-center">
-                                <FlowerIcon className="h-5 w-5" />
-                            </span>
-                            <span className="w-full text-center">Start Automated Planning Flow</span>
-                        </button>
-                        <p className="text-lg text-slate-500">Or just ask</p>
-                    </div>
-        
-                    <div className="w-full max-w-3xl mb-12 relative z-10">
-                        <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 p-1">
-                            <ChatInput 
-                                onSend={onSendQuery} 
-                                draftKey="weflora-home-draft"
-                            />
+                    <div className="w-full max-w-3xl flex flex-col items-center mb-12 relative z-10">
+                        <div className="w-full max-w-2xl space-y-4">
+                            <button
+                                onClick={() => navigate('/planning')}
+                                className="w-full bg-weflora-teal text-white rounded-2xl px-6 py-4 font-semibold text-sm shadow-md hover:bg-weflora-dark transition-colors relative flex items-center"
+                            >
+                                <span className="absolute left-5 flex items-center text-white">
+                                    <FlowerIcon className="h-5 w-5" />
+                                </span>
+                                <span className="w-full text-center">Start Automated Planning Flow</span>
+                            </button>
+                            <p className="text-lg text-slate-500 text-center">Or just ask</p>
+                            <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 p-1">
+                                <ChatInput 
+                                    onSend={onSendQuery} 
+                                    draftKey="weflora-home-draft"
+                                />
+                            </div>
                         </div>
                     </div>
         
