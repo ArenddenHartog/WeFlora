@@ -110,7 +110,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
     () => missingRefineInputs.filter((input) => input.severity === 'recommended'),
     [missingRefineInputs]
   );
-  const derivedInputs = state.derivedInputs ?? {};
+  const derivedInputs = useMemo(() => state.derivedInputs ?? {}, [state.derivedInputs]);
   const derivedInputEntries = useMemo(
     () =>
       Object.values(derivedInputs).map((entry) => ({
