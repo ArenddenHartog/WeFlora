@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import type { ExecutionState, DecisionProgram, EvidenceRef } from '../../types';
+import type { PcivConstraint } from '../../pciv/v0/types';
 import type { StepperStepViewModel } from './RightSidebarStepper';
 import RightSidebarStepper from './RightSidebarStepper';
 import DraftMatrixTable from './DraftMatrixTable';
@@ -21,11 +22,13 @@ export interface DecisionModeViewProps {
   state: ExecutionState;
   stepsVM: StepperStepViewModel[];
   onStartRun: () => void;
+  onOpenContextIntake?: () => void;
   onOpenCitations?: (args: { rowId: string; columnId: string; evidence?: EvidenceRef[] }) => void;
   onSubmitCard: (args: { cardId: string; cardType: 'deepen' | 'refine' | 'next_step'; input?: Record<string, unknown> }) =>
     Promise<any>;
   onPromoteToWorksheet?: (payload: { matrixId: string; rowIds?: string[] }) => void;
   onApplyDerivedInput?: (args: { pointer: string; value?: unknown; mode: 'accept' | 'ignore' | 'edit' }) => void;
+  pcivConstraints?: PcivConstraint[];
   inputChangeNotice?: {
     changedInputs: string[];
     impactedSteps: string[];
@@ -46,9 +49,11 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
   state,
   stepsVM,
   onStartRun,
+  onOpenContextIntake,
   onOpenCitations,
   onSubmitCard,
   onApplyDerivedInput,
+  pcivConstraints,
   inputChangeNotice,
   onRerunImpactedSteps,
   onKeepCurrentResults,
@@ -286,7 +291,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setIsValidationOpen(true)}
+                    onClick={() => (onOpenContextIntake ? onOpenContextIntake() : setIsValidationOpen(true))}
                     className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
                   >
                     Resolve inputs
@@ -441,7 +446,10 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
             </section>
           )}
 
-          <DerivedConstraintsPanel derivedConstraints={state.derivedConstraints} />
+          <DerivedConstraintsPanel
+            derivedConstraints={state.derivedConstraints}
+            pcivConstraints={pcivConstraints}
+          />
 
           <ReasoningTimeline
             steps={stepsVM}

@@ -1,3 +1,5 @@
+import type { PcivCommittedContext } from './pciv/v0/types';
+
 export type Phase = 'site' | 'species' | 'supply';
 
 export type RunStatus = 'idle' | 'running' | 'blocked' | 'done' | 'error' | 'canceled';
@@ -116,6 +118,7 @@ export interface EvidenceGraph {
   nodes: EvidenceNode[];
   edges: EvidenceEdge[];
 }
+
 
 export interface ArtifactRef {
   id: string;
@@ -312,4 +315,5 @@ export interface ExecutionState {
   timelineEntries?: TimelineEntry[];
   derivedConstraints?: DerivedConstraints;
   derivedInputs?: Record<string, DerivedInput>;
+  pcivCommittedContext?: PcivCommittedContext;
 }
