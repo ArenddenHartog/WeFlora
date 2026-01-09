@@ -69,7 +69,7 @@ export interface EvidenceItem {
   citations: Citation[];
 }
 
-export type EvidenceNodeType = 'source' | 'claim' | 'constraint' | 'skill' | 'artifact' | 'decision';
+export type EvidenceNodeType = 'source' | 'evidence' | 'claim' | 'constraint' | 'skill' | 'artifact' | 'decision';
 
 export interface ConfidenceBreakdown {
   formula: string;
@@ -180,6 +180,7 @@ export interface DerivedInput {
   confidence?: number;
   evidenceItemIds?: string[];
   timelineEntryId?: string;
+  status?: 'proposed' | 'accepted' | 'ignored';
 }
 
 export interface EvidenceFileRef {
@@ -282,6 +283,7 @@ export interface ExecutionContext {
   species: Record<string, unknown>;
   supply: Record<string, unknown>;
   selectedDocs?: EvidenceFileRef[];
+  contextVersionId?: string;
 }
 
 export interface ExecutionLogEntry {

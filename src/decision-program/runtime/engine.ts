@@ -12,7 +12,8 @@ const ensureContextSlots = (context?: Partial<ExecutionState['context']>): Execu
   equity: context?.equity ?? {},
   species: context?.species ?? {},
   supply: context?.supply ?? {},
-  selectedDocs: context?.selectedDocs ?? []
+  selectedDocs: context?.selectedDocs ?? [],
+  contextVersionId: context?.contextVersionId
 });
 
 const cloneState = (state: ExecutionState): ExecutionState => ({

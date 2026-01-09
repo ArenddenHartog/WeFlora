@@ -2,12 +2,12 @@ import React from 'react';
 import type { DecisionModeViewProps } from '../../src/decision-program/ui/decision-accelerator/DecisionModeView';
 import DecisionModeView from '../../src/decision-program/ui/decision-accelerator/DecisionModeView';
 
-const PlanningRunnerView: React.FC<DecisionModeViewProps> = (props) => {
+const PlanningRunnerView: React.FC<DecisionModeViewProps & { startLabel?: string }> = ({ startLabel, ...props }) => {
   return (
     <DecisionModeView
       {...props}
       labels={{
-        startRun: 'Start Planning',
+        startRun: startLabel ?? 'Start Planning',
         promotionSummary: 'Planning matrix promotion',
         promotionMessage: 'Planning Matrix promoted to Worksheet.'
       }}

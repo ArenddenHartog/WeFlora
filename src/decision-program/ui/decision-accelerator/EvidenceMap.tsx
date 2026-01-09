@@ -8,8 +8,8 @@ import NodeDetailsPanel from './NodeDetailsPanel';
 
 type EvidenceMapView = 'decision' | 'constraint' | 'source';
 
-const typeOrder: EvidenceNode['type'][] = ['source', 'claim', 'constraint', 'skill', 'artifact', 'decision'];
-const clusterableTypes = new Set<EvidenceNode['type']>(['source', 'claim']);
+const typeOrder: EvidenceNode['type'][] = ['source', 'evidence', 'claim', 'constraint', 'skill', 'artifact', 'decision'];
+const clusterableTypes = new Set<EvidenceNode['type']>(['source', 'evidence', 'claim']);
 
 const viewLabels: Record<EvidenceMapView, string> = {
   decision: 'Decision-centric',

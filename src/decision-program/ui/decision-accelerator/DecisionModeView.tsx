@@ -25,6 +25,7 @@ export interface DecisionModeViewProps {
   onSubmitCard: (args: { cardId: string; cardType: 'deepen' | 'refine' | 'next_step'; input?: Record<string, unknown> }) =>
     Promise<any>;
   onPromoteToWorksheet?: (payload: { matrixId: string; rowIds?: string[] }) => void;
+  onApplyDerivedInput?: (args: { pointer: string; value?: unknown; mode: 'accept' | 'ignore' | 'edit' }) => void;
   inputChangeNotice?: {
     changedInputs: string[];
     impactedSteps: string[];
@@ -47,6 +48,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
   onStartRun,
   onOpenCitations,
   onSubmitCard,
+  onApplyDerivedInput,
   inputChangeNotice,
   onRerunImpactedSteps,
   onKeepCurrentResults,
@@ -65,6 +67,8 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
   const [focusedEntryId, setFocusedEntryId] = useState<string | null>(null);
   const [isEvidenceMapOpen, setIsEvidenceMapOpen] = useState(false);
   const [focusEvidenceNodeId, setFocusEvidenceNodeId] = useState<string | null>(null);
+  const [editingDerivedPointer, setEditingDerivedPointer] = useState<string | null>(null);
+  const [editingDerivedValue, setEditingDerivedValue] = useState('');
 
   useEffect(() => {
     setLocalMatrix((prev) => {
@@ -121,6 +125,14 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
         label: allInputs.find((input) => input.pointer === entry.pointer)?.label ?? entry.pointer
       })),
     [allInputs, derivedInputs]
+  );
+  const evidenceItemMap = useMemo(
+    () => new Map((state.evidenceItems ?? []).map((item) => [item.id, item])),
+    [state.evidenceItems]
+  );
+  const evidenceSourceMap = useMemo(
+    () => new Map((state.evidenceSources ?? []).map((source) => [source.id, source])),
+    [state.evidenceSources]
   );
 
   useEffect(() => {
@@ -332,10 +344,29 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
                         <div>
                           <p className="font-semibold text-slate-700">{entry.label}</p>
                           <p className="text-[11px] text-slate-500 mt-1">Value: {String(entry.value)}</p>
+                          {typeof entry.confidence === 'number' && (
+                            <p className="text-[11px] text-slate-500">Confidence: {Math.round(entry.confidence * 100)}%</p>
+                          )}
+                          {(entry.evidenceItemIds ?? []).length > 0 && (
+                            <p className="text-[11px] text-slate-500 mt-1">
+                              {entry.evidenceItemIds
+                                ?.map((id) => {
+                                  const evidence = evidenceItemMap.get(id);
+                                  const citation = evidence?.citations?.[0];
+                                  const source = citation ? evidenceSourceMap.get(citation.sourceId) : undefined;
+                                  const page = citation?.locator?.page ? `p. ${citation.locator.page}` : undefined;
+                                  return [source?.title ?? citation?.sourceId ?? 'Source', page]
+                                    .filter(Boolean)
+                                    .join(' · ');
+                                })
+                                .filter(Boolean)
+                                .join(', ')}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                            Derived
+                            {entry.status === 'accepted' ? 'Accepted' : entry.status === 'ignored' ? 'Ignored' : 'Derived'}
                           </span>
                           {entry.timelineEntryId && (
                             <button
@@ -348,6 +379,58 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
                             >
                               View evidence
                             </button>
+                          )}
+                          {editingDerivedPointer === entry.pointer ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                value={editingDerivedValue}
+                                onChange={(event) => setEditingDerivedValue(event.target.value)}
+                                className="w-24 rounded border border-slate-200 px-2 py-0.5 text-[11px]"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onApplyDerivedInput?.({
+                                    pointer: entry.pointer,
+                                    value: editingDerivedValue,
+                                    mode: 'edit'
+                                  });
+                                  setEditingDerivedPointer(null);
+                                }}
+                                className="text-[10px] font-semibold text-weflora-teal"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onApplyDerivedInput?.({ pointer: entry.pointer, value: entry.value, mode: 'accept' })
+                                }
+                                className="text-[10px] font-semibold text-weflora-teal hover:text-weflora-dark"
+                              >
+                                Accept
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingDerivedPointer(entry.pointer);
+                                  setEditingDerivedValue(String(entry.value ?? ''));
+                                }}
+                                className="text-[10px] font-semibold text-slate-500 hover:text-slate-700"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onApplyDerivedInput?.({ pointer: entry.pointer, mode: 'ignore' })}
+                                className="text-[10px] font-semibold text-rose-500 hover:text-rose-700"
+                              >
+                                Ignore
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>

@@ -16,6 +16,8 @@
     "test:floragpt-worksheet": "node --experimental-strip-types scripts/test-floragpt-worksheet.ts",
     "test:decision-program": "node --experimental-strip-types scripts/test-decision-program.ts",
     "test:evidence-graph": "node --experimental-strip-types scripts/test-evidence-graph.ts",
+    "test:pciv": "node --experimental-strip-types scripts/test-pciv.ts",
+    "test:pciv-ui": "node --experimental-strip-types scripts/test-pciv-ui.ts",
     "check": "npm run lint && npm run guard:temp-ids && npm run guard:toast-icons && npm run build"
   },
   "dependencies": {
