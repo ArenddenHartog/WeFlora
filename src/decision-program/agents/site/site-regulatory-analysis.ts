@@ -1,6 +1,16 @@
 import type { Agent } from '../types.ts';
 import { runSiteRegulatoryAnalysis } from '../../skills/siteRegulatoryAnalysis.ts';
 import { buildContextPatchesFromDerivedConstraints, buildDerivedInputs } from '../../orchestrator/derivedConstraints.ts';
+import { buildRegistryInputs } from '../../orchestrator/pointerInputRegistry.ts';
+import {
+  buildArtifactNodeId,
+  buildClaimNodeId,
+  buildConstraintNodeId,
+  buildSkillNodeId,
+  buildSourceNodeId,
+  createEmptyEvidenceGraph,
+  mergeEvidenceGraph
+} from '../../orchestrator/evidenceGraph.ts';
 
 const pushStepLog = (state: { logs: any[] }, stepId: string, message: string) => {
   state.logs.push({
@@ -9,6 +19,14 @@ const pushStepLog = (state: { logs: any[] }, stepId: string, message: string) =>
     data: { stepId },
     timestamp: new Date().toISOString()
   });
+};
+
+const getPointerLabels = () => {
+  const registryInputs = buildRegistryInputs();
+  return registryInputs.reduce<Record<string, string>>((acc, input) => {
+    acc[input.pointer] = input.label;
+    return acc;
+  }, {});
 };
 
 export const siteRegulatoryAnalysis: Agent = {
@@ -44,6 +62,7 @@ export const siteRegulatoryAnalysis: Agent = {
 
     pushStepLog(state, stepId, `Extracting constraints from ${analysis.evidenceSources.length} sources…`);
     const derivedInputs = buildDerivedInputs(analysis.derivedConstraints, analysis.evidenceByPointer, analysis.timelineEntry.id);
+    const pointerLabels = getPointerLabels();
 
     pushStepLog(state, stepId, 'Linking citations to timeline evidence…');
     const evidenceRefs = analysis.evidenceItems.map((item) => ({
@@ -54,6 +73,78 @@ export const siteRegulatoryAnalysis: Agent = {
     }));
 
     const contextPatches = buildContextPatchesFromDerivedConstraints(analysis.derivedConstraints);
+    const evidenceGraph = createEmptyEvidenceGraph();
+    const skillNodeId = buildSkillNodeId('site-regulatory-analysis');
+    const artifactNodeId = buildArtifactNodeId('artifact-constraints');
+
+    evidenceGraph.nodes.push({
+      id: skillNodeId,
+      type: 'skill',
+      label: 'site_regulatory_analysis',
+      description: 'Extracts regulatory and site constraints from evidence sources.'
+    });
+    evidenceGraph.nodes.push({
+      id: artifactNodeId,
+      type: 'artifact',
+      label: 'Constraints object',
+      metadata: { href: '#planning-constraints' }
+    });
+    evidenceGraph.edges.push({ from: skillNodeId, to: artifactNodeId, type: 'produced_by' });
+
+    analysis.evidenceSources.forEach((source) => {
+      evidenceGraph.nodes.push({
+        id: buildSourceNodeId(source.id),
+        type: 'source',
+        label: source.title,
+        metadata: { sourceId: source.id }
+      });
+    });
+
+    analysis.evidenceItems.forEach((item) => {
+      const claimNodeId = buildClaimNodeId(item.id);
+      evidenceGraph.nodes.push({
+        id: claimNodeId,
+        type: 'claim',
+        label: item.claim,
+        metadata: {
+          evidenceItemId: item.id,
+          citations: item.citations,
+          timelineEntryId: analysis.timelineEntry.id
+        }
+      });
+      item.citations.forEach((citation) => {
+        evidenceGraph.edges.push({
+          from: buildSourceNodeId(citation.sourceId),
+          to: claimNodeId,
+          type: 'supports',
+          confidence: citation.confidence
+        });
+      });
+    });
+
+    Object.values(derivedInputs).forEach((input) => {
+      const constraintNodeId = buildConstraintNodeId(input.pointer);
+      evidenceGraph.nodes.push({
+        id: constraintNodeId,
+        type: 'constraint',
+        label: pointerLabels[input.pointer] ?? input.pointer,
+        description: `Value: ${String(input.value)}`,
+        metadata: {
+          pointer: input.pointer,
+          value: input.value,
+          confidence: input.confidence,
+          timelineEntryId: analysis.timelineEntry.id
+        }
+      });
+      (input.evidenceItemIds ?? []).forEach((evidenceItemId) => {
+        evidenceGraph.edges.push({
+          from: buildClaimNodeId(evidenceItemId),
+          to: constraintNodeId,
+          type: 'derived_from',
+          confidence: input.confidence
+        });
+      });
+    });
 
     return {
       patches: [
@@ -77,6 +168,10 @@ export const siteRegulatoryAnalysis: Agent = {
         {
           pointer: '/derivedInputs',
           value: derivedInputs
+        },
+        {
+          pointer: '/evidenceGraph',
+          value: mergeEvidenceGraph(state.evidenceGraph, evidenceGraph)
         },
         {
           pointer: `/evidenceIndex/${stepId}`,

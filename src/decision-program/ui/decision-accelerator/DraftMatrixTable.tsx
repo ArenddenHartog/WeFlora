@@ -1,8 +1,9 @@
 import React from 'react';
-import type { DraftMatrix, DraftMatrixColumn, DraftMatrixRow, EvidenceRef } from '../../types';
+import type { DraftMatrix, DraftMatrixColumn, DraftMatrixRow, EvidenceGraph, EvidenceRef } from '../../types';
 import { BookIcon, InfoIcon } from '../../../../components/icons';
 import { getBadgeClass, getScoreBand } from './severity';
 import { buildCellCitationsArgs } from './draftMatrixUtils';
+import { buildDecisionNodeId } from '../../orchestrator/evidenceGraph';
 
 type _DraftMatrixColumn = DraftMatrixColumn;
 type _DraftMatrixRow = DraftMatrixRow;
@@ -21,6 +22,7 @@ export interface DraftMatrixCell {
 export interface DraftMatrixTableProps {
   matrix: DraftMatrix;
   onOpenCitations?: (args: { rowId: string; columnId: string; evidence?: EvidenceRef[] }) => void;
+  onOpenEvidenceMap?: (args?: { focusNodeId?: string }) => void;
   onToggleColumnPinned?: (columnId: string) => void;
   onToggleColumnVisible?: (columnId: string) => void;
   onAddColumn?: (columnId: string) => void;
@@ -33,12 +35,14 @@ export interface DraftMatrixTableProps {
   showColumnWhy?: boolean;
   showCellRationale?: boolean;
   showConfidence?: boolean;
+  evidenceGraph?: EvidenceGraph;
   className?: string;
 }
 
 const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
   matrix,
   onOpenCitations,
+  onOpenEvidenceMap,
   onToggleColumnPinned,
   onToggleColumnVisible,
   onAddColumn,
@@ -50,6 +54,7 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
   showColumnWhy = false,
   showCellRationale = false,
   showConfidence = false,
+  evidenceGraph,
   className
 }) => {
   const visibleColumns = matrix.columns.filter((column) => column.visible !== false);
@@ -93,6 +98,25 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
     if (keyReasonCell?.value) return String(keyReasonCell.value);
     const noteCell = row.cells.find((cell) => typeof cell.value === 'string' && cell.value.length > 0);
     return noteCell?.value ? String(noteCell.value) : 'No summary provided yet.';
+  };
+
+  const getEvidenceSlice = (rowId: string) => {
+    if (!evidenceGraph) {
+      return { constraints: [], claims: [] };
+    }
+    const decisionNodeId = buildDecisionNodeId(`row:${rowId}`);
+    const edgesToDecision = evidenceGraph.edges.filter((edge) => edge.to === decisionNodeId);
+    const constraintNodes = edgesToDecision
+      .map((edge) => evidenceGraph.nodes.find((node) => node.id === edge.from))
+      .filter((node): node is NonNullable<typeof node> => Boolean(node && node.type === 'constraint'));
+    const claimNodes = evidenceGraph.edges
+      .filter((edge) => constraintNodes.some((constraint) => constraint.id === edge.to) && edge.type === 'derived_from')
+      .map((edge) => evidenceGraph.nodes.find((node) => node.id === edge.from))
+      .filter((node): node is NonNullable<typeof node> => Boolean(node && node.type === 'claim'));
+    return {
+      constraints: constraintNodes.slice(0, 5),
+      claims: claimNodes.slice(0, 4)
+    };
   };
 
   return (
@@ -218,6 +242,7 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
               const isSelected = selectedRowIds?.includes(row.id);
               const isRowExpanded = expandedRowId === row.id;
               const rowEvidence = buildRowEvidence(row);
+              const evidenceSlice = getEvidenceSlice(row.id);
               const rowFlags = row.cells
                 .flatMap((cell) => cell.flags ?? [])
                 .filter((flag, index, arr) => arr.indexOf(flag) === index);
@@ -340,6 +365,15 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
                           <div className="space-y-2">
                             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Fit summary</p>
                             <p>{getRowRationale(row)}</p>
+                            {onOpenEvidenceMap && (
+                              <button
+                                type="button"
+                                onClick={() => onOpenEvidenceMap({ focusNodeId: buildDecisionNodeId(`row:${row.id}`) })}
+                                className="text-[11px] font-semibold text-weflora-teal hover:text-weflora-dark"
+                              >
+                                Show evidence map
+                              </button>
+                            )}
                           </div>
                           <div className="space-y-2">
                             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Score breakdown</p>
@@ -378,6 +412,46 @@ const DraftMatrixTable: React.FC<DraftMatrixTableProps> = ({
                               </ul>
                             ) : (
                               <p className="text-slate-400">No evidence snippets yet.</p>
+                            )}
+                            {evidenceGraph && (
+                              <div className="space-y-2 pt-2 border-t border-slate-100">
+                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Evidence graph</p>
+                                <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                                  <span className="h-2 w-2 rounded-full bg-weflora-teal/60" />
+                                  <span className="h-px w-6 bg-slate-200" />
+                                  <span className="h-2 w-2 rounded-full bg-weflora-teal/40" />
+                                  <span className="h-px w-6 bg-slate-200" />
+                                  <span className="h-2 w-2 rounded-full bg-weflora-teal/60" />
+                                  <span className="h-px w-6 bg-slate-200" />
+                                  <span className="h-2 w-2 rounded-full bg-weflora-teal/80" />
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {evidenceSlice.constraints.length > 0 ? (
+                                    evidenceSlice.constraints.map((constraint) => (
+                                      <span
+                                        key={constraint.id}
+                                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-weflora-mint/40 text-weflora-teal"
+                                      >
+                                        {constraint.label}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400">No linked constraints yet.</span>
+                                  )}
+                                </div>
+                                {evidenceSlice.claims.length > 0 && (
+                                  <ul className="space-y-1 text-[11px] text-slate-500">
+                                    {evidenceSlice.claims.map((claim) => (
+                                      <li key={claim.id}>
+                                        {claim.label}
+                                        {claim.metadata?.citations?.[0]?.sourceId
+                                          ? ` · ${claim.metadata.citations[0].sourceId}`
+                                          : ''}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
                             )}
                             {rowFlags.length > 0 && (
                               <p className="text-[11px] text-rose-600">Known risks: {rowFlags.slice(0, 3).join(', ')}</p>

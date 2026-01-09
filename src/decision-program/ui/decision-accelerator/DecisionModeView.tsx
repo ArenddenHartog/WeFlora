@@ -14,6 +14,7 @@ import { getByPointer } from '../../runtime/pointers';
 import { getMissingInputs, splitInputsBySeverity } from './validationUtils';
 import { showMatrixColumn, toggleMatrixColumnPinned, toggleMatrixColumnVisible } from './draftMatrixUtils';
 import { buildRegistryInputs } from '../../orchestrator/pointerInputRegistry';
+import EvidenceMap from './EvidenceMap';
 
 export interface DecisionModeViewProps {
   program: DecisionProgram;
@@ -62,6 +63,8 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
   const [isValidationOpen, setIsValidationOpen] = useState(false);
   const [validationValues, setValidationValues] = useState<Record<string, string | number | boolean>>({});
   const [focusedEntryId, setFocusedEntryId] = useState<string | null>(null);
+  const [isEvidenceMapOpen, setIsEvidenceMapOpen] = useState(false);
+  const [focusEvidenceNodeId, setFocusEvidenceNodeId] = useState<string | null>(null);
 
   useEffect(() => {
     setLocalMatrix((prev) => {
@@ -193,6 +196,18 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+  };
+
+  const openEvidenceMap = (args?: { focusNodeId?: string; timelineEntryId?: string }) => {
+    let targetNodeId = args?.focusNodeId ?? null;
+    if (!targetNodeId && args?.timelineEntryId) {
+      const matched = state.evidenceGraph?.nodes.find(
+        (node) => node.metadata?.timelineEntryId === args.timelineEntryId
+      );
+      targetNodeId = matched?.id ?? null;
+    }
+    setFocusEvidenceNodeId(targetNodeId);
+    setIsEvidenceMapOpen(true);
   };
 
   return (
@@ -353,6 +368,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
             timelineEntries={state.timelineEntries}
             focusedEntryId={focusedEntryId}
             onOpenCitations={(args) => handleOpenStepCitations({ evidence: args.evidence, label: 'Sources' })}
+            onOpenEvidenceMap={(entryId) => openEvidenceMap({ timelineEntryId: entryId })}
           />
 
           {visibleMatrix ? (
@@ -360,6 +376,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
               <DraftMatrixTable
                 matrix={visibleMatrix}
                 onOpenCitations={handleOpenCitations}
+                onOpenEvidenceMap={(args) => openEvidenceMap(args)}
                 onToggleColumnPinned={handleToggleColumnPinned}
                 onToggleColumnVisible={handleToggleColumnVisible}
                 onAddColumn={handleAddColumn}
@@ -371,6 +388,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
                 density={matrixDensity}
                 showCellRationale
                 showConfidence
+                evidenceGraph={state.evidenceGraph}
               />
             </div>
           ) : (
@@ -386,6 +404,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
               blockedStepId={state.steps.find((step) => step.status === 'blocked')?.stepId}
               onSubmitCard={onSubmitCard}
               onOpenValidation={() => setIsValidationOpen(true)}
+              onOpenEvidenceMap={() => openEvidenceMap()}
               layout="stack"
               showTypeBadges={false}
             />
@@ -457,6 +476,20 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
           }}
         />
       )}
+
+      <EvidenceMap
+        graph={state.evidenceGraph}
+        isOpen={isEvidenceMapOpen}
+        focusNodeId={focusEvidenceNodeId}
+        onClose={() => {
+          setIsEvidenceMapOpen(false);
+          setFocusEvidenceNodeId(null);
+        }}
+        onJumpToTimelineEntry={(entryId) => {
+          setFocusedEntryId(entryId);
+          document.getElementById('planning-timeline')?.scrollIntoView({ behavior: 'smooth' });
+        }}
+      />
     </div>
   );
 };

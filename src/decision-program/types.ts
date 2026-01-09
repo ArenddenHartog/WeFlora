@@ -69,6 +69,38 @@ export interface EvidenceItem {
   citations: Citation[];
 }
 
+export type EvidenceNodeType = 'source' | 'claim' | 'constraint' | 'skill' | 'artifact' | 'decision';
+
+export interface EvidenceNode {
+  id: string;
+  type: EvidenceNodeType;
+  label: string;
+  description?: string;
+  metadata?: Record<string, any>;
+}
+
+export type EvidenceEdgeType =
+  | 'supports'
+  | 'derived_from'
+  | 'influences'
+  | 'produced_by'
+  | 'filters'
+  | 'scores'
+  | 'conflicts_with';
+
+export interface EvidenceEdge {
+  from: string;
+  to: string;
+  type: EvidenceEdgeType;
+  weight?: number;
+  confidence?: number;
+}
+
+export interface EvidenceGraph {
+  nodes: EvidenceNode[];
+  edges: EvidenceEdge[];
+}
+
 export interface ArtifactRef {
   id: string;
   kind: 'constraints' | 'shortlist' | 'scoring' | 'map' | 'supplyStatus';
@@ -258,6 +290,7 @@ export interface ExecutionState {
   evidenceIndex?: Record<string, EvidenceRef[]>;
   evidenceSources?: EvidenceSource[];
   evidenceItems?: EvidenceItem[];
+  evidenceGraph?: EvidenceGraph;
   timelineEntries?: TimelineEntry[];
   derivedConstraints?: DerivedConstraints;
   derivedInputs?: Record<string, DerivedInput>;

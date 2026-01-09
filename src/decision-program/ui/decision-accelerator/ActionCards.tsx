@@ -29,6 +29,7 @@ export interface ActionCardsProps {
   onOpenValidation?: (cardId: string) => void;
   onDismissCard?: (cardId: string) => void;
   onRunSuggestedAction?: (args: { label: string; action: string; icon?: string }) => void;
+  onOpenEvidenceMap?: () => void;
   contextSummary?: {
     selectedDocsCount: number;
     lastUserConstraints?: string[];
@@ -58,6 +59,7 @@ const ActionCards: React.FC<ActionCardsProps> = ({
   onSubmitCard,
   onDismissCard,
   onRunSuggestedAction,
+  onOpenEvidenceMap,
   contextSummary,
   layout = 'stack',
   showTypeBadges = true,
@@ -109,11 +111,22 @@ const ActionCards: React.FC<ActionCardsProps> = ({
           <h3 className="text-sm font-semibold text-slate-800">Next best actions</h3>
           <p className="text-xs text-slate-500">Choose the next move in the planning flow.</p>
         </div>
-        {contextSummary && (
-          <div className="text-xs text-slate-500">
-            {contextSummary.selectedDocsCount} docs · {contextSummary.lastUserConstraints?.length ?? 0} constraints
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {contextSummary && (
+            <div className="text-xs text-slate-500">
+              {contextSummary.selectedDocsCount} docs · {contextSummary.lastUserConstraints?.length ?? 0} constraints
+            </div>
+          )}
+          {onOpenEvidenceMap && (
+            <button
+              type="button"
+              onClick={onOpenEvidenceMap}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-weflora-mint/60 text-weflora-teal hover:bg-weflora-mint/20"
+            >
+              Show evidence map
+            </button>
+          )}
+        </div>
       </div>
 
       <div className={layout === 'grid' ? 'grid gap-4 md:grid-cols-2' : 'space-y-3'}>

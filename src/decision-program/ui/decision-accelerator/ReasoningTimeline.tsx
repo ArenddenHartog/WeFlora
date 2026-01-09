@@ -10,6 +10,7 @@ export interface ReasoningTimelineProps {
   evidenceSources?: EvidenceSource[];
   timelineEntries?: TimelineEntry[];
   onOpenCitations?: (args: { evidence?: EvidenceRef[]; sourceId?: string }) => void;
+  onOpenEvidenceMap?: (entryId?: string) => void;
   focusedEntryId?: string | null;
   className?: string;
 }
@@ -23,6 +24,7 @@ const ReasoningTimeline: React.FC<ReasoningTimelineProps> = ({
   evidenceSources,
   timelineEntries,
   onOpenCitations,
+  onOpenEvidenceMap,
   focusedEntryId,
   className
 }) => {
@@ -60,6 +62,15 @@ const ReasoningTimeline: React.FC<ReasoningTimelineProps> = ({
           <h3 className="text-sm font-semibold text-slate-800">Reasoning timeline</h3>
           <p className="text-xs text-slate-500">Findings, evidence, and artifacts as the run unfolds.</p>
         </div>
+        {onOpenEvidenceMap && (
+          <button
+            type="button"
+            onClick={() => onOpenEvidenceMap()}
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-weflora-mint/60 text-weflora-teal hover:bg-weflora-mint/20"
+          >
+            Show evidence map
+          </button>
+        )}
       </div>
 
       {items.length === 0 && (
@@ -88,6 +99,15 @@ const ReasoningTimeline: React.FC<ReasoningTimelineProps> = ({
                           </div>
                           <p className="text-[11px] text-slate-600">{item.summary}</p>
                         </div>
+                        {onOpenEvidenceMap && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenEvidenceMap(item.id)}
+                            className="text-[11px] font-semibold text-weflora-teal hover:text-weflora-dark"
+                          >
+                            Show evidence map
+                          </button>
+                        )}
                         {item.keyFindings.length > 0 && (
                           <ul className="text-[11px] text-slate-600 list-disc list-inside space-y-1">
                             {item.keyFindings.slice(0, 5).map((finding) => (

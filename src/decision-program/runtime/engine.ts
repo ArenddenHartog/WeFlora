@@ -2,6 +2,7 @@ import type { DecisionProgram, ExecutionState, StepState } from '../types.ts';
 import type { AgentRegistry } from '../agents/types.ts';
 import { listMissingPointers, setByPointer } from './pointers.ts';
 import { applyDynamicColumns } from '../orchestrator/dynamicColumns.ts';
+import { createEmptyEvidenceGraph } from '../orchestrator/evidenceGraph.ts';
 
 const now = () => new Date().toISOString();
 
@@ -21,6 +22,9 @@ const cloneState = (state: ExecutionState): ExecutionState => ({
   logs: [...state.logs],
   evidenceSources: state.evidenceSources ? [...state.evidenceSources] : undefined,
   evidenceItems: state.evidenceItems ? [...state.evidenceItems] : undefined,
+  evidenceGraph: state.evidenceGraph
+    ? { nodes: [...state.evidenceGraph.nodes], edges: [...state.evidenceGraph.edges] }
+    : undefined,
   timelineEntries: state.timelineEntries ? [...state.timelineEntries] : undefined,
   derivedInputs: state.derivedInputs ? { ...state.derivedInputs } : undefined
 });
@@ -50,6 +54,7 @@ export const createExecutionState = (
     actionCards: [],
     evidenceSources: [],
     evidenceItems: [],
+    evidenceGraph: createEmptyEvidenceGraph(),
     timelineEntries: [],
     derivedInputs: {},
     logs: [
