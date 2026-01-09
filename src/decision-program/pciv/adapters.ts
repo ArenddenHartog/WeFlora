@@ -120,18 +120,30 @@ export const buildEvidenceItemsFromPciv = (
   evidenceItems: PcivEvidenceItem[]
 ): EvidenceItem[] => {
   const evidenceMap = new Map(evidenceItems.map((item) => [item.evidenceId, item]));
-  return claims.map((claim) => {
-    const citations = claim.evidenceRefs.map((ref) => {
-      const evidence = evidenceMap.get(ref.evidenceId);
-      return {
-        sourceId: evidence?.sourceId ?? 'unknown',
-        locator: { page: evidence?.locator.page, section: evidence?.locator.section, row: evidence?.locator.row?.toString() }
-      };
+  const claimByEvidence = new Map<string, Claim>();
+  claims.forEach((claim) => {
+    claim.evidenceRefs.forEach((ref) => {
+      if (!claimByEvidence.has(ref.evidenceId)) {
+        claimByEvidence.set(ref.evidenceId, claim);
+      }
     });
+  });
+  const referencedEvidenceIds = new Set(claimByEvidence.keys());
+  return evidenceItems
+    .filter((item) => referencedEvidenceIds.has(item.evidenceId))
+    .map((item) => {
+      const claim = claimByEvidence.get(item.evidenceId);
+      const citations = [
+        {
+          sourceId: item.sourceId,
+          locator: { page: item.locator.page, section: item.locator.section, row: item.locator.row?.toString() }
+        }
+      ];
+      const kind = claim?.domain === 'regulatory' ? 'regulatory' : claim?.domain === 'equity' ? 'equity' : 'biophysical';
     return {
-      id: claim.claimId,
-      kind: claim.domain === 'regulatory' ? 'regulatory' : claim.domain === 'equity' ? 'equity' : 'biophysical',
-      claim: claim.statement,
+      id: item.evidenceId,
+      kind,
+      claim: claim?.statement ?? item.text ?? 'Evidence excerpt',
       citations
     };
   });
