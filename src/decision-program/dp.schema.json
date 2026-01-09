@@ -126,6 +126,55 @@
         "citations": { "type": "array", "items": { "$ref": "#/definitions/Citation" } }
       }
     },
+    "EvidenceNodeType": {
+      "type": "string",
+      "enum": ["source", "claim", "constraint", "skill", "artifact", "decision"]
+    },
+    "EvidenceNode": {
+      "type": "object",
+      "required": ["id", "type", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "$ref": "#/definitions/EvidenceNodeType" },
+        "label": { "type": "string" },
+        "description": { "type": "string" },
+        "metadata": { "type": "object" }
+      }
+    },
+    "EvidenceEdgeType": {
+      "type": "string",
+      "enum": [
+        "supports",
+        "derived_from",
+        "influences",
+        "produced_by",
+        "filters",
+        "scores",
+        "conflicts_with"
+      ]
+    },
+    "EvidenceEdge": {
+      "type": "object",
+      "required": ["from", "to", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "type": { "$ref": "#/definitions/EvidenceEdgeType" },
+        "weight": { "type": "number" },
+        "confidence": { "type": "number" }
+      }
+    },
+    "EvidenceGraph": {
+      "type": "object",
+      "required": ["nodes", "edges"],
+      "additionalProperties": false,
+      "properties": {
+        "nodes": { "type": "array", "items": { "$ref": "#/definitions/EvidenceNode" } },
+        "edges": { "type": "array", "items": { "$ref": "#/definitions/EvidenceEdge" } }
+      }
+    },
     "ArtifactRef": {
       "type": "object",
       "required": ["id", "kind", "label", "href"],
@@ -336,6 +385,7 @@
         },
         "evidenceSources": { "type": "array", "items": { "$ref": "#/definitions/EvidenceSource" } },
         "evidenceItems": { "type": "array", "items": { "$ref": "#/definitions/EvidenceItem" } },
+        "evidenceGraph": { "$ref": "#/definitions/EvidenceGraph" },
         "timelineEntries": { "type": "array", "items": { "$ref": "#/definitions/TimelineEntry" } },
         "derivedConstraints": { "$ref": "#/definitions/DerivedConstraints" },
         "derivedInputs": {
