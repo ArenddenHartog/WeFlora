@@ -139,6 +139,46 @@
         "type": { "$ref": "#/definitions/EvidenceNodeType" },
         "label": { "type": "string" },
         "description": { "type": "string" },
+        "value": {},
+        "confidence": { "type": "number" },
+        "confidenceBase": { "type": "number" },
+        "confidenceSource": { "type": "string", "enum": ["model", "user", "system"] },
+        "confidenceUpdatedAt": { "type": "string" },
+        "confidenceBreakdown": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["formula", "inputs"],
+          "properties": {
+            "formula": { "type": "string" },
+            "inputs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "label", "value"],
+                "additionalProperties": false,
+                "properties": {
+                  "id": { "type": "string" },
+                  "label": { "type": "string" },
+                  "value": { "type": "number" },
+                  "weight": { "type": "number" }
+                }
+              }
+            },
+            "penalties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["label", "value"],
+                "additionalProperties": false,
+                "properties": {
+                  "label": { "type": "string" },
+                  "value": { "type": "number" }
+                }
+              }
+            },
+            "notes": { "type": "array", "items": { "type": "string" } }
+          }
+        },
         "metadata": { "type": "object" }
       }
     },
@@ -149,6 +189,7 @@
         "derived_from",
         "influences",
         "produced_by",
+        "produces",
         "filters",
         "scores",
         "conflicts_with"
@@ -163,7 +204,9 @@
         "to": { "type": "string" },
         "type": { "$ref": "#/definitions/EvidenceEdgeType" },
         "weight": { "type": "number" },
-        "confidence": { "type": "number" }
+        "confidence": { "type": "number" },
+        "attenuation": { "type": "number" },
+        "polarity": { "type": "string", "enum": ["positive", "negative"] }
       }
     },
     "EvidenceGraph": {

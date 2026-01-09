@@ -71,11 +71,24 @@ export interface EvidenceItem {
 
 export type EvidenceNodeType = 'source' | 'claim' | 'constraint' | 'skill' | 'artifact' | 'decision';
 
+export interface ConfidenceBreakdown {
+  formula: string;
+  inputs: Array<{ id: string; label: string; value: number; weight?: number }>;
+  penalties?: Array<{ label: string; value: number }>;
+  notes?: string[];
+}
+
 export interface EvidenceNode {
   id: string;
   type: EvidenceNodeType;
   label: string;
   description?: string;
+  value?: unknown;
+  confidence?: number;
+  confidenceBase?: number;
+  confidenceSource?: 'model' | 'user' | 'system';
+  confidenceUpdatedAt?: string;
+  confidenceBreakdown?: ConfidenceBreakdown;
   metadata?: Record<string, any>;
 }
 
@@ -84,6 +97,7 @@ export type EvidenceEdgeType =
   | 'derived_from'
   | 'influences'
   | 'produced_by'
+  | 'produces'
   | 'filters'
   | 'scores'
   | 'conflicts_with';
@@ -94,6 +108,8 @@ export interface EvidenceEdge {
   type: EvidenceEdgeType;
   weight?: number;
   confidence?: number;
+  attenuation?: number;
+  polarity?: 'positive' | 'negative';
 }
 
 export interface EvidenceGraph {
