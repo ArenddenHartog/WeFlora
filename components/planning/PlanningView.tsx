@@ -14,7 +14,7 @@ import { planRun } from '../../src/decision-program/orchestrator/planRun';
 import { runAgentStep } from '../../src/decision-program/orchestrator/runAgentStep';
 import { getImpactedStepIds } from '../../src/decision-program/orchestrator/impactAnalysis';
 import { buildAgentRegistry } from '../../src/decision-program/agents/registry';
-import { getByPointer, setByPointer } from '../../src/decision-program/runtime/pointers';
+import { getByPointer, setByPointer, unsetByPointer } from '../../src/decision-program/runtime/pointers';
 import { buildRouteLogEntry, handleRouteAction } from '../../src/decision-program/ui/decision-accelerator/routeHandlers';
 import { promoteDraftMatrixToWorksheet } from '../../utils/draftMatrixPromotion';
 import RightSidebarStepper from '../../src/decision-program/ui/decision-accelerator/RightSidebarStepper';
@@ -286,6 +286,9 @@ const PlanningView: React.FC = () => {
           if (args.value !== undefined) {
             setByPointer(next, args.pointer, args.value);
           }
+        }
+        if (args.mode === 'ignore') {
+          unsetByPointer(next, args.pointer);
         }
         const existing = next.derivedInputs?.[args.pointer];
         if (existing) {

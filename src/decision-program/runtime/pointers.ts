@@ -54,6 +54,23 @@ export const setByPointer = (obj: any, pointer: string, value: any): void => {
   (current as any)[lastKey as any] = value;
 };
 
+export const unsetByPointer = (obj: any, pointer: string): void => {
+  const segments = splitPointer(pointer);
+  if (segments.length === 0) return;
+  let current = obj;
+  for (let i = 0; i < segments.length - 1; i += 1) {
+    const segment = segments[i];
+    const key = Array.isArray(current) ? Number(segment) : segment;
+    if ((current as any)[key as any] == null) return;
+    current = (current as any)[key as any];
+  }
+  const last = segments[segments.length - 1];
+  const lastKey = Array.isArray(current) ? Number(last) : last;
+  if (current && typeof current === 'object') {
+    delete (current as any)[lastKey as any];
+  }
+};
+
 export const listMissingPointers = (obj: any, pointers: string[]): string[] =>
   pointers.filter((pointer) => !hasPointer(obj, pointer));
 
