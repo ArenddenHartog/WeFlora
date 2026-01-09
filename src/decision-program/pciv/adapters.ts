@@ -119,7 +119,6 @@ export const buildEvidenceItemsFromPciv = (
   claims: Claim[],
   evidenceItems: PcivEvidenceItem[]
 ): EvidenceItem[] => {
-  const evidenceMap = new Map(evidenceItems.map((item) => [item.evidenceId, item]));
   const claimByEvidence = new Map<string, Claim>();
   claims.forEach((claim) => {
     claim.evidenceRefs.forEach((ref) => {
@@ -140,13 +139,13 @@ export const buildEvidenceItemsFromPciv = (
         }
       ];
       const kind = claim?.domain === 'regulatory' ? 'regulatory' : claim?.domain === 'equity' ? 'equity' : 'biophysical';
-    return {
-      id: item.evidenceId,
-      kind,
-      claim: claim?.statement ?? item.text ?? 'Evidence excerpt',
-      citations
-    };
-  });
+      return {
+        id: item.evidenceId,
+        kind,
+        claim: claim?.statement ?? item.text ?? 'Evidence excerpt',
+        citations
+      };
+    });
 };
 
 export const buildEvidenceGraphFromPciv = (snapshot: EvidenceGraphSnapshot): EvidenceGraph => {
