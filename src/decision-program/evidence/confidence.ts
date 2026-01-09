@@ -3,7 +3,7 @@ import { computeEffectiveImpact } from './impact.ts';
 
 const DEFAULT_SOURCE_CONFIDENCE = 0.6;
 
-const typeOrder: EvidenceNode['type'][] = ['source', 'claim', 'constraint', 'decision'];
+const typeOrder: EvidenceNode['type'][] = ['source', 'evidence', 'claim', 'constraint', 'decision'];
 
 export const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
