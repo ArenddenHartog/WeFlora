@@ -9,4 +9,5 @@ export const FEATURES = {
   // Worksheet-aware FloraGPT actions and context packing (feature-flagged).
   floragpt_worksheet_v0: import.meta.env.VITE_FLORAGPT_WORKSHEET_V0 === 'true',
   pcivContextIntake: import.meta.env.VITE_PCIV_CONTEXT_INTAKE === 'true',
+  pciv_v0: import.meta.env.VITE_PCIV_V0 ? import.meta.env.VITE_PCIV_V0 === 'true' : import.meta.env.DEV
 } as const;
