@@ -1,5 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { EvidenceEdge, EvidenceGraph, EvidenceNode } from '../../types';
+import { computeConfidenceGraph } from '../../evidence/confidence';
+import { computeEffectiveImpact } from '../../evidence/impact';
+import { simulateScenario, type ScenarioPatch } from '../../evidence/simulate';
+import EvidenceMapControls from './EvidenceMapControls';
+import NodeDetailsPanel from './NodeDetailsPanel';
 
 type EvidenceMapView = 'decision' | 'constraint' | 'source';
 
@@ -85,6 +90,8 @@ const buildLayout = (nodes: EvidenceNode[]) => {
   return positions;
 };
 
+const formatConfidence = (value?: number) => (typeof value === 'number' ? `${Math.round(value * 100)}%` : '--');
+
 export interface EvidenceMapProps {
   graph?: EvidenceGraph;
   isOpen: boolean;
@@ -103,12 +110,81 @@ const EvidenceMap: React.FC<EvidenceMapProps> = ({ graph, isOpen, focusNodeId, o
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
 
-  const { nodes, edges } = useMemo(() => clusterGraph(graph ?? { nodes: [], edges: [] }), [graph]);
+  const [whatIfOpen, setWhatIfOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedConstraintId, setSelectedConstraintId] = useState<string | null>(null);
+  const [draftValue, setDraftValue] = useState<string | number | boolean | null>(null);
+  const [assumeConfidence, setAssumeConfidence] = useState(0.95);
+  const [overrideEvidence, setOverrideEvidence] = useState(false);
+  const [scenarioPatches, setScenarioPatches] = useState<ScenarioPatch[]>([]);
+
+  const baselineGraph = useMemo(() => computeConfidenceGraph(graph ?? { nodes: [], edges: [] }), [graph]);
+  const constraintNodes = useMemo(
+    () => baselineGraph.nodes.filter((node) => node.type === 'constraint'),
+    [baselineGraph.nodes]
+  );
+  const selectedConstraint = constraintNodes.find((node) => node.id === selectedConstraintId) ?? null;
+
+  useEffect(() => {
+    if (!constraintNodes.length) return;
+    if (selectedConstraintId && constraintNodes.some((node) => node.id === selectedConstraintId)) return;
+    setSelectedConstraintId(constraintNodes[0]?.id ?? null);
+  }, [constraintNodes, selectedConstraintId]);
+
+  useEffect(() => {
+    if (!selectedConstraint) return;
+    const nextValue =
+      selectedConstraint.value ??
+      selectedConstraint.metadata?.value ??
+      selectedConstraint.metadata?.summary ??
+      '';
+    setDraftValue(nextValue as string | number | boolean);
+    const nextConfidence =
+      typeof selectedConstraint.confidence === 'number' ? selectedConstraint.confidence : 0.95;
+    setAssumeConfidence(Math.min(0.98, Math.max(0.5, nextConfidence)));
+  }, [selectedConstraint]);
+
+  useEffect(() => {
+    if (!whatIfOpen) {
+      setScenarioPatches([]);
+      return;
+    }
+    if (!selectedConstraintId) return;
+    const timer = window.setTimeout(() => {
+      const patch: ScenarioPatch = {
+        nodeId: selectedConstraintId,
+        mode: overrideEvidence ? 'overrideEvidence' : 'adjust',
+        patch: {
+          value: draftValue,
+          confidence: assumeConfidence,
+          confidenceSource: 'user'
+        }
+      };
+      setScenarioPatches((prev) => [...prev.filter((entry) => entry.nodeId !== patch.nodeId), patch]);
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [whatIfOpen, selectedConstraintId, draftValue, assumeConfidence, overrideEvidence]);
+
+  const scenario = useMemo(
+    () => ({ id: 'what-if', name: 'What-if', patches: scenarioPatches }),
+    [scenarioPatches]
+  );
+
+  const simulation = useMemo(() => {
+    if (!whatIfOpen) return null;
+    return simulateScenario(baselineGraph, scenario);
+  }, [baselineGraph, scenario, whatIfOpen]);
+
+  const displayGraph = simulation?.graphOverlay ?? baselineGraph;
+
+  const { nodes, edges } = useMemo(() => clusterGraph(displayGraph), [displayGraph]);
   const positions = useMemo(() => buildLayout(nodes), [nodes]);
   const connectedNodeIds = useMemo(() => {
     if (!hoveredNodeId) return new Set<string>();
     return getConnectedNodeIds(edges, hoveredNodeId);
   }, [edges, hoveredNodeId]);
+
+  const nodesById = useMemo(() => new Map(displayGraph.nodes.map((node) => [node.id, node])), [displayGraph.nodes]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -182,9 +258,9 @@ const EvidenceMap: React.FC<EvidenceMapProps> = ({ graph, isOpen, focusNodeId, o
     if (!position) return null;
     const isConnected = hoveredNodeId && (node.id === hoveredNodeId || connectedNodeIds.has(node.id));
     const isDimmed = hoveredNodeId && !isConnected;
-    const fill = node.id === selectedNodeId ? '#c4f0e4' : '#ffffff';
-    const stroke = isConnected ? '#0f766e' : '#94a3b8';
-    const opacity = isDimmed ? 0.25 : 1;
+    const nodeConfidence = node.confidence ?? node.confidenceBase ?? 0.6;
+    const opacity = isDimmed ? 0.2 : 0.5 + nodeConfidence * 0.5;
+    const isSelected = node.id === selectedNodeId;
     return (
       <g
         key={node.id}
@@ -194,9 +270,16 @@ const EvidenceMap: React.FC<EvidenceMapProps> = ({ graph, isOpen, focusNodeId, o
         onClick={() => setSelectedNodeId(node.id)}
         style={{ cursor: 'pointer', opacity }}
       >
-        <circle r="26" fill={fill} stroke={stroke} strokeWidth="2" />
-        <text x="0" y="4" textAnchor="middle" className="text-[10px] fill-slate-700">
+        <circle
+          r="26"
+          className={isSelected ? 'fill-weflora-mint/40 stroke-weflora-teal' : 'fill-white stroke-slate-300'}
+          strokeWidth="2"
+        />
+        <text x="0" y="2" textAnchor="middle" className="text-[10px] fill-slate-700">
           {node.label.length > 18 ? `${node.label.slice(0, 18)}…` : node.label}
+        </text>
+        <text x="0" y="16" textAnchor="middle" className="text-[9px] fill-slate-400">
+          {formatConfidence(node.confidence)}
         </text>
       </g>
     );
@@ -208,6 +291,13 @@ const EvidenceMap: React.FC<EvidenceMapProps> = ({ graph, isOpen, focusNodeId, o
     if (!from || !to) return null;
     const isConnected = hoveredNodeId && (edge.from === hoveredNodeId || edge.to === hoveredNodeId);
     const isDimmed = hoveredNodeId && !isConnected;
+    const sourceNode = nodesById.get(edge.from);
+    const constraintConfidence = sourceNode?.confidence ?? 0.6;
+    const impact = Math.abs(computeEffectiveImpact(edge, constraintConfidence));
+    const baseWeight = ['influences', 'filters', 'scores'].includes(edge.type)
+      ? impact
+      : edge.confidence ?? edge.weight ?? 0.4;
+    const strokeWidth = 1 + Math.min(3, baseWeight * 3);
     return (
       <line
         key={`${edge.from}-${edge.to}-${edge.type}`}
@@ -215,9 +305,10 @@ const EvidenceMap: React.FC<EvidenceMapProps> = ({ graph, isOpen, focusNodeId, o
         y1={from.y}
         x2={to.x}
         y2={to.y}
-        stroke={isConnected ? '#0f766e' : '#cbd5f5'}
-        strokeWidth={isConnected ? 2.5 : 1.2}
-        opacity={isDimmed ? 0.2 : 0.8}
+        className={isConnected ? 'stroke-weflora-teal' : 'stroke-slate-300'}
+        strokeWidth={isConnected ? strokeWidth + 1 : strokeWidth}
+        opacity={isDimmed ? 0.15 : 0.65}
+        strokeDasharray={edge.polarity === 'negative' ? '4 3' : undefined}
       />
     );
   };
@@ -230,6 +321,10 @@ const EvidenceMap: React.FC<EvidenceMapProps> = ({ graph, isOpen, focusNodeId, o
         .map((id) => nodes.find((node) => node.id === id))
         .filter((node): node is EvidenceNode => Boolean(node))
     : [];
+
+  const selectedTensions = selectedNode
+    ? simulation?.diff.evidenceTensions.find((entry) => entry.nodeId === selectedNode.id)?.conflictingSourceIds
+    : undefined;
 
   if (!isOpen) return null;
 
@@ -255,6 +350,16 @@ const EvidenceMap: React.FC<EvidenceMapProps> = ({ graph, isOpen, focusNodeId, o
             </button>
           ))}
           <button
+            onClick={() => setWhatIfOpen((prev) => !prev)}
+            className={`text-xs font-semibold px-3 py-1.5 rounded-lg border ${
+              whatIfOpen
+                ? 'border-weflora-teal text-weflora-teal bg-weflora-mint/20'
+                : 'border-slate-200 text-slate-600'
+            }`}
+          >
+            What-if
+          </button>
+          <button
             onClick={onClose}
             className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100"
           >
@@ -264,6 +369,22 @@ const EvidenceMap: React.FC<EvidenceMapProps> = ({ graph, isOpen, focusNodeId, o
       </div>
 
       <div className="flex-1 relative bg-slate-50">
+        <EvidenceMapControls
+          isOpen={whatIfOpen}
+          constraints={constraintNodes}
+          selectedConstraint={selectedConstraint}
+          searchTerm={searchTerm}
+          onSearchTermChange={setSearchTerm}
+          onSelectConstraint={setSelectedConstraintId}
+          value={draftValue}
+          onValueChange={setDraftValue}
+          confidence={assumeConfidence}
+          onConfidenceChange={setAssumeConfidence}
+          overrideEvidence={overrideEvidence}
+          onOverrideEvidenceChange={setOverrideEvidence}
+          diff={simulation?.diff}
+        />
+
         <div
           ref={containerRef}
           className="absolute inset-0"
@@ -288,70 +409,12 @@ const EvidenceMap: React.FC<EvidenceMapProps> = ({ graph, isOpen, focusNodeId, o
         </div>
 
         {selectedNode && (
-          <div className="absolute top-0 right-0 h-full w-80 border-l border-slate-200 bg-white px-4 py-5 overflow-y-auto">
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-400">Node</p>
-                <h3 className="text-sm font-semibold text-slate-800">{selectedNode.label}</h3>
-                <span className="inline-flex mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-weflora-mint/40 text-weflora-teal">
-                  {selectedNode.type}
-                </span>
-              </div>
-
-              {selectedNode.description && <p className="text-xs text-slate-600">{selectedNode.description}</p>}
-
-              {selectedNode.metadata && (
-                <div className="space-y-2">
-                  <p className="text-[11px] uppercase tracking-wide text-slate-400">Metadata</p>
-                  <ul className="text-xs text-slate-600 space-y-1">
-                    {Object.entries(selectedNode.metadata)
-                      .filter(([key]) => key !== 'citations')
-                      .map(([key, value]) => (
-                        <li key={key} className="flex justify-between gap-2">
-                          <span className="text-slate-500">{key}</span>
-                          <span className="text-slate-700">{String(value)}</span>
-                        </li>
-                      ))}
-                  </ul>
-                </div>
-              )}
-
-              {selectedNode.metadata?.citations && (
-                <div className="space-y-2">
-                  <p className="text-[11px] uppercase tracking-wide text-slate-400">Citations</p>
-                  <ul className="text-xs text-slate-600 space-y-1">
-                    {selectedNode.metadata.citations.map((citation: { sourceId: string; locator?: { page?: number } }) => (
-                      <li key={`${citation.sourceId}-${citation.locator?.page ?? ''}`}>
-                        {citation.sourceId}
-                        {citation.locator?.page ? ` · p. ${citation.locator.page}` : ''}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {linkedNodes.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-[11px] uppercase tracking-wide text-slate-400">Linked items</p>
-                  <ul className="text-xs text-slate-600 space-y-1">
-                    {linkedNodes.slice(0, 6).map((node) => (
-                      <li key={node.id}>{node.label}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {selectedNode.metadata?.timelineEntryId && (
-                <button
-                  type="button"
-                  onClick={() => onJumpToTimelineEntry?.(selectedNode.metadata.timelineEntryId)}
-                  className="text-xs font-semibold text-weflora-teal hover:text-weflora-dark"
-                >
-                  Jump to timeline entry
-                </button>
-              )}
-            </div>
-          </div>
+          <NodeDetailsPanel
+            node={selectedNode}
+            linkedNodes={linkedNodes}
+            onJumpToTimelineEntry={onJumpToTimelineEntry}
+            conflictingSources={selectedTensions}
+          />
         )}
       </div>
     </div>
