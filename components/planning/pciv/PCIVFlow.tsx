@@ -14,6 +14,7 @@ import ValidateStage from './ValidateStage';
 export interface PCIVFlowProps {
   projectId: string;
   userId?: string | null;
+  initialStage?: PcivStage;
   onComplete: (commit: PcivCommittedContext) => void;
   onCancel?: () => void;
 }
@@ -24,14 +25,20 @@ const STAGES: Array<{ id: PcivStage; label: string }> = [
   { id: 'validate', label: 'Validate & Commit' }
 ];
 
-const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, onComplete, onCancel }) => {
-  const [stage, setStage] = useState<PcivStage>('import');
+const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, onComplete, onCancel }) => {
+  const [stage, setStage] = useState<PcivStage>(initialStage ?? 'import');
   const [run, setRun] = useState<PcivContextIntakeRun | null>(null);
 
   useEffect(() => {
     const loaded = loadPcivRun(projectId, userId ?? null);
     setRun(loaded);
   }, [projectId, userId]);
+
+  useEffect(() => {
+    if (initialStage) {
+      setStage(initialStage);
+    }
+  }, [initialStage]);
 
   const draft = run?.draft;
   const metrics = run?.metrics;
@@ -141,7 +148,9 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, onComplete, onCa
             ))}
           </div>
           <span className="text-slate-400">•</span>
-          <span className="font-semibold text-slate-600">Stage: {stageLabel}</span>
+          <span className="font-semibold text-slate-600" data-testid="pciv-stage">
+            Stage: {stageLabel}
+          </span>
           <span className="text-slate-400">•</span>
           <span>Sources: {headerMetrics.sources_count}</span>
           <span>Fields: {headerMetrics.fields_filled_count}/{headerMetrics.fields_total}</span>

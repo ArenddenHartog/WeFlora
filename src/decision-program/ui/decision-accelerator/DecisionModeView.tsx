@@ -40,6 +40,7 @@ export interface DecisionModeViewProps {
     promotionSummary?: string;
     promotionMessage?: string;
   };
+  hideMissingInputs?: boolean;
   stepperTitle?: string;
   className?: string;
 }
@@ -58,6 +59,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
   onRerunImpactedSteps,
   onKeepCurrentResults,
   labels,
+  hideMissingInputs,
   stepperTitle,
   className
 }) => {
@@ -139,6 +141,14 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
     () => new Map((state.evidenceSources ?? []).map((source) => [source.id, source])),
     [state.evidenceSources]
   );
+
+  const handleResolveInputs = () => {
+    if (onOpenContextIntake) {
+      onOpenContextIntake();
+      return;
+    }
+    setIsValidationOpen(true);
+  };
 
   useEffect(() => {
     setValidationValues((prev) => {
@@ -278,7 +288,10 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
               </div>
             </div>
           )}
-          {(missingRequiredInputs.length > 0 || missingRecommendedInputs.length > 0 || derivedInputEntries.length > 0) && (
+          {!hideMissingInputs &&
+            (missingRequiredInputs.length > 0 ||
+              missingRecommendedInputs.length > 0 ||
+              derivedInputEntries.length > 0) && (
             <section className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
@@ -291,7 +304,7 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => (onOpenContextIntake ? onOpenContextIntake() : setIsValidationOpen(true))}
+                    onClick={handleResolveInputs}
                     className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
                   >
                     Resolve inputs
@@ -489,16 +502,16 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
           )}
 
           <div ref={actionCardsRef}>
-            <ActionCards
-              runId={state.runId}
-              cards={state.actionCards}
-              blockedStepId={state.steps.find((step) => step.status === 'blocked')?.stepId}
-              onSubmitCard={onSubmitCard}
-              onOpenValidation={() => setIsValidationOpen(true)}
-              onOpenEvidenceMap={() => openEvidenceMap()}
-              layout="stack"
-              showTypeBadges={false}
-            />
+          <ActionCards
+            runId={state.runId}
+            cards={state.actionCards}
+            blockedStepId={state.steps.find((step) => step.status === 'blocked')?.stepId}
+            onSubmitCard={onSubmitCard}
+            onOpenValidation={handleResolveInputs}
+            onOpenEvidenceMap={() => openEvidenceMap()}
+            layout="stack"
+            showTypeBadges={false}
+          />
           </div>
         </div>
       </div>
