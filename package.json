@@ -18,7 +18,7 @@
     "test:evidence-graph": "node --experimental-strip-types scripts/test-evidence-graph.ts",
     "test:pciv": "node --experimental-strip-types scripts/test-pciv.ts",
     "test:pciv-ui": "node --experimental-strip-types scripts/test-pciv-ui.ts",
-    "test:pciv-stabilization:unit": "node --experimental-strip-types tests/unit/derivedConstraintsPanel.test.tsx && node --experimental-strip-types tests/unit/planningViewStartLabel.test.ts && node --experimental-strip-types tests/unit/planningViewActions.test.ts && node --experimental-strip-types tests/unit/resolvePlanningProject.test.ts",
+    "test:pciv-stabilization:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
     "check": "npm run lint && npm run guard:temp-ids && npm run guard:toast-icons && npm run build"
   },
   "dependencies": {

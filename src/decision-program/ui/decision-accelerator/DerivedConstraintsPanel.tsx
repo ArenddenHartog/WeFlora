@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { DerivedConstraints } from '../../types';
 import type { PcivConstraint } from '../../pciv/v0/types';
+import { shouldUsePcivConstraints } from './derivedConstraintsUtils';
 
 const formatValue = (value: unknown) => {
   if (value === null || value === undefined || value === '') return '—';
@@ -44,7 +45,7 @@ const provenanceBadge = (provenance: PcivConstraint['provenance']) => {
 const DerivedConstraintsPanel: React.FC<DerivedConstraintsPanelProps> = ({ derivedConstraints, pcivConstraints }) => {
   const [snippet, setSnippet] = useState<{ label: string; text: string } | null>(null);
 
-  const hasPcivConstraints = (pcivConstraints?.length ?? 0) > 0;
+  const hasPcivConstraints = shouldUsePcivConstraints(pcivConstraints);
   const groupedPciv = useMemo(() => {
     if (!hasPcivConstraints) return null;
     return pcivConstraints.reduce<Record<string, PcivConstraint[]>>((acc, constraint) => {
