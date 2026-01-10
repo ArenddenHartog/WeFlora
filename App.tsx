@@ -51,6 +51,11 @@ const AppContent: React.FC = () => {
 
     useEffect(() => {
         console.info('[features]', FEATURES);
+        console.info('BUILD_STAMP', {
+            sha: __BUILD_SHA__,
+            time: __BUILD_TIME__,
+            mode: import.meta.env.MODE
+        });
     }, []);
 
     if (loading) return <div className="h-[100dvh] w-full flex items-center justify-center bg-slate-50">Loading WeFlora...</div>;

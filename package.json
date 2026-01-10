@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/list-sourcemaps.mjs",
+    "build": "node scripts/build-with-stamp.mjs && node scripts/list-sourcemaps.mjs && node scripts/verify-sourcemaps.mjs",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",

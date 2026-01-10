@@ -88,6 +88,21 @@ const main = async () => {
   const uniqueCycles = cycles.map((cycle) => cycle.join(' -> '));
   console.log('Cycles detected:');
   uniqueCycles.forEach((cycle) => console.log(`- ${cycle}`));
+
+  const planningTargets = [
+    'components/MainContent.tsx',
+    'components/planning/',
+    'components/routes/ContextIntakeRoute.tsx',
+    'components/routes/PlanningRoute.ts'
+  ];
+  const offending = uniqueCycles.filter((cycle) =>
+    planningTargets.some((target) => cycle.includes(target))
+  );
+  if (offending.length > 0) {
+    console.error('Planning/context-intake cycles detected:');
+    offending.forEach((cycle) => console.error(`- ${cycle}`));
+    process.exit(1);
+  }
 };
 
 main().catch((error) => {

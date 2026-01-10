@@ -125,7 +125,7 @@ const PlanningView: React.FC = () => {
   }, [pcivEnabled, planningScopeId, user?.email]);
 
   useEffect(() => {
-    if (!pcivEnabled || !planningProjectId || !contextIntakeState?.pcivCommittedAt) return;
+    if (!pcivEnabled || !planningScopeId || !contextIntakeState?.pcivCommittedAt) return;
     if (lastHandledCommitRef.current === contextIntakeState.pcivCommittedAt) return;
     const commit = loadPcivCommit(planningScopeId, user?.email ?? null);
     if (!commit || commit.committed_at !== contextIntakeState.pcivCommittedAt) return;
@@ -563,6 +563,14 @@ const PlanningView: React.FC = () => {
     if (!refineCard?.inputs) return 0;
     return refineCard.inputs.filter((input) => input.severity === 'required' || input.required).length;
   }, [planningState]);
+  const buildStamp = useMemo(
+    () => ({
+      sha: __BUILD_SHA__,
+      time: __BUILD_TIME__,
+      mode: import.meta.env.MODE
+    }),
+    []
+  );
   const debugEnabled = import.meta.env.DEV || import.meta.env.VITE_DEBUG_PLANNING === '1';
   const debugFooter = debugEnabled ? (
     <div className="border-t border-dashed border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-500">
@@ -577,6 +585,11 @@ const PlanningView: React.FC = () => {
       <div>pcivConstraints: {pcivCommittedContext?.constraints?.length ?? 0}</div>
     </div>
   ) : null;
+  const buildFooter = (
+    <div className="border-t border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-500">
+      Build: {buildStamp.sha} · {buildStamp.time} · {buildStamp.mode}
+    </div>
+  );
 
   if (planningState) {
     return (
@@ -637,6 +650,7 @@ const PlanningView: React.FC = () => {
           />
         </div>
         {debugFooter}
+        {buildFooter}
       </div>
     );
   }
@@ -719,6 +733,7 @@ const PlanningView: React.FC = () => {
         />
       </div>
       {debugFooter}
+      {buildFooter}
     </div>
   );
 };
