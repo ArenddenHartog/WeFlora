@@ -44,61 +44,56 @@ const provenanceBadge = (provenance: PcivConstraint['provenance']) => {
 const DerivedConstraintsPanel: React.FC<DerivedConstraintsPanelProps> = ({ derivedConstraints, pcivConstraints }) => {
   const [snippet, setSnippet] = useState<{ label: string; text: string } | null>(null);
 
+  const hasPcivConstraints = (pcivConstraints?.length ?? 0) > 0;
   const groupedPciv = useMemo(() => {
-    if (!pcivConstraints) return null;
+    if (!hasPcivConstraints) return null;
     return pcivConstraints.reduce<Record<string, PcivConstraint[]>>((acc, constraint) => {
       acc[constraint.domain] = acc[constraint.domain] ?? [];
       acc[constraint.domain].push(constraint);
       return acc;
     }, {});
-  }, [pcivConstraints]);
+  }, [hasPcivConstraints, pcivConstraints]);
 
-  if (pcivConstraints) {
+  if (hasPcivConstraints) {
     return (
-      <section className="space-y-3" id="planning-constraints">
+      <section className="space-y-3" id="planning-constraints" data-testid="derived-constraints-panel">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-slate-800">Derived constraints</h3>
             <p className="text-xs text-slate-500">Structured constraints extracted from context intake.</p>
           </div>
         </div>
-        {pcivConstraints.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-            No derived constraints yet — add sources or provide inputs.
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {Object.entries(groupedPciv ?? {}).map(([domain, constraints]) => (
-              <div key={domain} className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
-                <h4 className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                  {domain.charAt(0).toUpperCase() + domain.slice(1)}
-                </h4>
-                <div className="space-y-2 text-xs text-slate-700">
-                  {constraints.map((constraint) => (
-                    <div key={constraint.id} className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="font-semibold text-slate-700">{constraint.label}</p>
-                        <p className="text-[11px] text-slate-500">Value: {formatValue(constraint.value)}</p>
-                        {constraint.provenance === 'source-backed' && constraint.snippet && (
-                          <button
-                            type="button"
-                            onClick={() => setSnippet({ label: constraint.label, text: constraint.snippet ?? '' })}
-                            className="text-[11px] font-semibold text-weflora-teal hover:text-weflora-dark"
-                          >
-                            View snippet
-                          </button>
-                        )}
-                      </div>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${provenanceBadge(constraint.provenance)}`}>
-                        {constraint.provenance.replace('-', ' ')}
-                      </span>
+        <div className="grid gap-4 md:grid-cols-2">
+          {Object.entries(groupedPciv ?? {}).map(([domain, constraints]) => (
+            <div key={domain} className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                {domain.charAt(0).toUpperCase() + domain.slice(1)}
+              </h4>
+              <div className="space-y-2 text-xs text-slate-700">
+                {constraints.map((constraint) => (
+                  <div key={constraint.id} className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-slate-700">{constraint.label}</p>
+                      <p className="text-[11px] text-slate-500">Value: {formatValue(constraint.value)}</p>
+                      {constraint.provenance === 'source-backed' && constraint.snippet && (
+                        <button
+                          type="button"
+                          onClick={() => setSnippet({ label: constraint.label, text: constraint.snippet ?? '' })}
+                          className="text-[11px] font-semibold text-weflora-teal hover:text-weflora-dark"
+                        >
+                          View snippet
+                        </button>
+                      )}
                     </div>
-                  ))}
-                </div>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${provenanceBadge(constraint.provenance)}`}>
+                      {constraint.provenance.replace('-', ' ')}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
         {snippet && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div className="max-w-lg w-full rounded-2xl bg-white p-5 space-y-3 shadow-xl">
@@ -129,7 +124,7 @@ const DerivedConstraintsPanel: React.FC<DerivedConstraintsPanelProps> = ({ deriv
     Object.values(biophysical).some((value) => value !== null && value !== undefined && value !== '');
 
   return (
-    <section className="space-y-3" id="planning-constraints">
+    <section className="space-y-3" id="planning-constraints" data-testid="derived-constraints-panel">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-slate-800">Derived constraints</h3>
