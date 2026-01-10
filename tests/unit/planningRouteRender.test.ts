@@ -5,11 +5,11 @@ import { renderToString } from 'react-dom/server';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { planningRoutePaths } from '../../components/routes/planningRoutePaths.ts';
 
-test('planning route mounts in router without crashing', () => {
-  const tree = renderToString(
+test('planning routes mount in router without crashing', () => {
+  const planningTree = renderToString(
     React.createElement(
       MemoryRouter,
-      { initialEntries: ['/planning'] },
+      { initialEntries: [planningRoutePaths.planning[0]] },
       React.createElement(
         Routes,
         null,
@@ -21,5 +21,21 @@ test('planning route mounts in router without crashing', () => {
     )
   );
 
-  assert.ok(tree.includes('Planning'));
+  const intakeTree = renderToString(
+    React.createElement(
+      MemoryRouter,
+      { initialEntries: [planningRoutePaths.contextIntake[0]] },
+      React.createElement(
+        Routes,
+        null,
+        React.createElement(Route, {
+          path: planningRoutePaths.contextIntake[0],
+          element: React.createElement('div', { 'data-testid': 'context-intake-route' }, 'Context Intake')
+        })
+      )
+    )
+  );
+
+  assert.ok(planningTree.includes('Planning'));
+  assert.ok(intakeTree.includes('Context Intake'));
 });
