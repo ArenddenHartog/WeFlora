@@ -1,5 +1,4 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { supabase } from '../../../services/supabaseClient';
 
 const LOCAL_PROJECT_STORAGE_KEY = 'pciv_local_projects';
 const LOCAL_PROJECT_ACTIVE_KEY = 'pciv_local_project_active';
@@ -61,7 +60,9 @@ const resolveLocalProject = (defaultName: string, now: () => string): ResolvePla
 export const resolvePlanningProject = async (
   options: ResolvePlanningProjectOptions = {}
 ): Promise<ResolvePlanningProjectResult | null> => {
-  const client = options.client ?? supabase;
+  const client =
+    options.client ??
+    (await import('../../../services/supabaseClient.ts')).supabase;
   const defaultName = options.defaultName ?? 'My first project';
   const now = options.now ?? (() => new Date().toISOString());
 

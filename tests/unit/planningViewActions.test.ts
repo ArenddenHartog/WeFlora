@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import type { PcivCommittedContext } from '../../src/decision-program/pciv/v0/types';
-import { getPlanningStartAction, getResolveInputsAction } from '../../components/planning/planningUtils';
+import {
+  getPlanningBackTarget,
+  getPlanningStartAction,
+  getResolveInputsAction,
+  getResolveInputsUrl
+} from '../../components/planning/planningUtils.ts';
 
 const committedContext: PcivCommittedContext = {
   status: 'committed',
@@ -23,9 +29,37 @@ const committedContext: PcivCommittedContext = {
   }
 };
 
-assert.equal(getPlanningStartAction(true, null), 'pciv-import');
-assert.equal(getPlanningStartAction(true, committedContext), 'start-planning');
-assert.equal(getPlanningStartAction(false, null), 'start-planning');
+test('planning actions derive from pciv state', () => {
+  assert.equal(getPlanningStartAction(true, null), 'pciv-import');
+  assert.equal(getPlanningStartAction(true, committedContext), 'start-planning');
+  assert.equal(getPlanningStartAction(false, null), 'start-planning');
 
-assert.equal(getResolveInputsAction(true), 'pciv-map');
-assert.equal(getResolveInputsAction(false), 'legacy');
+  assert.equal(getResolveInputsAction(true), 'pciv-map');
+  assert.equal(getResolveInputsAction(false), 'legacy');
+});
+
+test('resolve inputs URL uses validate stage and missing-required focus', () => {
+  assert.equal(
+    getResolveInputsUrl('project-1', 'validate'),
+    '/project/project-1/context-intake?stage=validate&focus=missingRequired'
+  );
+});
+
+test('planning back target prefers project id', () => {
+  assert.equal(
+    getPlanningBackTarget({ planningProjectId: 'project-1' }),
+    '/project/project-1'
+  );
+  assert.equal(
+    getPlanningBackTarget({ resolvedProjectId: 'project-2' }),
+    '/project/project-2'
+  );
+  assert.equal(
+    getPlanningBackTarget({ fallbackPath: '/projects' }),
+    '/projects'
+  );
+  assert.equal(
+    getPlanningBackTarget({}),
+    null
+  );
+});

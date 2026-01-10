@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import type { PcivCommittedContext } from '../../src/decision-program/pciv/v0/types';
-import { getPlanningStartLabel } from '../../components/planning/planningUtils';
+import { getPlanningStartLabel } from '../../components/planning/planningUtils.ts';
 
 const committedContext: PcivCommittedContext = {
   status: 'committed',
@@ -23,6 +24,8 @@ const committedContext: PcivCommittedContext = {
   }
 };
 
-assert.equal(getPlanningStartLabel(true, null), 'Start Context Intake');
-assert.equal(getPlanningStartLabel(true, committedContext), 'Start Planning');
-assert.equal(getPlanningStartLabel(false, null), 'Start Planning');
+test('getPlanningStartLabel gates CTA copy', () => {
+  assert.equal(getPlanningStartLabel(true, null), 'Start Context Intake');
+  assert.equal(getPlanningStartLabel(true, committedContext), 'Start Planning');
+  assert.equal(getPlanningStartLabel(false, null), 'Start Planning');
+});
