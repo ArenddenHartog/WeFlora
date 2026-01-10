@@ -34,7 +34,6 @@ export const parseContextIntakeFocus = (value: string | null): 'missingRequired'
   value === 'missingRequired' ? 'missingRequired' : null;
 
 export const getContextIntakeUrl = (
-  projectId: string,
   stage: PcivStage,
   options?: { focus?: 'missingRequired' | null }
 ) => {
@@ -43,11 +42,11 @@ export const getContextIntakeUrl = (
   if (options?.focus) {
     params.set('focus', options.focus);
   }
-  return `/project/${projectId}/context-intake?${params.toString()}`;
+  return `/planning/context-intake?${params.toString()}`;
 };
 
-export const getResolveInputsUrl = (projectId: string, stage: PcivStage = 'validate') =>
-  getContextIntakeUrl(projectId, stage, { focus: 'missingRequired' });
+export const getResolveInputsUrl = (stage: PcivStage = 'validate') =>
+  getContextIntakeUrl(stage, { focus: 'missingRequired' });
 
 export const getPlanningBackTarget = (args: {
   planningProjectId?: string | null;

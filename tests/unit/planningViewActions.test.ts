@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { PcivCommittedContext } from '../../src/decision-program/pciv/v0/types';
 import {
+  getContextIntakeUrl,
   getPlanningBackTarget,
   getPlanningStartAction,
   getResolveInputsAction,
@@ -40,8 +41,15 @@ test('planning actions derive from pciv state', () => {
 
 test('resolve inputs URL uses validate stage and missing-required focus', () => {
   assert.equal(
-    getResolveInputsUrl('project-1', 'validate'),
-    '/project/project-1/context-intake?stage=validate&focus=missingRequired'
+    getResolveInputsUrl('validate'),
+    '/planning/context-intake?stage=validate&focus=missingRequired'
+  );
+});
+
+test('context intake URL is global and preserves stage', () => {
+  assert.equal(
+    getContextIntakeUrl('import'),
+    '/planning/context-intake?stage=import'
   );
 });
 

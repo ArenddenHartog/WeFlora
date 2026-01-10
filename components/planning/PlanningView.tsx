@@ -1,8 +1,7 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import type { ExecutionState } from '../../src/decision-program/types';
 import PlanningRunnerView from './PlanningRunnerView';
-import PCIVModal from './pciv/PCIVModal';
 import { buildProgram } from '../../src/decision-program/orchestrator/buildProgram';
 import { buildActionCards } from '../../src/decision-program/orchestrator/buildActionCards';
 import {
@@ -24,12 +23,17 @@ import { useChat } from '../../contexts/ChatContext';
 import { useProject } from '../../contexts/ProjectContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { ChevronRightIcon, FlowerIcon } from '../icons';
-import type { PcivCommittedContext } from '../../src/decision-program/pciv/v0/types';
+import type { PcivCommittedContext, PcivStage } from '../../src/decision-program/pciv/v0/types';
 import { applyCommittedContext } from '../../src/decision-program/pciv/v0/context';
 import { loadPcivCommit, loadPcivRun, updatePcivRunId } from '../../src/decision-program/pciv/v0/store';
-import usePcivController from './pciv/usePcivController';
 import { resolvePlanningProject } from '../../src/lib/projects/resolvePlanningProject';
-import { getPlanningStartAction, getPlanningStartLabel, getResolveInputsAction } from './planningUtils';
+import {
+  getContextIntakeUrl,
+  getPlanningStartAction,
+  getPlanningStartLabel,
+  getResolveInputsAction,
+  getResolveInputsUrl
+} from './planningUtils';
 
 const PlanningView: React.FC = () => {
   const navigate = useNavigate();
@@ -45,6 +49,9 @@ const PlanningView: React.FC = () => {
   const routeProjectId = params.projectId ?? null;
   const [resolvedProjectId, setResolvedProjectId] = useState<string | null>(routeProjectId);
   const planningProjectId = routeProjectId ?? resolvedProjectId;
+  const contextIntakeState = location.state as
+    | { pcivCommittedAt?: string; pcivAutoStart?: boolean }
+    | null;
   const pcivEnabled = FEATURES.pciv;
   const defaultPlanningContext = useMemo(
     () => ({
@@ -87,8 +94,8 @@ const PlanningView: React.FC = () => {
   }, [files, planningProjectId]);
   const [planningState, setPlanningState] = useState<ExecutionState | null>(null);
   const [isStarting, setIsStarting] = useState(false);
-  const pcivController = usePcivController();
-  const pcivCommittedContext = pcivController.committedContext;
+  const [pcivCommittedContext, setPcivCommittedContext] = useState<PcivCommittedContext | null>(null);
+  const lastHandledCommitRef = useRef<string | null>(null);
   const [inputChangeNotice, setInputChangeNotice] = useState<{
     changedInputs: string[];
     impactedSteps: string[];
@@ -105,14 +112,11 @@ const PlanningView: React.FC = () => {
     resolvePlanningProject().then((resolved) => {
       if (!active || !resolved) return;
       setResolvedProjectId(resolved.projectId);
-      if (!routeProjectId && !planningRunId) {
-        navigate(`/project/${resolved.projectId}/planning`, { replace: true });
-      }
     });
     return () => {
       active = false;
     };
-  }, [navigate, pcivEnabled, planningProjectId, planningRunId, routeProjectId]);
+  }, [pcivEnabled, planningProjectId]);
 
   useEffect(() => {
     if (!planningRunId) return;
@@ -120,18 +124,37 @@ const PlanningView: React.FC = () => {
     if (existing?.executionState) {
       setPlanningState(existing.executionState);
       if (existing.executionState.pcivCommittedContext) {
-        pcivController.setCommittedContext(existing.executionState.pcivCommittedContext);
+        setPcivCommittedContext(existing.executionState.pcivCommittedContext);
       }
     }
-  }, [pcivController, planningRunId, planningRuns]);
+  }, [planningRunId, planningRuns]);
 
   useEffect(() => {
     if (!planningProjectId || !pcivEnabled) return;
     const commit = loadPcivCommit(planningProjectId, user?.email ?? null);
     if (commit) {
-      pcivController.setCommittedContext(commit);
+      setPcivCommittedContext(commit);
     }
-  }, [pcivController, pcivEnabled, planningProjectId, user?.email]);
+  }, [pcivEnabled, planningProjectId, user?.email]);
+
+  useEffect(() => {
+    if (!pcivEnabled || !planningProjectId || !contextIntakeState?.pcivCommittedAt) return;
+    if (lastHandledCommitRef.current === contextIntakeState.pcivCommittedAt) return;
+    const commit = loadPcivCommit(planningProjectId, user?.email ?? null);
+    if (!commit || commit.committed_at !== contextIntakeState.pcivCommittedAt) return;
+    setPcivCommittedContext(commit);
+    lastHandledCommitRef.current = contextIntakeState.pcivCommittedAt;
+    if (contextIntakeState.pcivAutoStart) {
+      startPlanningRun(commit, planningProjectId);
+    }
+  }, [
+    contextIntakeState?.pcivAutoStart,
+    contextIntakeState?.pcivCommittedAt,
+    pcivEnabled,
+    planningProjectId,
+    startPlanningRun,
+    user?.email
+  ]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -144,12 +167,12 @@ const PlanningView: React.FC = () => {
       const parsed = JSON.parse(raw) as ExecutionState;
       setPlanningState(parsed);
       if (parsed.pcivCommittedContext) {
-        pcivController.setCommittedContext(parsed.pcivCommittedContext);
+        setPcivCommittedContext(parsed.pcivCommittedContext);
       }
     } catch {
       // noop
     }
-  }, [pcivController]);
+  }, []);
 
   useEffect(() => {
     if (!planningState) return;
@@ -202,23 +225,34 @@ const PlanningView: React.FC = () => {
     const resolved = await resolvePlanningProject();
     if (!resolved) return null;
     setResolvedProjectId(resolved.projectId);
-    if (!routeProjectId && !planningRunId) {
-      navigate(`/project/${resolved.projectId}/planning`, { replace: true });
-    }
     return resolved.projectId;
-  }, [navigate, planningProjectId, planningRunId, routeProjectId]);
+  }, [planningProjectId]);
+
+  const openContextIntake = useCallback(
+    async (stage: PcivStage, options?: { focus?: 'missingRequired' | null; autoStart?: boolean }) => {
+      const resolvedProject = await ensurePlanningProject();
+      if (!resolvedProject) return;
+      navigate(getContextIntakeUrl(stage, { focus: options?.focus ?? null }), {
+        state: {
+          returnTo: location.pathname,
+          autoStart: options?.autoStart ?? false
+        }
+      });
+    },
+    [ensurePlanningProject, location.pathname, navigate]
+  );
 
   const handleStartFlow = useCallback(async () => {
     const resolvedProject = await ensurePlanningProject();
     const action = getPlanningStartAction(pcivEnabled, pcivCommittedContext);
     if (action === 'pciv-import') {
       if (resolvedProject) {
-        pcivController.open('import');
+        await openContextIntake('import', { autoStart: true });
       }
       return;
     }
     startPlanningRun(pcivCommittedContext ?? undefined, resolvedProject);
-  }, [ensurePlanningProject, pcivCommittedContext, pcivController, pcivEnabled, startPlanningRun]);
+  }, [ensurePlanningProject, openContextIntake, pcivCommittedContext, pcivEnabled, startPlanningRun]);
 
   const stepsVM = useMemo(() => {
     const evidenceIndex = planningState?.evidenceIndex ?? {};
@@ -528,8 +562,19 @@ const PlanningView: React.FC = () => {
     setInputChangeNotice(null);
   }, []);
 
-  const showBackButton = Boolean(planningProjectId) || location.key !== 'default';
+  const showBackButton = Boolean(routeProjectId) || location.key !== 'default';
+  const backTarget = routeProjectId ? `/project/${routeProjectId}` : null;
   const startLabel = getPlanningStartLabel(pcivEnabled, pcivCommittedContext);
+  const debugFooter = import.meta.env.DEV ? (
+    <div className="border-t border-dashed border-slate-200 bg-white px-4 py-2 text-[11px] text-slate-500">
+      <div>pathname: {location.pathname}</div>
+      <div>resolvedProjectId: {resolvedProjectId ?? 'null'}</div>
+      <div>pcivCommittedAt: {pcivCommittedContext?.committed_at ?? 'null'}</div>
+      <div>planningStartAction: {getPlanningStartAction(pcivEnabled, pcivCommittedContext)}</div>
+      <div>contextIntakeUrl: {getContextIntakeUrl(pcivCommittedContext ? 'validate' : 'import')}</div>
+      <div>resolveInputsUrl: {getResolveInputsUrl('validate')}</div>
+    </div>
+  ) : null;
 
   if (planningState) {
     return (
@@ -538,7 +583,7 @@ const PlanningView: React.FC = () => {
           <div className="flex items-center gap-3">
             {showBackButton && (
               <button
-                onClick={() => (planningProjectId ? navigate(`/project/${planningProjectId}`) : navigate(-1))}
+                onClick={() => (backTarget ? navigate(backTarget) : navigate(-1))}
                 className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium"
                 title="Back"
               >
@@ -552,6 +597,17 @@ const PlanningView: React.FC = () => {
             </div>
             <h1 className="text-lg font-bold text-slate-900">Planning</h1>
           </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                openContextIntake(pcivCommittedContext ? 'validate' : 'import', { autoStart: false })
+              }
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+            >
+              Context intake
+            </button>
+          </div>
         </header>
         <div className="flex-1 min-h-0">
           <PlanningRunnerView
@@ -563,11 +619,8 @@ const PlanningView: React.FC = () => {
             onApplyDerivedInput={handleApplyDerivedInput}
             onOpenContextIntake={
               getResolveInputsAction(pcivEnabled) === 'pciv-map'
-                ? async () => {
-                    const resolvedProject = await ensurePlanningProject();
-                    if (resolvedProject) {
-                      pcivController.open('map');
-                    }
+                ? () => {
+                    openContextIntake('validate', { focus: 'missingRequired', autoStart: true });
                   }
                 : undefined
             }
@@ -583,17 +636,7 @@ const PlanningView: React.FC = () => {
             hideMissingInputs={pcivEnabled}
           />
         </div>
-        <PCIVModal
-          isOpen={pcivController.isOpen}
-          projectId={planningProjectId}
-          userId={user?.email ?? null}
-          initialStage={pcivController.stage}
-          onClose={pcivController.close}
-          onComplete={(commit) => {
-            pcivController.commit(commit);
-            startPlanningRun(commit, planningProjectId);
-          }}
-        />
+        {debugFooter}
       </div>
     );
   }
@@ -602,9 +645,9 @@ const PlanningView: React.FC = () => {
     <div className="flex h-full flex-col bg-slate-50">
       <header className="flex-none h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30">
         <div className="flex items-center gap-3">
-          {showBackButton && (
-            <button
-              onClick={() => (planningProjectId ? navigate(`/project/${planningProjectId}`) : navigate(-1))}
+            {showBackButton && (
+              <button
+                onClick={() => (backTarget ? navigate(backTarget) : navigate(-1))}
               className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium"
               title="Back"
             >
@@ -617,6 +660,17 @@ const PlanningView: React.FC = () => {
             <FlowerIcon className="h-5 w-5 text-weflora-teal" />
           </div>
           <h1 className="text-lg font-bold text-slate-900">Planning</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              openContextIntake(pcivCommittedContext ? 'validate' : 'import', { autoStart: false })
+            }
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+          >
+            Context intake
+          </button>
         </div>
       </header>
       <div className="flex flex-1 min-h-0">
@@ -666,17 +720,7 @@ const PlanningView: React.FC = () => {
           headerTitle="Planning flow"
         />
       </div>
-      <PCIVModal
-        isOpen={pcivController.isOpen}
-        projectId={planningProjectId}
-        userId={user?.email ?? null}
-        initialStage={pcivController.stage}
-        onClose={pcivController.close}
-        onComplete={(commit) => {
-          pcivController.commit(commit);
-          startPlanningRun(commit, planningProjectId);
-        }}
-      />
+      {debugFooter}
     </div>
   );
 };

@@ -9,7 +9,7 @@ import GlobalWorkspace from './GlobalWorkspace';
 import ProjectWorkspace from './ProjectWorkspace';
 import WorksheetsRoute from './routes/WorksheetsRoute';
 import ReportsRoute from './routes/ReportsRoute';
-import PlanningRoute from './routes/PlanningRoute';
+import { planningRoutes } from './routes/planningRoutes';
 import GlobalLayout from './GlobalLayout';
 import BaseModal from './BaseModal';
 import { DatabaseIcon, FolderIcon, PlusIcon, CheckIcon, SparklesIcon, RefreshIcon } from './icons';
@@ -628,10 +628,9 @@ const MainContent: React.FC<MainContentProps> = ({
                     <Route path="/projects" element={<GlobalWorkspace view="projects" {...sharedProps} />} />
                     <Route path="/sessions" element={<GlobalWorkspace view="research_history" {...sharedProps} />} />
                     <Route path="/chat" element={<GlobalWorkspace view="chat" {...sharedProps} />} />
-                    <Route path="/planning" element={<PlanningRoute />} />
-                    <Route path="/planning/:runId" element={<PlanningRoute />} />
-                    <Route path="/planning/run/:runId" element={<PlanningRoute />} />
-                    <Route path="/project/:projectId/planning" element={<PlanningRoute />} />
+                    {planningRoutes.map((route) => (
+                      <Route key={route.path} path={route.path} element={route.element} />
+                    ))}
                     <Route path="/files" element={<GlobalWorkspace view="knowledge_base" {...sharedProps} />} />
                     <Route path="/prompts" element={<GlobalWorkspace view="prompts" {...sharedProps} />} />
                 </Route>

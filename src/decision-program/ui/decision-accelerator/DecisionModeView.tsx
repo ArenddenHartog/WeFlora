@@ -112,9 +112,26 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
     () => splitInputsBySeverity(allInputs),
     [allInputs]
   );
+  const contextValues = useMemo(() => {
+    const next: Record<string, string | number | boolean> = {};
+    allInputs.forEach((input) => {
+      const existingValue = getByPointer(state, input.pointer);
+      if (existingValue !== undefined) {
+        next[input.id] = existingValue as string | number | boolean;
+      }
+    });
+    return next;
+  }, [allInputs, state]);
+  const effectiveValidationValues = useMemo(
+    () => ({
+      ...contextValues,
+      ...validationValues
+    }),
+    [contextValues, validationValues]
+  );
   const missingRefineInputs = useMemo(
-    () => getMissingInputs(refineInputs, validationValues),
-    [refineInputs, validationValues]
+    () => getMissingInputs(refineInputs, effectiveValidationValues),
+    [refineInputs, effectiveValidationValues]
   );
   const missingRequiredInputs = useMemo(
     () => missingRefineInputs.filter((input) => input.severity === 'required' || input.required),
@@ -151,18 +168,8 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
   };
 
   useEffect(() => {
-    setValidationValues((prev) => {
-      const next = { ...prev };
-      allInputs.forEach((input) => {
-        if (next[input.id] !== undefined) return;
-        const existingValue = getByPointer(state, input.pointer);
-        if (existingValue !== undefined) {
-          next[input.id] = existingValue as string | number | boolean;
-        }
-      });
-      return next;
-    });
-  }, [allInputs, state]);
+    setValidationValues(contextValues);
+  }, [contextValues]);
 
   const handleOpenCitations = (args: { rowId: string; columnId: string; evidence?: EvidenceRef[] }) => {
     const evidence = args.evidence ?? [];
