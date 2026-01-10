@@ -256,6 +256,14 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
             >
               Inputs
             </button>
+            {onOpenContextIntake && (
+              <button
+                onClick={onOpenContextIntake}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+              >
+                Context intake
+              </button>
+            )}
             {state.status === 'idle' && (
               <button
                 onClick={onStartRun}
