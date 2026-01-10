@@ -1,4 +1,7 @@
-import type { PcivCommittedContext, PcivStage } from '../../src/decision-program/pciv/v0/types';
+import type { ExecutionState } from '../../src/decision-program/types.ts';
+import type { PcivCommittedContext, PcivStage } from '../../src/decision-program/pciv/v0/types.ts';
+import { applyCommittedContext } from '../../src/decision-program/pciv/v0/context.ts';
+import { buildActionCards } from '../../src/decision-program/orchestrator/buildActionCards.ts';
 
 export type PlanningStartAction = 'pciv-import' | 'start-planning';
 export type ResolveInputsAction = 'pciv-map' | 'legacy';
@@ -34,7 +37,6 @@ export const parseContextIntakeFocus = (value: string | null): 'missingRequired'
   value === 'missingRequired' ? 'missingRequired' : null;
 
 export const getContextIntakeUrl = (
-  projectId: string,
   stage: PcivStage,
   options?: { focus?: 'missingRequired' | null }
 ) => {
@@ -43,11 +45,11 @@ export const getContextIntakeUrl = (
   if (options?.focus) {
     params.set('focus', options.focus);
   }
-  return `/project/${projectId}/context-intake?${params.toString()}`;
+  return `/planning/context-intake?${params.toString()}`;
 };
 
-export const getResolveInputsUrl = (projectId: string, stage: PcivStage = 'validate') =>
-  getContextIntakeUrl(projectId, stage, { focus: 'missingRequired' });
+export const getResolveInputsUrl = (stage: PcivStage = 'validate') =>
+  getContextIntakeUrl(stage, { focus: 'missingRequired' });
 
 export const getPlanningBackTarget = (args: {
   planningProjectId?: string | null;
@@ -59,4 +61,20 @@ export const getPlanningBackTarget = (args: {
     return `/project/${targetId}`;
   }
   return args.fallbackPath ?? null;
+};
+
+export const applyPcivCommitToPlanningState = (
+  state: ExecutionState,
+  committedContext: PcivCommittedContext
+): ExecutionState => {
+  const nextContext = applyCommittedContext(state.context, committedContext);
+  const updated = {
+    ...state,
+    context: nextContext,
+    pcivCommittedContext: committedContext
+  };
+  return {
+    ...updated,
+    actionCards: buildActionCards(updated)
+  };
 };

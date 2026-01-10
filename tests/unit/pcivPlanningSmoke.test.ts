@@ -10,12 +10,12 @@ import {
 test('pciv planning smoke test', () => {
   assert.equal(getPlanningStartLabel(true, null), 'Start Context Intake');
   assert.equal(
-    getContextIntakeUrl('project-1', 'import'),
-    '/project/project-1/context-intake?stage=import'
+    getContextIntakeUrl('import'),
+    '/planning/context-intake?stage=import'
   );
   assert.equal(
-    getResolveInputsUrl('project-1', 'validate'),
-    '/project/project-1/context-intake?stage=validate&focus=missingRequired'
+    getResolveInputsUrl('validate'),
+    '/planning/context-intake?stage=validate&focus=missingRequired'
   );
   assert.equal(
     getPlanningBackTarget({ planningProjectId: 'project-1' }),

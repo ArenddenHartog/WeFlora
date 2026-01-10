@@ -118,6 +118,11 @@ const ReportsRoute: React.FC<ReportsRouteProps> = ({ onOpenDestinationModal }) =
         updateReport(updated);
     };
 
+    const handleDelete = (id: string) => {
+        deleteReport(id);
+        if (reportId === id) navigate('/reports');
+    };
+
     const handleUpdateDoc = async (doc: ReportDocument) => {
         if (!activeRootReport) return;
         const currentTabs = reports.filter(r => r.id === doc.id || r.parentId === doc.id);
@@ -143,11 +148,6 @@ const ReportsRoute: React.FC<ReportsRouteProps> = ({ onOpenDestinationModal }) =
                 handleDelete(oldTab.id);
             }
         });
-    };
-
-    const handleDelete = (id: string) => {
-        deleteReport(id);
-        if (reportId === id) navigate('/reports');
     };
 
     const togglePanel = (panel: 'chat' | 'manage' | 'writing_assistant') => {

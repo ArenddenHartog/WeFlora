@@ -1,6 +1,6 @@
-import { STREET_TREE_POINTER_INPUT_SPECS } from '../../orchestrator/pointerInputRegistry';
-import type { PcivConstraint, PcivDraft, PcivField, PcivFieldProvenance } from './types';
-import { deriveConstraintsFromSources, deriveFieldSuggestions } from './extract';
+import { STREET_TREE_POINTER_INPUT_SPECS } from '../../orchestrator/pointerInputRegistry.ts';
+import type { PcivConstraint, PcivDraft, PcivField, PcivFieldProvenance } from './types.ts';
+import { deriveConstraintsFromSources, deriveFieldSuggestions } from './extract.ts';
 
 const DOMAIN_MAP: Record<string, PcivField['group']> = {
   site: 'site',
