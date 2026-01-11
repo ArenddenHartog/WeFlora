@@ -1,7 +1,7 @@
-import type { ExecutionState } from '../../types';
-import { setByPointer } from '../../runtime/pointers';
+import type { ExecutionState } from '../../types.ts';
+import { setByPointer } from '../../runtime/pointers.ts';
 import type { PcivCommittedContext } from './types';
-import { mapConstraintToPointer } from './map';
+import { mapConstraintToPointer } from './map.ts';
 
 export const applyCommittedContext = (
   baseContext: ExecutionState['context'],
