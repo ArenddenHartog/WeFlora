@@ -68,9 +68,13 @@ export const applyPcivCommitToPlanningState = (
   committedContext: PcivCommittedContext
 ): ExecutionState => {
   const nextContext = applyCommittedContext(state.context, committedContext);
+  const contextWithVersion = {
+    ...nextContext,
+    contextVersionId: committedContext.committed_at
+  };
   const updated = {
     ...state,
-    context: nextContext,
+    context: contextWithVersion,
     pcivCommittedContext: committedContext
   };
   return {

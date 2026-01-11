@@ -1,14 +1,60 @@
-import type { PcivCommittedContext, PcivContextIntakeRun, PcivDraft } from './types';
-import { buildPcivFields } from './map';
-import { computePcivMetrics } from './metrics';
+import type { PcivCommittedContext, PcivContextIntakeRun, PcivDraft, PcivSource } from './types.ts';
+import { buildPcivFields } from './map.ts';
+import { computePcivMetrics } from './metrics.ts';
 
 const STORAGE_PREFIX = 'pciv_v0_context';
+const MAX_STORAGE_CHARS = 2_000_000;
 
 const now = () => new Date().toISOString();
 
 const buildId = () => `pciv-${crypto.randomUUID()}`;
 
 const storageKey = (projectId: string) => `${STORAGE_PREFIX}:${projectId}`;
+
+const sanitizeSourceForStorage = (source: PcivSource): PcivSource => ({
+  id: source.id,
+  type: source.type,
+  name: source.name,
+  mimeType: source.mimeType,
+  size: source.size,
+  status: source.status,
+  createdAt: source.createdAt,
+  error: source.error
+});
+
+const sanitizeDraftForStorage = (draft: PcivDraft): PcivDraft => ({
+  ...draft,
+  sources: draft.sources.map(sanitizeSourceForStorage)
+});
+
+const sanitizeCommitForStorage = (commit: PcivCommittedContext): PcivCommittedContext => ({
+  ...commit,
+  sources: commit.sources.map(sanitizeSourceForStorage)
+});
+
+const sanitizePcivRun = (run: PcivContextIntakeRun): PcivContextIntakeRun => ({
+  ...run,
+  draft: sanitizeDraftForStorage(run.draft),
+  commit: run.commit ? sanitizeCommitForStorage(run.commit) : run.commit
+});
+
+const compactPcivRun = (run: PcivContextIntakeRun): PcivContextIntakeRun => {
+  const sourcesLimit = 50;
+  return {
+    ...run,
+    draft: {
+      ...run.draft,
+      sources: run.draft.sources.slice(0, sourcesLimit),
+      errors: []
+    },
+    commit: run.commit
+      ? {
+          ...run.commit,
+          sources: run.commit.sources.slice(0, sourcesLimit)
+        }
+      : run.commit
+  };
+};
 
 const defaultDraft = (projectId: string, userId?: string | null): PcivDraft => ({
   projectId,
@@ -65,7 +111,14 @@ export const loadPcivCommit = (projectId: string, userId?: string | null) => {
 };
 
 export const savePcivRun = (run: PcivContextIntakeRun) => {
-  window.localStorage.setItem(storageKey(run.projectId), JSON.stringify(run));
+  const sanitized = sanitizePcivRun(run);
+  let serialized = JSON.stringify(sanitized);
+  if (serialized.length > MAX_STORAGE_CHARS) {
+    console.warn('pciv_v0_storage_compact', { size: serialized.length });
+    const compacted = compactPcivRun(sanitized);
+    serialized = JSON.stringify(compacted);
+  }
+  window.localStorage.setItem(storageKey(run.projectId), serialized);
 };
 
 export const updatePcivDraft = (run: PcivContextIntakeRun, draft: PcivDraft): PcivContextIntakeRun => {

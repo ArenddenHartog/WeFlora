@@ -1,6 +1,6 @@
 export type PcivStage = 'import' | 'map' | 'validate';
 
-export type PcivSourceStatus = 'pending' | 'parsed' | 'failed';
+export type PcivSourceStatus = 'pending' | 'parsed' | 'failed' | 'unsupported';
 export type PcivSourceType = 'file' | 'location_hint' | 'manual_note';
 
 export type PcivFieldProvenance = 'source-backed' | 'model-inferred' | 'user-entered' | 'unknown';
