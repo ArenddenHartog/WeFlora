@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { PcivDraft, PcivMetrics, PcivSource } from '../../../src/decision-program/pciv/v0/types';
 import { applyPcivAutoMapping } from '../../../src/decision-program/pciv/v0/map';
+import { getPcivSourceStatus, isPcivFileSupported } from '../../../src/decision-program/pciv/v0/sourceUtils';
 
 export interface ImportStageProps {
   draft: PcivDraft;
@@ -15,6 +16,8 @@ const statusPill = (status: PcivSource['status']) => {
       return 'bg-emerald-50 text-emerald-700';
     case 'failed':
       return 'bg-rose-50 text-rose-700';
+    case 'unsupported':
+      return 'bg-slate-100 text-slate-500';
     default:
       return 'bg-amber-50 text-amber-700';
   }
@@ -30,7 +33,7 @@ const ImportStage: React.FC<ImportStageProps> = ({ draft, metrics, onUpdateDraft
     if (metrics.sources_count === 0 && draft.locationHint) {
       return 'Location hint captured';
     }
-    if (metrics.sources_ready_count < metrics.sources_count) {
+    if (draft.sources.some((source) => source.status === 'pending')) {
       return 'Parsing sources…';
     }
     return 'Sources ready for mapping';
@@ -41,26 +44,32 @@ const ImportStage: React.FC<ImportStageProps> = ({ draft, metrics, onUpdateDraft
     setIsUploading(true);
     for (const file of Array.from(files)) {
       const sourceId = `pciv-${crypto.randomUUID()}`;
+      const statusDecision = getPcivSourceStatus(file);
       const pendingSource: PcivSource = {
         id: sourceId,
         type: 'file',
         name: file.name,
         mimeType: file.type,
         size: file.size,
-        status: 'pending',
+        status: statusDecision.status,
+        error: statusDecision.error,
         createdAt: new Date().toISOString()
       };
       onUpdateDraft((prevDraft) => ({
         ...prevDraft,
         sources: [...prevDraft.sources, pendingSource]
       }));
+      if (!isPcivFileSupported(file)) {
+        continue;
+      }
       try {
         const content = await file.text();
+        const excerpt = content.slice(0, 20000);
         const parsedSource: PcivSource = {
           ...pendingSource,
-          status: content ? 'parsed' : 'failed',
-          content: content || undefined,
-          error: content ? undefined : 'No readable text found.'
+          status: excerpt ? 'parsed' : 'failed',
+          content: excerpt || undefined,
+          error: excerpt ? undefined : 'No readable text found.'
         };
         onUpdateDraft((prevDraft) => {
           const updated = {
@@ -129,6 +138,11 @@ const ImportStage: React.FC<ImportStageProps> = ({ draft, metrics, onUpdateDraft
             Could not extract from sources. Try uploading a different format or add details manually in the next step.
           </div>
         )}
+        {draft.sources.some((source) => source.status === 'unsupported') && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+            PDF parsing is not supported yet. Upload .txt, .csv, or .json files for automatic extraction.
+          </div>
+        )}
         {draft.sources.length === 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
             No usable sources found yet. Add documents or provide a location hint.
@@ -145,7 +159,13 @@ const ImportStage: React.FC<ImportStageProps> = ({ draft, metrics, onUpdateDraft
                   <p className="text-[11px] text-slate-400">{source.mimeType ?? 'Unknown type'}</p>
                 </div>
                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusPill(source.status)}`}>
-                  {source.status === 'parsed' ? 'Parsed' : source.status === 'failed' ? 'Failed' : 'Pending'}
+                  {source.status === 'parsed'
+                    ? 'Parsed'
+                    : source.status === 'failed'
+                      ? 'Failed'
+                      : source.status === 'unsupported'
+                        ? 'Unsupported'
+                        : 'Pending'}
                 </span>
               </div>
             ))}

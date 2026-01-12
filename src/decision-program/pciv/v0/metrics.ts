@@ -16,7 +16,7 @@ export const computePcivMetrics = (draft: PcivDraft): PcivMetrics => {
 
   return {
     sources_count: draft.sources.length,
-    sources_ready_count: draft.sources.filter((source) => source.status === 'parsed').length,
+    sources_ready_count: draft.sources.filter((source) => source.status !== 'pending').length,
     fields_total: fieldsTotal,
     fields_filled_count: fieldsFilled.length,
     required_unresolved_count: requiredUnresolved.length,

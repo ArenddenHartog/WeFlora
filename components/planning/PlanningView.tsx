@@ -202,7 +202,6 @@ const PlanningView: React.FC = () => {
     if (!contextIntakeState?.pcivAutoStart) return;
     if (!pcivCommittedContext) return;
     if (!pcivEnabled) return;
-    if (!planningProjectId) return;
     startPlanningRun(pcivCommittedContext, planningProjectId);
   }, [contextIntakeState?.pcivAutoStart, pcivCommittedContext, pcivEnabled, planningProjectId, startPlanningRun]);
 
