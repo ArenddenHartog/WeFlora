@@ -268,7 +268,7 @@ const PlanningView: React.FC = () => {
       return;
     }
     startPlanningRun(planningProjectId ?? null);
-  }, [openContextIntake, pcivCommittedContext, pcivEnabled, planningProjectId, planningScopeId, startPlanningRun, user?.email]);
+  }, [openContextIntake, pcivEnabled, planningProjectId, planningScopeId, startPlanningRun, user?.email]);
 
   const stepsVM = useMemo(() => {
     const evidenceIndex = planningState?.evidenceIndex ?? {};
