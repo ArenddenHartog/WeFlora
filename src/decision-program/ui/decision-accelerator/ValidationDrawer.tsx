@@ -48,6 +48,9 @@ const ValidationDrawer: React.FC<ValidationDrawerProps> = ({
 
   const renderInputField = (input: ActionCardInput) => {
     const derived = derivedInputs?.[input.pointer];
+    const testId = input.pointer === '/context/site/geo/locationHint'
+      ? 'planning-input-locationHint'
+      : undefined;
     return (
     <label key={input.id} className="block text-xs text-slate-600 space-y-1">
       <div className="flex items-center justify-between">
@@ -73,6 +76,7 @@ const ValidationDrawer: React.FC<ValidationDrawerProps> = ({
         <select
           value={(values[input.id] as string | undefined) ?? ''}
           onChange={(event) => onChange(input.id, event.target.value)}
+          data-testid={testId}
           className="w-full rounded-md border border-slate-200 px-2 py-1 text-xs"
         >
           <option value="" disabled>
@@ -90,6 +94,7 @@ const ValidationDrawer: React.FC<ValidationDrawerProps> = ({
           value={(values[input.id] as number | string | undefined) ?? ''}
           onChange={(event) => onChange(input.id, event.target.value === '' ? '' : Number(event.target.value))}
           placeholder={input.placeholder}
+          data-testid={testId}
           className="w-full rounded-md border border-slate-200 px-2 py-1 text-xs"
         />
       ) : input.type === 'boolean' ? (
@@ -98,6 +103,7 @@ const ValidationDrawer: React.FC<ValidationDrawerProps> = ({
             type="checkbox"
             checked={Boolean(values[input.id])}
             onChange={(event) => onChange(input.id, event.target.checked)}
+            data-testid={testId}
             className="rounded border-slate-300 text-weflora-teal"
           />
           <span className="text-xs text-slate-500">{input.placeholder ?? 'Toggle'}</span>
@@ -108,6 +114,7 @@ const ValidationDrawer: React.FC<ValidationDrawerProps> = ({
           value={(values[input.id] as string | undefined) ?? ''}
           onChange={(event) => onChange(input.id, event.target.value)}
           placeholder={input.placeholder}
+          data-testid={testId}
           className="w-full rounded-md border border-slate-200 px-2 py-1 text-xs"
         />
       )}

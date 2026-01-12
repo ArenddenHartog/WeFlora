@@ -316,6 +316,9 @@ const DecisionModeView: React.FC<DecisionModeViewProps> = ({
                       ? 'Add the remaining inputs to keep the plan precise.'
                       : 'Derived inputs were pulled from uploaded evidence.'}
                   </p>
+                  <p className="text-[10px] text-slate-400" data-testid="missing-required-count">
+                    Required missing: {missingRequiredInputs.length}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
