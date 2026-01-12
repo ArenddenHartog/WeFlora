@@ -2,6 +2,7 @@ import type { ExecutionState } from '../../src/decision-program/types.ts';
 import type { PcivCommittedContext, PcivStage } from '../../src/decision-program/pciv/v0/types.ts';
 import { applyCommittedContext } from '../../src/decision-program/pciv/v0/context.ts';
 import { buildActionCards } from '../../src/decision-program/orchestrator/buildActionCards.ts';
+import { listMissingPointersBySeverity } from '../../src/decision-program/orchestrator/pointerInputRegistry.ts';
 
 export type PlanningStartAction = 'pciv-import' | 'start-planning';
 export type ResolveInputsAction = 'pciv-map' | 'legacy';
@@ -77,6 +78,12 @@ export const applyPcivCommitToPlanningState = (
     context: contextWithVersion,
     pcivCommittedContext: committedContext
   };
+  if (import.meta.env?.DEV) {
+    const missingRequired = listMissingPointersBySeverity(updated, 'required');
+    console.info('pciv_v0_planning_state_commit_applied', {
+      missingRequiredCount: missingRequired.length
+    });
+  }
   return {
     ...updated,
     actionCards: buildActionCards(updated)

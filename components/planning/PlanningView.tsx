@@ -7,7 +7,8 @@ import { buildActionCards } from '../../src/decision-program/orchestrator/buildA
 import {
   buildDefaultPatchesForPointers,
   buildDefaultsLogEntry,
-  getInputSpec
+  getInputSpec,
+  listMissingPointersBySeverity
 } from '../../src/decision-program/orchestrator/pointerInputRegistry';
 import { planRun } from '../../src/decision-program/orchestrator/planRun';
 import { runAgentStep } from '../../src/decision-program/orchestrator/runAgentStep';
@@ -124,10 +125,13 @@ const PlanningView: React.FC = () => {
       contextVersionId: committedContext?.committed_at ?? undefined
     };
     const resolvedContext = committedContext ? applyCommittedContext(baseContext, committedContext) : baseContext;
-    if (committedContext && import.meta.env.DEV) {
-      console.info('PCIV: using committed context');
-    }
     const planned = withActionCards(planRun(program, resolvedContext));
+    if (committedContext && import.meta.env.DEV) {
+      const missingRequired = listMissingPointersBySeverity(planned, 'required');
+      console.info('PCIV: planning start after commit', {
+        missingRequiredCount: missingRequired.length
+      });
+    }
     planned.pcivCommittedContext = committedContext ?? undefined;
     setPlanningState(planned);
     setInputChangeNotice(null);
