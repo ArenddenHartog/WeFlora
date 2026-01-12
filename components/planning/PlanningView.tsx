@@ -33,7 +33,8 @@ import {
   getPlanningStartAction,
   getPlanningStartLabel,
   getResolveInputsAction,
-  getResolveInputsUrl
+  getResolveInputsUrl,
+  hasCommittedPciv
 } from './planningUtils';
 
 const PlanningView: React.FC = () => {
@@ -180,7 +181,9 @@ const PlanningView: React.FC = () => {
   useEffect(() => {
     if (!planningScopeId || !pcivEnabled) return;
     const commit = loadPcivCommit(planningScopeId, user?.email ?? null);
-    setPcivCommittedContext(commit ?? null);
+    if (commit) {
+      setPcivCommittedContext(commit);
+    }
   }, [pcivEnabled, planningScopeId, user?.email]);
 
   const pcivCommitSignature = useMemo(() => {
@@ -257,7 +260,9 @@ const PlanningView: React.FC = () => {
   );
 
   const handleStartFlow = useCallback(async () => {
-    const action = getPlanningStartAction(pcivEnabled, pcivCommittedContext);
+    const hasCommit = pcivEnabled && hasCommittedPciv(planningScopeId, user?.email ?? null);
+    const committedContext = hasCommit ? loadPcivCommit(planningScopeId, user?.email ?? null) : null;
+    const action = getPlanningStartAction(pcivEnabled, committedContext);
     if (action === 'pciv-import') {
       await openContextIntake('import', { autoStart: true });
       return;
