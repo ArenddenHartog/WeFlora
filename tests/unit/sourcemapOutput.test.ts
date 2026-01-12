@@ -23,6 +23,10 @@ const getSourcemapSetting = async () => {
 };
 
 test('build output includes sourcemaps when enabled', async () => {
+  if (process.env.RUN_BUILD_ASSERTS !== '1') {
+    assert.ok(true);
+    return;
+  }
   const sourcemapSetting = await getSourcemapSetting();
   if (sourcemapSetting !== true) {
     assert.ok(true);

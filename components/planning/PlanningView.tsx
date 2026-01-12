@@ -181,18 +181,23 @@ const PlanningView: React.FC = () => {
   useEffect(() => {
     if (!planningScopeId || !pcivEnabled) return;
     const commit = loadPcivCommit(planningScopeId, user?.email ?? null);
-    setPcivCommittedContext(commit ?? null);
-  }, [contextIntakeState?.pcivCommittedAt, pcivEnabled, planningScopeId, user?.email]);
+    if (commit) {
+      setPcivCommittedContext(commit);
+    }
+  }, [pcivEnabled, planningScopeId, user?.email]);
+
+  const pcivCommitSignature = useMemo(() => {
+    if (!pcivCommittedContext) return null;
+    return [
+      pcivCommittedContext.status,
+      pcivCommittedContext.committed_at,
+      pcivCommittedContext.metrics.fields_filled_count,
+      pcivCommittedContext.metrics.constraints_count
+    ].join(':');
+  }, [pcivCommittedContext]);
 
   useEffect(() => {
-    if (!contextIntakeState?.pcivAutoStart) return;
-    if (!pcivCommittedContext) return;
-    if (!pcivEnabled) return;
-    startPlanningRun(planningProjectId);
-  }, [contextIntakeState?.pcivAutoStart, pcivCommittedContext, pcivEnabled, planningProjectId, startPlanningRun]);
-
-  useEffect(() => {
-    if (!pcivCommittedContext) return;
+    if (!pcivCommitSignature) return;
     setPlanningState((prev) => {
       if (!prev) return prev;
       return hydratePlanningStateFromPcivCommit(prev, {
@@ -201,7 +206,14 @@ const PlanningView: React.FC = () => {
         debug: FEATURES.pcivDebug
       });
     });
-  }, [pcivCommittedContext?.committed_at, planningScopeId, user?.email]);
+  }, [pcivCommitSignature, planningScopeId, user?.email]);
+
+  useEffect(() => {
+    if (!contextIntakeState?.pcivAutoStart) return;
+    if (!pcivCommitSignature) return;
+    if (!pcivEnabled) return;
+    startPlanningRun(planningProjectId);
+  }, [contextIntakeState?.pcivAutoStart, pcivCommitSignature, pcivEnabled, planningProjectId, startPlanningRun]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -570,7 +582,7 @@ const PlanningView: React.FC = () => {
   const backTarget = routeProjectId ? `/project/${routeProjectId}` : null;
   const hasCommit = useMemo(
     () => pcivEnabled && hasCommittedPciv(planningScopeId, user?.email ?? null),
-    [pcivEnabled, planningScopeId, user?.email, pcivCommittedContext?.committed_at]
+    [pcivEnabled, planningScopeId, user?.email]
   );
   const committedContextForCta = hasCommit
     ? (pcivCommittedContext ?? loadPcivCommit(planningScopeId, user?.email ?? null))
