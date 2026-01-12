@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildProgram } from '../../src/decision-program/orchestrator/buildProgram.ts';
-import { planRun } from '../../src/decision-program/orchestrator/planRun.ts';
-import { listMissingPointersBySeverity } from '../../src/decision-program/orchestrator/pointerInputRegistry.ts';
-import { getByPointer } from '../../src/decision-program/runtime/pointers.ts';
-import { hydratePlanningStateFromPcivCommit } from '../../src/decision-program/pciv/v0/hydratePlanning.ts';
-import { savePcivRun } from '../../src/decision-program/pciv/v0/store.ts';
-import type { PcivCommittedContext, PcivContextIntakeRun, PcivField } from '../../src/decision-program/pciv/v0/types.ts';
+import { buildProgram } from '../../orchestrator/buildProgram.ts';
+import { planRun } from '../../orchestrator/planRun.ts';
+import { listMissingPointersBySeverity } from '../../orchestrator/pointerInputRegistry.ts';
+import { getByPointer } from '../../runtime/pointers.ts';
+import { buildPcivPlanningPatches, hydratePlanningStateFromPcivCommit } from './hydratePlanning.ts';
+import { savePcivRun } from './store.ts';
+import type { PcivCommittedContext, PcivContextIntakeRun, PcivField } from './types.ts';
 
 class LocalStorageMock {
   private store = new Map<string, string>();
@@ -39,23 +39,33 @@ const makeCommit = (fields: Record<string, PcivField>): PcivCommittedContext => 
   userId: null,
   sources: [],
   fields,
-  constraints: [],
+  constraints: [
+    {
+      id: 'constraint-1',
+      key: 'regulatory.setbacksKnown',
+      domain: 'regulatory',
+      label: 'Setbacks known',
+      value: true,
+      provenance: 'user-entered'
+    }
+  ],
   metrics: {
     sources_count: 0,
     sources_ready_count: 0,
     fields_total: Object.keys(fields).length,
     fields_filled_count: Object.values(fields).filter((field) => field.value !== null && field.value !== undefined && field.value !== '').length,
     required_unresolved_count: 0,
-    constraints_count: 0,
+    constraints_count: 1,
     confidence_overall: 100
   }
 });
 
-test('hydratePlanningStateFromPcivCommit merges committed values into context', () => {
+test('hydratePlanningStateFromPcivCommit applies committed fields into planning context', () => {
   const localStorage = new LocalStorageMock();
   (globalThis as typeof globalThis & { window?: { localStorage: LocalStorageMock } }).window = {
     localStorage
   };
+
   const program = buildProgram();
   const baseContext = {
     site: {},
@@ -69,8 +79,8 @@ test('hydratePlanningStateFromPcivCommit merges committed values into context', 
   const initialMissing = listMissingPointersBySeverity(state, 'required');
 
   const commit = makeCommit({
-    '/context/site/geo/locationHint': makeField('/context/site/geo/locationHint', 'Utrecht'),
-    '/context/site/soil/type': makeField('/context/site/soil/type', 'loam')
+    '/context/site/soil/type': makeField('/context/site/soil/type', 'loam'),
+    '/context/site/geo/locationHint': makeField('/context/site/geo/locationHint', 'Utrecht')
   });
   const run: PcivContextIntakeRun = {
     id: 'pciv-1',
@@ -94,18 +104,25 @@ test('hydratePlanningStateFromPcivCommit merges committed values into context', 
     updatedAt: commit.committed_at
   };
   savePcivRun(run);
-  const updated = hydratePlanningStateFromPcivCommit(state, { scopeId: commit.projectId, userId: null });
-  const nextMissing = listMissingPointersBySeverity(updated, 'required');
 
-  assert.equal(updated.pcivCommittedContext?.committed_at, commit.committed_at);
-  assert.equal(updated.context.contextVersionId, commit.committed_at);
-  assert.equal(
-    getByPointer(updated, '/context/site/geo/locationHint'),
-    'Utrecht'
-  );
-  assert.equal(
-    getByPointer(updated, '/context/site/soil/type'),
-    'loam'
-  );
+  const hydrated = hydratePlanningStateFromPcivCommit(state, { scopeId: commit.projectId, userId: null });
+  const nextMissing = listMissingPointersBySeverity(hydrated, 'required');
+
+  assert.equal(getByPointer(hydrated, '/context/site/geo/locationHint'), 'Utrecht');
+  assert.equal(getByPointer(hydrated, '/context/site/soil/type'), 'loam');
+  assert.equal(hydrated.context.contextVersionId, commit.committed_at);
   assert.ok(nextMissing.length < initialMissing.length);
+});
+
+test('buildPcivPlanningPatches returns deterministic pointer ordering', () => {
+  const commit = makeCommit({
+    '/context/site/soil/type': makeField('/context/site/soil/type', 'loam'),
+    '/context/site/geo/locationHint': makeField('/context/site/geo/locationHint', 'Utrecht')
+  });
+  const patches = buildPcivPlanningPatches(commit);
+  const pointers = patches.map((patch) => patch.pointer);
+  const sorted = [...pointers].sort((a, b) => a.localeCompare(b));
+
+  assert.deepEqual(pointers, sorted);
+  assert.ok(pointers.includes('/context/contextVersionId'));
 });
