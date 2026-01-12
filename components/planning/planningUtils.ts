@@ -1,18 +1,15 @@
-import type { ExecutionState } from '../../src/decision-program/types.ts';
 import type { PcivCommittedContext, PcivStage } from '../../src/decision-program/pciv/v0/types.ts';
-import { applyCommittedContext } from '../../src/decision-program/pciv/v0/context.ts';
-import { buildActionCards } from '../../src/decision-program/orchestrator/buildActionCards.ts';
-import { listMissingPointersBySeverity } from '../../src/decision-program/orchestrator/pointerInputRegistry.ts';
+import { loadPcivCommit } from '../../src/decision-program/pciv/v0/store.ts';
 
 export type PlanningStartAction = 'pciv-import' | 'start-planning';
 export type ResolveInputsAction = 'pciv-map' | 'legacy';
 
 export const getPlanningStartLabel = (
   pcivEnabled: boolean,
-  committedContext: PcivCommittedContext | null
+  _committedContext: PcivCommittedContext | null
 ) => {
   if (!pcivEnabled) return 'Start Planning';
-  return committedContext ? 'Start Planning' : 'Start Context Intake';
+  return 'Start Planning';
 };
 
 export const getPlanningStartAction = (
@@ -64,28 +61,8 @@ export const getPlanningBackTarget = (args: {
   return args.fallbackPath ?? null;
 };
 
-export const applyPcivCommitToPlanningState = (
-  state: ExecutionState,
-  committedContext: PcivCommittedContext
-): ExecutionState => {
-  const nextContext = applyCommittedContext(state.context, committedContext);
-  const contextWithVersion = {
-    ...nextContext,
-    contextVersionId: committedContext.committed_at
-  };
-  const updated = {
-    ...state,
-    context: contextWithVersion,
-    pcivCommittedContext: committedContext
-  };
-  if (import.meta.env?.DEV) {
-    const missingRequired = listMissingPointersBySeverity(updated, 'required');
-    console.info('pciv_v0_planning_state_commit_applied', {
-      missingRequiredCount: missingRequired.length
-    });
-  }
-  return {
-    ...updated,
-    actionCards: buildActionCards(updated)
-  };
+export const hasCommittedPciv = (scopeId: string, userId?: string | null) => {
+  if (typeof window === 'undefined') return false;
+  const commit = loadPcivCommit(scopeId, userId);
+  return commit?.status === 'committed' || commit?.status === 'partial_committed';
 };

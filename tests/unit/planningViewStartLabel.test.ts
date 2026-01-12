@@ -25,7 +25,7 @@ const committedContext: PcivCommittedContext = {
 };
 
 test('getPlanningStartLabel gates CTA copy', () => {
-  assert.equal(getPlanningStartLabel(true, null), 'Start Context Intake');
+  assert.equal(getPlanningStartLabel(true, null), 'Start Planning');
   assert.equal(getPlanningStartLabel(true, committedContext), 'Start Planning');
   assert.equal(getPlanningStartLabel(false, null), 'Start Planning');
 });
