@@ -57,7 +57,7 @@ const committedContext: PcivCommittedContext = {
 };
 
 test('planning CTA resolves to context intake when no committed context is available', () => {
-  assert.equal(getPlanningStartLabel(true, null), 'Start Context Intake');
+  assert.equal(getPlanningStartLabel(true, null), 'Start Planning');
   assert.equal(getPlanningStartAction(true, null), 'pciv-import');
   assert.equal(getContextIntakeUrl('import'), '/planning/context-intake?stage=import');
 });

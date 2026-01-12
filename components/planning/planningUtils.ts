@@ -6,10 +6,10 @@ export type ResolveInputsAction = 'pciv-map' | 'legacy';
 
 export const getPlanningStartLabel = (
   pcivEnabled: boolean,
-  committedContext: PcivCommittedContext | null
+  _committedContext: PcivCommittedContext | null
 ) => {
   if (!pcivEnabled) return 'Start Planning';
-  return committedContext ? 'Start Planning' : 'Start Context Intake';
+  return 'Start Planning';
 };
 
 export const getPlanningStartAction = (

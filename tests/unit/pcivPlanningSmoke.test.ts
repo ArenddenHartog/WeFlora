@@ -8,7 +8,7 @@ import {
 } from '../../components/planning/planningUtils.ts';
 
 test('pciv planning smoke test', () => {
-  assert.equal(getPlanningStartLabel(true, null), 'Start Context Intake');
+  assert.equal(getPlanningStartLabel(true, null), 'Start Planning');
   assert.equal(
     getContextIntakeUrl('import'),
     '/planning/context-intake?stage=import'

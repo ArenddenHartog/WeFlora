@@ -44,7 +44,7 @@ const PlanningView: React.FC = () => {
   const location = useLocation();
   const agentRegistry = useMemo(() => buildAgentRegistry(), []);
   const { showNotification } = useUI();
-  const { planningRuns, upsertPlanningRun } = useChat();
+  const { planningRuns, setPlanningRuns, upsertPlanningRun } = useChat();
   const { createMatrix, files } = useProject();
   const { user } = useAuth();
   const planningRunId = params.runId;
@@ -268,7 +268,7 @@ const PlanningView: React.FC = () => {
       return;
     }
     startPlanningRun(planningProjectId ?? null);
-  }, [openContextIntake, pcivEnabled, planningProjectId, planningScopeId, startPlanningRun, user?.email]);
+  }, [openContextIntake, pcivCommittedContext, pcivEnabled, planningProjectId, startPlanningRun]);
 
   const stepsVM = useMemo(() => {
     const evidenceIndex = planningState?.evidenceIndex ?? {};
@@ -578,14 +578,25 @@ const PlanningView: React.FC = () => {
     setInputChangeNotice(null);
   }, []);
 
+  const handleResetPlanning = useCallback(() => {
+    setPlanningState(null);
+    setInputChangeNotice(null);
+    setIsStarting(false);
+    setPlanningRuns((prev) =>
+      prev.filter(
+        (run) =>
+          run.projectId !== planningProjectId &&
+          run.runId !== planningState?.runId
+      )
+    );
+    navigate('/planning', { replace: true });
+  }, [navigate, planningProjectId, planningState?.runId, setPlanningRuns]);
+
   const showBackButton = Boolean(routeProjectId) || location.key !== 'default';
   const backTarget = routeProjectId ? `/project/${routeProjectId}` : null;
-  const hasCommit = useMemo(
-    () => pcivEnabled && hasCommittedPciv(planningScopeId, user?.email ?? null),
-    [pcivEnabled, planningScopeId, user?.email]
-  );
-  const committedContextForCta = hasCommit
-    ? (pcivCommittedContext ?? loadPcivCommit(planningScopeId, user?.email ?? null))
+  const hasPcivCommit = Boolean(pcivCommittedContext);
+  const committedContextForCta = hasPcivCommit
+    ? pcivCommittedContext
     : null;
   const startLabel = getPlanningStartLabel(pcivEnabled, committedContextForCta);
   const startAction = getPlanningStartAction(pcivEnabled, committedContextForCta);
@@ -654,7 +665,14 @@ const PlanningView: React.FC = () => {
               onClick={() => openContextIntake('import', { autoStart: false })}
               className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
             >
-              Context intake
+              {hasPcivCommit ? 'Update Context' : 'Context intake'}
+            </button>
+            <button
+              type="button"
+              onClick={handleResetPlanning}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+            >
+              Reset Planning
             </button>
           </div>
         </header>
@@ -717,7 +735,7 @@ const PlanningView: React.FC = () => {
             onClick={() => openContextIntake('import', { autoStart: false })}
             className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
           >
-            Context intake
+            {hasPcivCommit ? 'Update Context' : 'Context intake'}
           </button>
         </div>
       </header>
@@ -741,6 +759,24 @@ const PlanningView: React.FC = () => {
                   ? 'Starting Planning...'
                   : startLabel}
               </button>
+              {hasPcivCommit && (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openContextIntake('import', { autoStart: false })}
+                    className="flex-1 min-w-[160px] px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                  >
+                    Update Context
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetPlanning}
+                    className="flex-1 min-w-[160px] px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                  >
+                    Reset Planning
+                  </button>
+                </div>
+              )}
               <button
                 type="button"
                 className="w-full px-5 py-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
