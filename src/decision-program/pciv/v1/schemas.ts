@@ -224,3 +224,19 @@ export type PcivInputSourceV1 = z.infer<typeof PcivInputSourceV1Schema>;
 export type PcivConstraintV1 = z.infer<typeof PcivConstraintV1Schema>;
 export type PcivArtifactV1 = z.infer<typeof PcivArtifactV1Schema>;
 export type PcivContextViewV1 = z.infer<typeof PcivContextViewV1Schema>;
+
+/**
+ * scopeId is the semantic identifier used by consumers for PCIV v1 context.
+ * projectId is the persisted legacy field name (storage compatibility only).
+ */
+export type PcivScopeId = string;
+export type PcivProjectId = string;
+
+export type ResolveContextViewArgs = {
+  /** semantic scope identifier (persisted as projectId in storage). */
+  scopeId: PcivScopeId;
+  userId?: string | null;
+  runId?: string | null;
+  prefer?: 'latest_commit' | 'runId';
+  debug?: boolean;
+};

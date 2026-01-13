@@ -157,6 +157,39 @@ export const fetchLatestCommittedRun = async (scopeId: string, userId?: string |
   return mapRunRow(data[0]);
 };
 
+export const listRunsForScope = async (scopeId: string, userId?: string | null): Promise<PcivRunV1[]> => {
+  let query = supabase
+    .from('pciv_runs')
+    .select('*')
+    .eq('scope_id', scopeId);
+
+  if (userId !== undefined) {
+    query = userId === null ? query.is('user_id', null) : query.eq('user_id', userId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(`Failed to list runs for scope ${scopeId}: ${error.message}`);
+  }
+
+  return (data ?? []).map(mapRunRow);
+};
+
+export const fetchRunById = async (runId: string): Promise<PcivRunV1> => {
+  const { data, error } = await supabase
+    .from('pciv_runs')
+    .select('*')
+    .eq('id', runId)
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Failed to fetch run ${runId}: ${error?.message ?? 'missing run'}`);
+  }
+
+  return mapRunRow(data);
+};
+
 export const fetchContextViewByRunId = async (runId: string): Promise<PcivContextViewV1> => {
   const { data: runRow, error: runError } = await supabase
     .from('pciv_runs')
@@ -285,6 +318,25 @@ export const createDraftRun = async (scopeId: string, userId?: string | null): P
 
   if (error || !data) {
     throw new Error(`Failed to create draft run: ${error?.message ?? 'missing row'}`);
+  }
+
+  return mapRunRow(data);
+};
+
+export const updateDraftRun = async (runId: string): Promise<PcivRunV1> => {
+  const timestamp = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('pciv_runs')
+    .update({
+      status: 'draft',
+      updated_at: timestamp
+    })
+    .eq('id', runId)
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Failed to update draft run ${runId}: ${error?.message ?? 'missing row'}`);
   }
 
   return mapRunRow(data);

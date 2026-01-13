@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { DerivedConstraints } from '../../types';
-import type { PcivConstraint } from '../../pciv/v0/types';
+import type { PcivConstraintV1 } from '../../pciv/v1/schemas';
 import { shouldUsePcivConstraints } from './derivedConstraintsUtils';
 
 const formatValue = (value: unknown) => {
@@ -26,10 +26,10 @@ const renderSection = (title: string, entries: Array<{ label: string; value: unk
 
 export interface DerivedConstraintsPanelProps {
   derivedConstraints?: DerivedConstraints;
-  pcivConstraints?: PcivConstraint[];
+  pcivConstraints?: PcivConstraintV1[];
 }
 
-const provenanceBadge = (provenance: PcivConstraint['provenance']) => {
+const provenanceBadge = (provenance: PcivConstraintV1['provenance']) => {
   switch (provenance) {
     case 'source-backed':
       return 'bg-emerald-50 text-emerald-700';
@@ -42,13 +42,28 @@ const provenanceBadge = (provenance: PcivConstraint['provenance']) => {
   }
 };
 
+const readConstraintValue = (constraint: PcivConstraintV1) => {
+  switch (constraint.valueKind) {
+    case 'number':
+      return constraint.valueNumber;
+    case 'boolean':
+      return constraint.valueBoolean;
+    case 'enum':
+      return constraint.valueEnum;
+    case 'json':
+      return constraint.valueJson;
+    default:
+      return constraint.valueString;
+  }
+};
+
 const DerivedConstraintsPanel: React.FC<DerivedConstraintsPanelProps> = ({ derivedConstraints, pcivConstraints }) => {
   const [snippet, setSnippet] = useState<{ label: string; text: string } | null>(null);
 
   const hasPcivConstraints = shouldUsePcivConstraints(pcivConstraints);
   const groupedPciv = useMemo(() => {
     if (!hasPcivConstraints) return null;
-    return pcivConstraints.reduce<Record<string, PcivConstraint[]>>((acc, constraint) => {
+    return pcivConstraints.reduce<Record<string, PcivConstraintV1[]>>((acc, constraint) => {
       acc[constraint.domain] = acc[constraint.domain] ?? [];
       acc[constraint.domain].push(constraint);
       return acc;
@@ -75,7 +90,7 @@ const DerivedConstraintsPanel: React.FC<DerivedConstraintsPanelProps> = ({ deriv
                   <div key={constraint.id} className="flex items-center justify-between gap-4">
                     <div>
                       <p className="font-semibold text-slate-700">{constraint.label}</p>
-                      <p className="text-[11px] text-slate-500">Value: {formatValue(constraint.value)}</p>
+                      <p className="text-[11px] text-slate-500">Value: {formatValue(readConstraintValue(constraint))}</p>
                       {constraint.provenance === 'source-backed' && constraint.snippet && (
                         <button
                           type="button"

@@ -1,14 +1,14 @@
 import React from 'react';
-import type { PcivCommittedContext, PcivStage } from '../../../src/decision-program/pciv/v0/types';
+import type { PcivRunV1 } from '../../../src/decision-program/pciv/v1/schemas';
 import PCIVFlow from './PCIVFlow';
 
 export interface PCIVModalProps {
   isOpen: boolean;
   projectId?: string | null;
   userId?: string | null;
-  initialStage?: PcivStage;
+  initialStage?: 'import' | 'map' | 'validate';
   onClose: () => void;
-  onComplete: (commit: PcivCommittedContext) => void;
+  onComplete: (run: PcivRunV1) => void;
 }
 
 const PCIVModal: React.FC<PCIVModalProps> = ({
