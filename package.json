@@ -19,6 +19,8 @@
     "test:pciv": "node --experimental-strip-types scripts/test-pciv.ts",
     "test:pciv-ui": "node --experimental-strip-types scripts/test-pciv-ui.ts",
     "test:pciv-stabilization:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
+    "test:pciv:db": "node --test tests/integration/pcivSupabaseContract.test.ts",
+    "pciv:db:audit": "node --experimental-strip-types scripts/pciv-db-audit.ts",
     "check": "npm run lint && npm run guard:temp-ids && npm run guard:toast-icons && npm run build"
   },
   "dependencies": {
