@@ -45,17 +45,6 @@ const parseScopeId = () => {
   return args[scopeIndex + 1];
 };
 
-const findIndexColumns = (indexDef: string) => {
-  const match = indexDef.match(/\(([^)]+)\)/);
-  if (!match) return [];
-  return match[1]
-    .split(',')
-    .map((value) => value.trim())
-    .map((value) => value.replace(/"/g, ''))
-    .map((value) => value.split(' ')[0])
-    .filter(Boolean);
-};
-
 const formatHeader = (title: string) => `\n=== ${title} ===`;
 
 const mapRunRow = (row: any) =>
@@ -87,168 +76,27 @@ const main = async () => {
     usingServiceRole: Boolean(env.serviceRoleKey)
   });
 
-  const { data: tableRows, error: tableError } = await supabase
-    .schema('information_schema')
-    .from('tables')
-    .select('table_name')
-    .eq('table_schema', 'public')
-    .in('table_name', tableNames as unknown as string[]);
+  const { data: introspectData, error: introspectError } = await supabase.rpc('pciv_introspect');
 
-  if (tableError) {
-    throw new Error(`Failed to read information_schema.tables: ${tableError.message}`);
+  if (introspectError || !introspectData) {
+    throw new Error(
+      `pciv_introspect RPC failed: ${introspectError?.message ?? 'no data returned'}. ` +
+        'Ensure the function exists in public schema and grants execute to anon/authenticated.'
+    );
   }
 
-  const existingTables = new Set((tableRows ?? []).map((row) => row.table_name));
+  const tables = (introspectData as { tables?: Record<string, any> }).tables ?? {};
 
-  console.log(formatHeader('Table existence'));
+  console.log(formatHeader('Table report'));
   tableNames.forEach((table) => {
-    console.log({ table, exists: existingTables.has(table) });
-  });
-
-  const { data: columnRows, error: columnError } = await supabase
-    .schema('information_schema')
-    .from('columns')
-    .select('table_name,column_name,data_type,is_nullable')
-    .eq('table_schema', 'public')
-    .in('table_name', tableNames as unknown as string[]);
-
-  if (columnError) {
-    throw new Error(`Failed to read information_schema.columns: ${columnError.message}`);
-  }
-
-  console.log(formatHeader('Columns'));
-  tableNames.forEach((table) => {
-    const columns = (columnRows ?? []).filter((row) => row.table_name === table);
-    console.log({ table, columns });
-  });
-
-  const { data: namespaceRows, error: namespaceError } = await supabase
-    .schema('pg_catalog')
-    .from('pg_namespace')
-    .select('oid')
-    .eq('nspname', 'public')
-    .single();
-
-  if (namespaceError || !namespaceRows) {
-    throw new Error(`Failed to read pg_namespace: ${namespaceError?.message ?? 'missing row'}`);
-  }
-
-  const { data: classRows, error: classError } = await supabase
-    .schema('pg_catalog')
-    .from('pg_class')
-    .select('oid,relname,relnamespace')
-    .eq('relnamespace', namespaceRows.oid)
-    .in('relname', tableNames as unknown as string[]);
-
-  if (classError) {
-    throw new Error(`Failed to read pg_class: ${classError.message}`);
-  }
-
-  const tableOids = new Map<string, number>();
-  (classRows ?? []).forEach((row) => {
-    tableOids.set(row.relname, row.oid);
-  });
-
-  const { data: attributeRows, error: attributeError } = await supabase
-    .schema('pg_catalog')
-    .from('pg_attribute')
-    .select('attrelid,attnum,attname,attisdropped')
-    .in('attrelid', Array.from(tableOids.values()))
-    .gt('attnum', 0)
-    .eq('attisdropped', false);
-
-  if (attributeError) {
-    throw new Error(`Failed to read pg_attribute: ${attributeError.message}`);
-  }
-
-  const attributesByTable = new Map<number, Map<number, string>>();
-  (attributeRows ?? []).forEach((row) => {
-    const tableMap = attributesByTable.get(row.attrelid) ?? new Map<number, string>();
-    tableMap.set(row.attnum, row.attname);
-    attributesByTable.set(row.attrelid, tableMap);
-  });
-
-  const { data: constraintRows, error: constraintError } = await supabase
-    .schema('pg_catalog')
-    .from('pg_constraint')
-    .select('conname,contype,conrelid,confrelid,conkey,confkey')
-    .in('conrelid', Array.from(tableOids.values()));
-
-  if (constraintError) {
-    throw new Error(`Failed to read pg_constraint: ${constraintError.message}`);
-  }
-
-  const oidToTable = new Map<number, string>();
-  tableOids.forEach((oid, name) => oidToTable.set(oid, name));
-
-  const constraintsByTable = new Map<string, {
-    primaryKeys: Array<{ name: string; columns: string[] }>;
-    uniques: Array<{ name: string; columns: string[] }>;
-    foreignKeys: Array<{ name: string; columns: string[]; references: { table: string; columns: string[] } }>;
-  }>();
-
-  (constraintRows ?? []).forEach((row) => {
-    const tableName = oidToTable.get(row.conrelid);
-    if (!tableName) return;
-    const tableConstraints = constraintsByTable.get(tableName) ?? {
-      primaryKeys: [],
-      uniques: [],
-      foreignKeys: []
-    };
-    const attMap = attributesByTable.get(row.conrelid) ?? new Map<number, string>();
-    const columns = (row.conkey ?? []).map((attnum: number) => attMap.get(attnum)).filter(Boolean) as string[];
-
-    if (row.contype === 'p') {
-      tableConstraints.primaryKeys.push({ name: row.conname, columns });
-    } else if (row.contype === 'u') {
-      tableConstraints.uniques.push({ name: row.conname, columns });
-    } else if (row.contype === 'f') {
-      const refTable = oidToTable.get(row.confrelid);
-      const refAttMap = attributesByTable.get(row.confrelid) ?? new Map<number, string>();
-      const refColumns = (row.confkey ?? [])
-        .map((attnum: number) => refAttMap.get(attnum))
-        .filter(Boolean) as string[];
-      tableConstraints.foreignKeys.push({
-        name: row.conname,
-        columns,
-        references: {
-          table: refTable ?? 'unknown',
-          columns: refColumns
-        }
-      });
-    }
-
-    constraintsByTable.set(tableName, tableConstraints);
-  });
-
-  console.log(formatHeader('Constraints summary'));
-  tableNames.forEach((table) => {
+    const tableInfo = tables[table];
     console.log({
       table,
-      constraints: constraintsByTable.get(table) ?? { primaryKeys: [], uniques: [], foreignKeys: [] }
+      exists: tableInfo?.exists ?? false,
+      columns: tableInfo?.columns?.length ?? 0,
+      constraints: tableInfo?.constraints?.length ?? 0,
+      indexes: tableInfo?.indexes?.length ?? 0
     });
-  });
-
-  const { data: indexRows, error: indexError } = await supabase
-    .schema('pg_catalog')
-    .from('pg_indexes')
-    .select('tablename,indexname,indexdef')
-    .eq('schemaname', 'public')
-    .in('tablename', tableNames as unknown as string[]);
-
-  if (indexError) {
-    throw new Error(`Failed to read pg_indexes: ${indexError.message}`);
-  }
-
-  console.log(formatHeader('Indexes'));
-  tableNames.forEach((table) => {
-    const indexes = (indexRows ?? [])
-      .filter((row) => row.tablename === table)
-      .map((row) => ({
-        name: row.indexname,
-        columns: findIndexColumns(row.indexdef)
-      }));
-    console.log({ table, indexes });
   });
 
   const { data: runRows, error: runError } = await supabase

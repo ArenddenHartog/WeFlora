@@ -100,3 +100,111 @@ create table if not exists public.pciv_artifacts (
 );
 
 create index if not exists pciv_artifacts_run_id_idx on public.pciv_artifacts (run_id);
+
+create or replace function public.pciv_introspect()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, pg_catalog
+as $$
+declare
+  table_list text[] := array[
+    'pciv_runs',
+    'pciv_sources',
+    'pciv_inputs',
+    'pciv_input_sources',
+    'pciv_constraints',
+    'pciv_artifacts'
+  ];
+  tbl text;
+  tables_json jsonb := '{}'::jsonb;
+  table_exists boolean;
+  columns_json jsonb;
+  constraints_json jsonb;
+  indexes_json jsonb;
+begin
+  foreach tbl in array table_list loop
+    select exists(
+      select 1
+      from information_schema.tables
+      where table_schema = 'public'
+        and table_name = tbl
+    )
+    into table_exists;
+
+    if table_exists then
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'name', column_name,
+            'type', data_type,
+            'is_nullable', is_nullable,
+            'column_default', column_default
+          )
+          order by ordinal_position
+        ),
+        '[]'::jsonb
+      )
+      into columns_json
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = tbl;
+
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'name', con.conname,
+            'type', con.contype,
+            'definition', pg_get_constraintdef(con.oid)
+          )
+          order by con.conname
+        ),
+        '[]'::jsonb
+      )
+      into constraints_json
+      from pg_constraint con
+      join pg_class rel on rel.oid = con.conrelid
+      join pg_namespace ns on ns.oid = rel.relnamespace
+      where ns.nspname = 'public'
+        and rel.relname = tbl;
+
+      select coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'name', idx.relname,
+            'definition', pg_get_indexdef(idx.oid)
+          )
+          order by idx.relname
+        ),
+        '[]'::jsonb
+      )
+      into indexes_json
+      from pg_class rel
+      join pg_namespace ns on ns.oid = rel.relnamespace
+      join pg_index i on i.indrelid = rel.oid
+      join pg_class idx on idx.oid = i.indexrelid
+      where ns.nspname = 'public'
+        and rel.relname = tbl;
+    else
+      columns_json := '[]'::jsonb;
+      constraints_json := '[]'::jsonb;
+      indexes_json := '[]'::jsonb;
+    end if;
+
+    tables_json := tables_json || jsonb_build_object(
+      tbl,
+      jsonb_build_object(
+        'exists', table_exists,
+        'columns', columns_json,
+        'constraints', constraints_json,
+        'indexes', indexes_json
+      )
+    );
+  end loop;
+
+  return jsonb_build_object('tables', tables_json);
+end;
+$$;
+
+grant execute on function public.pciv_introspect() to anon, authenticated;
