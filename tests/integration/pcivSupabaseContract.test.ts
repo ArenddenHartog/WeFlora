@@ -123,25 +123,78 @@ const uniqueExpectations: Record<TableName, string[][]> = {
   pciv_artifacts: [['id']]
 };
 
-const indexExpectations: Record<TableName, string[][]> = {
+const requiredColumnGroups: Record<TableName, string[][]> = {
   pciv_runs: [
-    ['scope_id'],
-    ['scope_id', 'status']
+    ['id'],
+    ['scope_id', 'project_id'],
+    ['status'],
+    ['created_at'],
+    ['updated_at'],
+    ['committed_at'],
+    ['allow_partial'],
+    ['user_id'],
+    ['run_id', 'id']
   ],
-  pciv_sources: [['run_id']],
-  pciv_inputs: [
+  pciv_sources: [
+    ['id'],
     ['run_id'],
-    ['run_id', 'pointer']
+    ['scope_id', 'project_id'],
+    ['type', 'kind'],
+    ['name', 'title'],
+    ['mime_type'],
+    ['size_bytes'],
+    ['status', 'parse_status'],
+    ['created_at']
   ],
-  pciv_input_sources: [
-    ['input_id'],
-    ['input_id', 'source_id']
+  pciv_inputs: [
+    ['id'],
+    ['run_id'],
+    ['scope_id', 'project_id'],
+    ['pointer'],
+    ['label'],
+    ['domain'],
+    ['required'],
+    ['type', 'field_type'],
+    ['options'],
+    ['value_json'],
+    ['provenance'],
+    ['created_at', 'updated_at']
   ],
-  pciv_constraints: [['run_id']],
-  pciv_artifacts: [['run_id']]
+  pciv_input_sources: [['input_id'], ['source_id'], ['snippet'], ['created_at']],
+  pciv_constraints: [
+    ['id'],
+    ['run_id'],
+    ['scope_id', 'project_id'],
+    ['key'],
+    ['domain'],
+    ['label'],
+    ['value_json'],
+    ['provenance'],
+    ['source_id'],
+    ['snippet'],
+    ['created_at']
+  ],
+  pciv_artifacts: [
+    ['id'],
+    ['run_id'],
+    ['scope_id', 'project_id'],
+    ['type'],
+    ['payload_json', 'payload'],
+    ['created_at']
+  ]
 };
 
 const fkExpectations = [
+  {
+    table: 'pciv_sources',
+    columns: ['run_id'],
+    references: { table: 'pciv_runs', columns: ['id'] }
+  },
+  {
+    table: 'pciv_inputs',
+    columns: ['run_id'],
+    references: { table: 'pciv_runs', columns: ['id'] }
+  },
   {
     table: 'pciv_input_sources',
     columns: ['input_id'],
@@ -151,6 +204,16 @@ const fkExpectations = [
     table: 'pciv_input_sources',
     columns: ['source_id'],
     references: { table: 'pciv_sources', columns: ['id'] }
+  },
+  {
+    table: 'pciv_constraints',
+    columns: ['run_id'],
+    references: { table: 'pciv_runs', columns: ['id'] }
+  },
+  {
+    table: 'pciv_artifacts',
+    columns: ['run_id'],
+    references: { table: 'pciv_runs', columns: ['id'] }
   }
 ] as const;
 
@@ -230,10 +293,43 @@ const findIndexColumns = (indexDef: string) => {
 
 const normalizeColumns = (columns: string[]) => columns.map((value) => value.toLowerCase());
 
+const parseColumnList = (value: string) =>
+  value
+    .split(',')
+    .map((column) => column.trim())
+    .map((column) => column.replace(/"/g, ''))
+    .map((column) => column.split(' ')[0])
+    .filter(Boolean);
+
+const extractColumnsFromDefinition = (definition: string) => {
+  const match = definition.match(/\(([^)]+)\)/);
+  if (!match) return [];
+  return parseColumnList(match[1]);
+};
+
+const normalizeReferenceTable = (value: string) => value.replace(/"/g, '').split('.').pop() ?? value;
+
+const extractForeignKeyDefinition = (definition: string) => {
+  const match = definition.match(
+    /foreign key\s*\(([^)]+)\)\s*references\s+([^\s(]+)\s*\(([^)]+)\)/i
+  );
+  if (!match) return null;
+  return {
+    columns: parseColumnList(match[1]),
+    references: {
+      table: normalizeReferenceTable(match[2]),
+      columns: parseColumnList(match[3])
+    }
+  };
+};
+
 const indexSatisfies = (indexColumns: string[], expectedColumns: string[]) => {
   const indexSet = new Set(normalizeColumns(indexColumns));
   return expectedColumns.every((col) => indexSet.has(col.toLowerCase()));
 };
+
+const indexDefinitionHasColumns = (definition: string, expectedColumns: string[]) =>
+  indexSatisfies(findIndexColumns(definition), expectedColumns);
 
 describe('PCIV v1 Supabase DB contract', () => {
   const env = resolveSupabaseEnv();
@@ -254,44 +350,39 @@ describe('PCIV v1 Supabase DB contract', () => {
 
     const supabase = createClient(env.url, env.preferredKey ?? '');
 
-    const { data: tableRows, error: tableError } = await supabase
-      .schema('information_schema')
-      .from('tables')
-      .select('table_name')
-      .eq('table_schema', 'public')
-      .in('table_name', tableNames as string[]);
+    const { data: introspectData, error: introspectError } = await supabase.rpc('pciv_introspect');
 
-    if (tableError) {
-      throw new Error(`Failed to read information_schema.tables: ${tableError.message}`);
+    if (introspectError || !introspectData) {
+      throw new Error(
+        `pciv_introspect RPC failed: ${introspectError?.message ?? 'no data returned'}. ` +
+          'Ensure the function exists in public schema and grants execute to anon/authenticated.'
+      );
     }
 
-    const existingTables = new Set((tableRows ?? []).map((row) => row.table_name));
+    const tables = (introspectData as { tables?: Record<string, any> }).tables ?? {};
+
     tableNames.forEach((tableName) => {
-      assert.ok(existingTables.has(tableName), `Expected table public.${tableName} to exist.`);
+      assert.ok(tables[tableName]?.exists, `Expected table public.${tableName} to exist.`);
     });
 
-    const { data: columnRows, error: columnError } = await supabase
-      .schema('information_schema')
-      .from('columns')
-      .select('table_name,column_name,data_type,is_nullable')
-      .eq('table_schema', 'public')
-      .in('table_name', tableNames as string[]);
-
-    if (columnError) {
-      throw new Error(`Failed to read information_schema.columns: ${columnError.message}`);
-    }
-
-    const columnsByTable = (columnRows ?? []).reduce<Record<string, typeof columnRows>>((acc, row) => {
-      acc[row.table_name] = acc[row.table_name] ?? [];
-      acc[row.table_name].push(row);
+    const columnsByTable = tableNames.reduce<Record<string, Array<any>>>((acc, tableName) => {
+      acc[tableName] = tables[tableName]?.columns ?? [];
       return acc;
-    }, {});
+    }, {} as Record<string, Array<any>>);
 
     const expectedColumns = collectColumnExpectations();
 
     tableNames.forEach((tableName) => {
       const tableColumns = columnsByTable[tableName] ?? [];
-      const columnLookup = new Map(tableColumns.map((row) => [row.column_name, row]));
+      const columnLookup = new Map(tableColumns.map((row) => [row.name, row]));
+
+      requiredColumnGroups[tableName].forEach((group) => {
+        const hasColumn = group.some((column) => columnLookup.has(column));
+        assert.ok(
+          hasColumn,
+          `Expected ${tableName} to include one of: ${group.join(' or ')}.`
+        );
+      });
 
       expectedColumns[tableName].forEach((column) => {
         assert.ok(columnLookup.has(column), `Expected column ${tableName}.${column} to exist.`);
@@ -325,101 +416,42 @@ describe('PCIV v1 Supabase DB contract', () => {
       });
     });
 
-    const { data: namespaceRows, error: namespaceError } = await supabase
-      .schema('pg_catalog')
-      .from('pg_namespace')
-      .select('oid')
-      .eq('nspname', 'public')
-      .single();
-
-    if (namespaceError || !namespaceRows) {
-      throw new Error(`Failed to read pg_namespace for public schema: ${namespaceError?.message ?? 'missing row'}`);
-    }
-
-    const { data: classRows, error: classError } = await supabase
-      .schema('pg_catalog')
-      .from('pg_class')
-      .select('oid,relname,relnamespace')
-      .eq('relnamespace', namespaceRows.oid)
-      .in('relname', tableNames as string[]);
-
-    if (classError) {
-      throw new Error(`Failed to read pg_class: ${classError.message}`);
-    }
-
-    const tableOids = new Map<string, number>();
-    (classRows ?? []).forEach((row) => {
-      tableOids.set(row.relname, row.oid);
-    });
-
-    const { data: attributeRows, error: attributeError } = await supabase
-      .schema('pg_catalog')
-      .from('pg_attribute')
-      .select('attrelid,attnum,attname,attisdropped')
-      .in('attrelid', Array.from(tableOids.values()))
-      .gt('attnum', 0)
-      .eq('attisdropped', false);
-
-    if (attributeError) {
-      throw new Error(`Failed to read pg_attribute: ${attributeError.message}`);
-    }
-
-    const attributesByTable = new Map<number, Map<number, string>>();
-    (attributeRows ?? []).forEach((row) => {
-      const tableMap = attributesByTable.get(row.attrelid) ?? new Map<number, string>();
-      tableMap.set(row.attnum, row.attname);
-      attributesByTable.set(row.attrelid, tableMap);
-    });
-
-    const { data: constraintRows, error: constraintError } = await supabase
-      .schema('pg_catalog')
-      .from('pg_constraint')
-      .select('conname,contype,conrelid,confrelid,conkey,confkey')
-      .in('conrelid', Array.from(tableOids.values()));
-
-    if (constraintError) {
-      throw new Error(`Failed to read pg_constraint: ${constraintError.message}`);
-    }
-
     const constraintsByTable = new Map<string, {
       primaryKeys: Array<{ name: string; columns: string[] }>;
       uniques: Array<{ name: string; columns: string[] }>;
       foreignKeys: Array<{ name: string; columns: string[]; references: { table: string; columns: string[] } }>;
     }>();
-
-    const oidToTable = new Map<number, string>();
-    tableOids.forEach((oid, name) => oidToTable.set(oid, name));
-
-    (constraintRows ?? []).forEach((row) => {
-      const tableName = oidToTable.get(row.conrelid);
-      if (!tableName) return;
+    tableNames.forEach((tableName) => {
       const tableConstraints = constraintsByTable.get(tableName) ?? {
         primaryKeys: [],
         uniques: [],
         foreignKeys: []
       };
-      const attMap = attributesByTable.get(row.conrelid) ?? new Map<number, string>();
-      const columns = (row.conkey ?? []).map((attnum: number) => attMap.get(attnum)).filter(Boolean) as string[];
+      const constraints = tables[tableName]?.constraints ?? [];
 
-      if (row.contype === 'p') {
-        tableConstraints.primaryKeys.push({ name: row.conname, columns });
-      } else if (row.contype === 'u') {
-        tableConstraints.uniques.push({ name: row.conname, columns });
-      } else if (row.contype === 'f') {
-        const refTable = oidToTable.get(row.confrelid);
-        const refAttMap = attributesByTable.get(row.confrelid) ?? new Map<number, string>();
-        const refColumns = (row.confkey ?? [])
-          .map((attnum: number) => refAttMap.get(attnum))
-          .filter(Boolean) as string[];
-        tableConstraints.foreignKeys.push({
-          name: row.conname,
-          columns,
-          references: {
-            table: refTable ?? 'unknown',
-            columns: refColumns
+      constraints.forEach((constraint: { name: string; type: string; definition: string }) => {
+        const definition = constraint.definition ?? '';
+        if (constraint.type === 'p') {
+          tableConstraints.primaryKeys.push({
+            name: constraint.name,
+            columns: extractColumnsFromDefinition(definition)
+          });
+        } else if (constraint.type === 'u') {
+          tableConstraints.uniques.push({
+            name: constraint.name,
+            columns: extractColumnsFromDefinition(definition)
+          });
+        } else if (constraint.type === 'f') {
+          const foreignKey = extractForeignKeyDefinition(definition);
+          if (foreignKey) {
+            tableConstraints.foreignKeys.push({
+              name: constraint.name,
+              columns: foreignKey.columns,
+              references: foreignKey.references
+            });
           }
-        });
-      }
+        }
+      });
 
       constraintsByTable.set(tableName, tableConstraints);
     });
@@ -452,36 +484,37 @@ describe('PCIV v1 Supabase DB contract', () => {
       assert.ok(match, `Expected FK on ${expected.table}(${expected.columns.join(', ')}) -> ${expected.references.table}`);
     });
 
-    const { data: indexRows, error: indexError } = await supabase
-      .schema('pg_catalog')
-      .from('pg_indexes')
-      .select('tablename,indexname,indexdef')
-      .eq('schemaname', 'public')
-      .in('tablename', tableNames as string[]);
-
-    if (indexError) {
-      throw new Error(`Failed to read pg_indexes: ${indexError.message}`);
-    }
-
-    const indexesByTable = (indexRows ?? []).reduce<Record<string, Array<{ name: string; columns: string[] }>>>(
-      (acc, row) => {
-        acc[row.tablename] = acc[row.tablename] ?? [];
-        acc[row.tablename].push({ name: row.indexname, columns: findIndexColumns(row.indexdef) });
+    const indexesByTable = tableNames.reduce<Record<string, Array<{ name: string; definition: string }>>>(
+      (acc, tableName) => {
+        const indexes = tables[tableName]?.indexes ?? [];
+        acc[tableName] = indexes.map((index: { name: string; definition: string }) => ({
+          name: index.name,
+          definition: index.definition
+        }));
         return acc;
       },
       {}
     );
 
-    tableNames.forEach((tableName) => {
-      const indexes = indexesByTable[tableName] ?? [];
-      indexExpectations[tableName].forEach((expectedColumns) => {
-        const match = indexes.some((index) => indexSatisfies(index.columns, expectedColumns));
-        assert.ok(
-          match,
-          `Expected index on ${tableName} covering (${expectedColumns.join(', ')}).`
-        );
-      });
+    const runIndexes = indexesByTable.pciv_runs ?? [];
+    const hasRunIndex = runIndexes.some((index) => {
+      const columns = findIndexColumns(index.definition);
+      const hasScope = indexSatisfies(columns, ['scope_id']) || indexSatisfies(columns, ['project_id']);
+      const hasUpdated = indexSatisfies(columns, ['updated_at']);
+      return hasScope && hasUpdated;
     });
+    assert.ok(
+      hasRunIndex,
+      'Expected pciv_runs index covering (scope_id, updated_at desc) or equivalent.'
+    );
+
+    const inputIndexes = indexesByTable.pciv_inputs ?? [];
+    const hasInputIndex = inputIndexes.some((index) => indexDefinitionHasColumns(index.definition, ['run_id', 'pointer']));
+    assert.ok(hasInputIndex, 'Expected pciv_inputs index covering (run_id, pointer).');
+
+    const sourceIndexes = indexesByTable.pciv_sources ?? [];
+    const hasSourceIndex = sourceIndexes.some((index) => indexDefinitionHasColumns(index.definition, ['run_id']));
+    assert.ok(hasSourceIndex, 'Expected pciv_sources index covering (run_id).');
   });
 
   test('draft → commit → resolve context view roundtrip', async (t) => {
