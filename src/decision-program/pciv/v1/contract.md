@@ -14,6 +14,12 @@ PcivContextViewV1 = {
 }
 ```
 
+## Glossary
+
+- **scopeId (semantic)**: the identifier consumers use to resolve PCIV context.
+- **projectId (persisted legacy field name)**: storage/DB field name that stores the same identifier for backward compatibility.
+- Consumers MUST use `scopeId`; storage persists it as `projectId`.
+
 ### Invariants
 
 - `run` is the canonical run metadata, including commit status and timestamps.
@@ -61,6 +67,19 @@ Skills/agents are consumers and producers of PCIV v1 data.
 - Planning execution program
 - Skills/agents
 - Evidence UI
+
+## ContextView Resolver Boundary
+
+Only the resolver boundary may serve PCIV v1 context to consumers.
+
+- Planning → `resolveContextView(...)`
+- Skills → `getContextViewForSkill(...)` → `resolveContextView(...)`
+- No consumer may read v1 tables directly.
+- No consumer may read localStorage for PCIV data.
+- Deterministic precedence: if multiple committed runs exist for a scope/user, the resolver selects the latest
+  `committed`/`partial_committed` run by `committedAt`, falling back to `updatedAt` with a stable tie-breaker.
+- Context versioning: consumers use `run.committedAt` (or `run.updatedAt` when needed) as the
+  `contextVersionId` applied into planning state.
 
 ## NO SCHEMA SPRAWL
 

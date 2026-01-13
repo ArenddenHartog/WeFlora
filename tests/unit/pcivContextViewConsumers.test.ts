@@ -1,24 +1,40 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { assertPcivContextView } from '../../src/decision-program/pciv/v1/contextView.ts';
+import { buildProgram } from '../../src/decision-program/orchestrator/buildProgram.ts';
+import { planRun } from '../../src/decision-program/orchestrator/planRun.ts';
+import { listMissingPointersBySeverity } from '../../src/decision-program/orchestrator/pointerInputRegistry.ts';
+import { applyContextViewToPlanningState } from '../../components/planning/planningUtils.ts';
 import { PcivContextViewV1Schema } from '../../src/decision-program/pciv/v1/schemas.ts';
+const loadContextResolvers = async () => {
+  process.env.VITE_SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? 'https://example.supabase.co';
+  process.env.VITE_SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY ?? 'test-key';
+  const cacheBust = `?cache=${Date.now()}-${Math.random()}`;
+  const { resolveContextView } = await import(`../../src/decision-program/pciv/v1/resolveContextView.ts${cacheBust}`);
+  const { getContextViewForSkill } = await import(`../../src/decision-program/skills/context/getContextView.ts${cacheBust}`);
+  return { resolveContextView, getContextViewForSkill };
+};
 
-test('Planning and Skills consume the same PcivContextViewV1 shape', () => {
-  const fixture = {
+const buildFixtureView = () => {
+  const runId = '11111111-1111-4111-8111-111111111111';
+  const committedAt = '2025-01-02T03:04:05.000Z';
+  return PcivContextViewV1Schema.parse({
     run: {
-      id: '11111111-1111-4111-8111-111111111111',
+      id: runId,
       scopeId: 'project-123',
-      userId: '22222222-2222-4222-8222-222222222222',
+      userId: null,
       status: 'committed',
       allowPartial: false,
-      committedAt: '2025-01-02T03:04:05.000Z',
-      createdAt: '2025-01-02T03:04:05.000Z',
-      updatedAt: '2025-01-02T03:04:05.000Z'
+      committedAt,
+      createdAt: committedAt,
+      updatedAt: committedAt
     },
     sourcesById: {
       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa': {
         id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        runId: '11111111-1111-4111-8111-111111111111',
+        runId,
         kind: 'file',
         title: 'Site report',
         uri: 's3://example/site-report.pdf',
@@ -28,122 +44,138 @@ test('Planning and Skills consume the same PcivContextViewV1 shape', () => {
         parseStatus: 'parsed',
         excerpt: 'Site report excerpt',
         rawMeta: {},
-        createdAt: '2025-01-02T03:04:05.000Z'
+        createdAt: committedAt
       }
     },
     inputsByPointer: {
-      'site.name': {
+      '/context/site/geo/locationHint': {
         id: '33333333-3333-4333-8333-333333333333',
-        runId: '11111111-1111-4111-8111-111111111111',
-        pointer: 'site.name',
-        label: 'Site name',
+        runId,
+        pointer: '/context/site/geo/locationHint',
+        label: 'Location hint',
         domain: 'site',
         required: true,
         fieldType: 'text',
         options: null,
         valueKind: 'string',
-        valueString: 'Pine Ridge',
+        valueString: 'Utrecht',
         valueNumber: null,
         valueBoolean: null,
         valueEnum: null,
         valueJson: null,
         provenance: 'user-entered',
         updatedBy: 'user',
-        updatedAt: '2025-01-02T03:04:05.000Z',
+        updatedAt: committedAt,
         evidenceSnippet: null,
         sourceIds: []
-      },
-      'site.acres': {
+      }
+    },
+    constraints: [
+      {
         id: '44444444-4444-4444-8444-444444444444',
-        runId: '11111111-1111-4111-8111-111111111111',
-        pointer: 'site.acres',
-        label: 'Site acreage',
-        domain: 'site',
-        required: true,
-        fieldType: 'text',
-        options: null,
-        valueKind: 'number',
-        valueString: null,
-        valueNumber: 42,
+        runId,
+        key: 'regulatory.setting',
+        domain: 'regulatory',
+        label: 'Setting',
+        valueKind: 'string',
+        valueString: 'Urban core',
+        valueNumber: null,
         valueBoolean: null,
         valueEnum: null,
         valueJson: null,
-        provenance: 'model-inferred',
-        updatedBy: 'model',
-        updatedAt: '2025-01-02T03:04:05.000Z',
-        evidenceSnippet: null,
-        sourceIds: []
-      },
-      'site.hasWetlands': {
-        id: '55555555-5555-4555-8555-555555555555',
-        runId: '11111111-1111-4111-8111-111111111111',
-        pointer: 'site.hasWetlands',
-        label: 'Wetlands present',
-        domain: 'biophysical',
-        required: false,
-        fieldType: 'boolean',
-        options: null,
-        valueKind: 'boolean',
-        valueString: null,
-        valueNumber: null,
-        valueBoolean: true,
-        valueEnum: null,
-        valueJson: null,
         provenance: 'source-backed',
-        updatedBy: 'system',
-        updatedAt: '2025-01-02T03:04:05.000Z',
-        evidenceSnippet: 'Report notes wetlands near stream.',
-        sourceIds: ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa']
+        sourceId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        snippet: null,
+        createdAt: committedAt
       }
+    ],
+    artifactsByType: {}
+  });
+};
+
+test('Resolver returns validated ContextView', async () => {
+  const view = buildFixtureView();
+  const run = view.run;
+
+  const { resolveContextView } = await loadContextResolvers();
+  const deps = {
+    listRunsForScope: async () => [run],
+    fetchContextViewByRunId: async () => view
+  };
+
+  const resolved = await resolveContextView({ scopeId: run.scopeId, userId: run.userId }, deps);
+  assert.deepEqual(resolved, PcivContextViewV1Schema.parse(resolved));
+});
+
+test('Resolver passes scopeId to adapter', async () => {
+  const view = buildFixtureView();
+  const run = view.run;
+  const scopeId = 'scope-xyz';
+  let receivedScopeId: string | null = null;
+
+  const { resolveContextView } = await loadContextResolvers();
+  const deps = {
+    listRunsForScope: async (incomingScopeId: string) => {
+      receivedScopeId = incomingScopeId;
+      return [{ ...run, scopeId }];
     },
-    constraints: [],
-    artifactsByType: {
-      summary: [
-        {
-          id: '66666666-6666-4666-8666-666666666666',
-          runId: '11111111-1111-4111-8111-111111111111',
-          type: 'summary',
-          title: 'Summary',
-          payload: { text: 'Summary text.' },
-          createdAt: '2025-01-02T03:04:05.000Z'
-        }
-      ]
-    }
+    fetchContextViewByRunId: async () => ({ ...view, run: { ...view.run, scopeId } })
   };
 
-  const parsedViaSchema = PcivContextViewV1Schema.parse(fixture);
-  const view = assertPcivContextView(parsedViaSchema);
+  await resolveContextView({ scopeId }, deps);
+  assert.equal(receivedScopeId, scopeId);
+});
 
-  const planningConsumer = (context: typeof view) => {
-    const siteName = context.inputsByPointer['site.name'];
-    const siteAcres = context.inputsByPointer['site.acres'];
-    const wetlands = context.inputsByPointer['site.hasWetlands'];
+test('Planning and Skill consume the same ContextView', async () => {
+  const view = buildFixtureView();
+  const run = view.run;
 
-    assert.equal(siteName.valueKind, 'string');
-    assert.equal(siteName.valueString, 'Pine Ridge');
-
-    assert.equal(siteAcres.valueKind, 'number');
-    assert.equal(siteAcres.valueNumber, 42);
-
-    assert.equal(wetlands.valueKind, 'boolean');
-    assert.equal(wetlands.valueBoolean, true);
-
-    return { siteName, siteAcres, wetlands };
+  const { resolveContextView, getContextViewForSkill } = await loadContextResolvers();
+  const deps = {
+    listRunsForScope: async () => [run],
+    fetchContextViewByRunId: async () => view
   };
 
-  const skillsConsumer = (context: typeof view) => {
-    const inputs = Object.values(context.inputsByPointer);
-    inputs.forEach((input) => {
-      if (input.provenance === 'source-backed') {
-        assert.ok(input.sourceIds && input.sourceIds.length > 0, 'Missing sourceIds for source-backed input');
-      }
-    });
-    return true;
-  };
+  const planningView = await resolveContextView({ scopeId: run.scopeId, userId: run.userId }, deps);
+  const skillsView = await getContextViewForSkill({ scopeId: run.scopeId, userId: run.userId }, deps);
 
-  const planningResult = planningConsumer(view);
-  const skillsResult = skillsConsumer(view);
+  assert.deepEqual(planningView.inputsByPointer, skillsView.inputsByPointer);
+  assert.deepEqual(planningView.constraints, skillsView.constraints);
+  assert.equal(planningView.run.id, skillsView.run.id);
+  assert.equal(planningView.run.committedAt, skillsView.run.committedAt);
+});
 
-  assert.ok(planningResult.siteName === view.inputsByPointer['site.name']);
-  assert.ok(skillsResult);
+test('Planning application shrinks missing required inputs', () => {
+  const program = buildProgram();
+  const baseState = planRun(program, {
+    site: {},
+    regulatory: {},
+    equity: {},
+    species: {},
+    supply: {},
+    selectedDocs: []
+  });
+  const initialMissing = listMissingPointersBySeverity(baseState, 'required').length;
+
+  const view = buildFixtureView();
+  const hydrated = applyContextViewToPlanningState(baseState, view);
+  const hydratedMissing = listMissingPointersBySeverity(hydrated, 'required').length;
+
+  assert.ok(hydratedMissing < initialMissing);
+});
+
+test('No v0/localStorage dependency in resolver + planning + skills entry points', () => {
+  const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  const files = [
+    'components/planning/PlanningView.tsx',
+    'components/planning/planningUtils.ts',
+    'src/decision-program/pciv/v1/resolveContextView.ts',
+    'src/decision-program/skills/context/getContextView.ts'
+  ];
+
+  files.forEach((relativePath) => {
+    const contents = fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+    assert.ok(!contents.includes('pciv/v0'), `${relativePath} should not reference pciv/v0`);
+    assert.ok(!contents.includes('localStorage'), `${relativePath} should not reference localStorage`);
+  });
 });

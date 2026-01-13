@@ -1,5 +1,3 @@
-import type { PcivCommittedContext } from './pciv/v0/types';
-
 export type Phase = 'site' | 'species' | 'supply';
 
 export type RunStatus = 'idle' | 'running' | 'blocked' | 'done' | 'error' | 'canceled';
@@ -287,6 +285,7 @@ export interface ExecutionContext {
   supply: Record<string, unknown>;
   selectedDocs?: EvidenceFileRef[];
   contextVersionId?: string;
+  scopeId?: string;
 }
 
 export interface ExecutionLogEntry {
@@ -315,5 +314,5 @@ export interface ExecutionState {
   timelineEntries?: TimelineEntry[];
   derivedConstraints?: DerivedConstraints;
   derivedInputs?: Record<string, DerivedInput>;
-  pcivCommittedContext?: PcivCommittedContext;
+  pcivCommittedContext?: unknown;
 }

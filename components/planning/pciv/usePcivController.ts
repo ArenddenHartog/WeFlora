@@ -1,22 +1,22 @@
 import { useCallback, useState } from 'react';
-import type { PcivCommittedContext, PcivStage } from '../../../src/decision-program/pciv/v0/types';
+import type { PcivContextViewV1 } from '../../../src/decision-program/pciv/v1/schemas';
 
 interface UsePcivControllerOptions {
-  initialStage?: PcivStage;
-  initialCommittedContext?: PcivCommittedContext | null;
+  initialStage?: 'import' | 'map' | 'validate';
+  initialCommittedContext?: PcivContextViewV1 | null;
 }
 
-const DEFAULT_STAGE: PcivStage = 'import';
+const DEFAULT_STAGE: 'import' | 'map' | 'validate' = 'import';
 
 const usePcivController = (options: UsePcivControllerOptions = {}) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [stage, setStage] = useState<PcivStage>(options.initialStage ?? DEFAULT_STAGE);
-  const [committedContext, setCommittedContext] = useState<PcivCommittedContext | null>(
+  const [stage, setStage] = useState<'import' | 'map' | 'validate'>(options.initialStage ?? DEFAULT_STAGE);
+  const [committedContext, setCommittedContext] = useState<PcivContextViewV1 | null>(
     options.initialCommittedContext ?? null
   );
 
   const open = useCallback(
-    (nextStage: PcivStage = options.initialStage ?? DEFAULT_STAGE) => {
+    (nextStage: 'import' | 'map' | 'validate' = options.initialStage ?? DEFAULT_STAGE) => {
       setStage(nextStage);
       setIsOpen(true);
     },
@@ -27,7 +27,7 @@ const usePcivController = (options: UsePcivControllerOptions = {}) => {
     setIsOpen(false);
   }, []);
 
-  const commit = useCallback((context: PcivCommittedContext) => {
+  const commit = useCallback((context: PcivContextViewV1) => {
     setCommittedContext(context);
     setIsOpen(false);
   }, []);

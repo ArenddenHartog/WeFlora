@@ -36,10 +36,10 @@ const ContextIntakeRoute: React.FC = () => {
       userId={user?.email ?? null}
       initialStage={initialStage}
       onCancel={() => navigate(returnTo)}
-      onComplete={(commit) => {
+      onComplete={(run) => {
         navigate(returnTo, {
           state: {
-            pcivCommittedAt: commit.committed_at,
+            pcivRunId: run.id,
             pcivAutoStart: autoStart
           }
         });

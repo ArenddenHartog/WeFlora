@@ -1,12 +1,29 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import type { PcivCommittedContext, PcivContextIntakeRun, PcivDraft, PcivMetrics, PcivStage } from '../../../src/decision-program/pciv/v0/types';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { PcivContextIntakeRun, PcivDraft, PcivMetrics, PcivSource } from '../../../src/decision-program/pciv/v0/types';
 import {
   applyPcivAutoMapping,
+  buildPcivFields,
   ensureDefaultInferences,
   setPcivFieldValue,
   updateLocationHintField
 } from '../../../src/decision-program/pciv/v0/map';
-import { commitPcivDraft, loadPcivRun, updatePcivDraft } from '../../../src/decision-program/pciv/v0/store';
+import { computePcivMetrics } from '../../../src/decision-program/pciv/v0/metrics';
+import {
+  commitRun,
+  createDraftRun,
+  linkInputSources,
+  updateDraftRun,
+  upsertConstraints,
+  upsertInputs,
+  upsertSources
+} from '../../../src/decision-program/pciv/v1/storage/supabase';
+import type {
+  PcivConstraintV1,
+  PcivInputSourceV1,
+  PcivInputV1,
+  PcivRunV1,
+  PcivSourceV1
+} from '../../../src/decision-program/pciv/v1/schemas';
 import ImportStage from './ImportStage';
 import MapStage from './MapStage';
 import ValidateStage from './ValidateStage';
@@ -14,25 +31,271 @@ import ValidateStage from './ValidateStage';
 export interface PCIVFlowProps {
   projectId: string;
   userId?: string | null;
-  initialStage?: PcivStage;
-  onComplete: (commit: PcivCommittedContext) => void;
+  initialStage?: 'import' | 'map' | 'validate';
+  onComplete: (run: PcivRunV1) => void;
   onCancel?: () => void;
 }
 
-const STAGES: Array<{ id: PcivStage; label: string }> = [
+const STAGES: Array<{ id: 'import' | 'map' | 'validate'; label: string }> = [
   { id: 'import', label: 'Import' },
   { id: 'map', label: 'Map' },
   { id: 'validate', label: 'Validate & Commit' }
 ];
 
+const now = () => new Date().toISOString();
+
+const ensureMappedId = (map: Map<string, string>, key: string) => {
+  const existing = map.get(key);
+  if (existing) return existing;
+  const created = crypto.randomUUID();
+  map.set(key, created);
+  return created;
+};
+
+const mapUpdatedBy = (provenance: PcivDraft['fields'][string]['provenance']): PcivInputV1['updatedBy'] => {
+  if (provenance === 'user-entered') return 'user';
+  if (provenance === 'model-inferred') return 'model';
+  return 'system';
+};
+
+const mapInputValueKind = (fieldType: PcivDraft['fields'][string]['type']): PcivInputV1['valueKind'] => {
+  if (fieldType === 'boolean') return 'boolean';
+  if (fieldType === 'select') return 'enum';
+  return 'string';
+};
+
+const buildInputValueFields = (
+  valueKind: PcivInputV1['valueKind'],
+  value: PcivDraft['fields'][string]['value'],
+  provenance: PcivDraft['fields'][string]['provenance']
+) => {
+  if (provenance === 'unknown' || value === null || value === undefined || value === '') {
+    return {
+      valueKind,
+      valueString: null,
+      valueNumber: null,
+      valueBoolean: null,
+      valueEnum: null,
+      valueJson: null
+    };
+  }
+  if (valueKind === 'boolean') {
+    return {
+      valueKind,
+      valueString: null,
+      valueNumber: null,
+      valueBoolean: value === true,
+      valueEnum: null,
+      valueJson: null
+    };
+  }
+  if (valueKind === 'enum') {
+    return {
+      valueKind,
+      valueString: null,
+      valueNumber: null,
+      valueBoolean: null,
+      valueEnum: String(value),
+      valueJson: null
+    };
+  }
+  return {
+    valueKind,
+    valueString: String(value),
+    valueNumber: null,
+    valueBoolean: null,
+    valueEnum: null,
+    valueJson: null
+  };
+};
+
+const mapConstraintValueFields = (value: PcivDraft['constraints'][number]['value']) => {
+  if (value === null || value === undefined || value === '') {
+    return {
+      valueKind: 'string' as const,
+      valueString: null,
+      valueNumber: null,
+      valueBoolean: null,
+      valueEnum: null,
+      valueJson: null
+    };
+  }
+  if (typeof value === 'number') {
+    return {
+      valueKind: 'number' as const,
+      valueString: null,
+      valueNumber: value,
+      valueBoolean: null,
+      valueEnum: null,
+      valueJson: null
+    };
+  }
+  if (typeof value === 'boolean') {
+    return {
+      valueKind: 'boolean' as const,
+      valueString: null,
+      valueNumber: null,
+      valueBoolean: value,
+      valueEnum: null,
+      valueJson: null
+    };
+  }
+  if (typeof value === 'object') {
+    return {
+      valueKind: 'json' as const,
+      valueString: null,
+      valueNumber: null,
+      valueBoolean: null,
+      valueEnum: null,
+      valueJson: value
+    };
+  }
+  return {
+    valueKind: 'string' as const,
+    valueString: String(value),
+    valueNumber: null,
+    valueBoolean: null,
+    valueEnum: null,
+    valueJson: null
+  };
+};
+
+const mapSourceKind = (source: PcivSource): PcivSourceV1['kind'] =>
+  source.type === 'file' ? 'file' : 'manual';
+
 const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, onComplete, onCancel }) => {
-  const [stage, setStage] = useState<PcivStage>(initialStage ?? 'import');
+  const [stage, setStage] = useState<'import' | 'map' | 'validate'>(initialStage ?? 'import');
   const [run, setRun] = useState<PcivContextIntakeRun | null>(null);
+  const runIdRef = useRef<string | null>(null);
+  const sourceIdMapRef = useRef<Map<string, string>>(new Map());
+  const inputIdMapRef = useRef<Map<string, string>>(new Map());
+  const constraintIdMapRef = useRef<Map<string, string>>(new Map());
+
+  const buildDefaultDraft = useCallback(
+    (runId: string): PcivDraft => ({
+      projectId,
+      runId,
+      userId: userId ?? null,
+      locationHint: '',
+      sources: [],
+      fields: buildPcivFields(),
+      constraints: [],
+      errors: []
+    }),
+    [projectId, userId]
+  );
+
+  const persistDraft = useCallback(async (draftToPersist: PcivDraft) => {
+    const runId = runIdRef.current;
+    if (!runId) return;
+
+    const sourceIdMap = sourceIdMapRef.current;
+    const inputIdMap = inputIdMapRef.current;
+    const constraintIdMap = constraintIdMapRef.current;
+    const timestamp = now();
+
+    const sources: PcivSourceV1[] = draftToPersist.sources.map((source) => {
+      const sourceId = ensureMappedId(sourceIdMap, source.id);
+      return {
+        id: sourceId,
+        runId,
+        kind: mapSourceKind(source),
+        title: source.name,
+        uri: source.id || source.name,
+        fileId: null,
+        mimeType: source.mimeType ?? null,
+        sizeBytes: source.size ?? null,
+        parseStatus: source.status,
+        excerpt: source.content ?? null,
+        rawMeta: source.error ? { error: source.error } : {},
+        createdAt: source.createdAt
+      };
+    });
+
+    const inputs: PcivInputV1[] = Object.values(draftToPersist.fields).map((field) => {
+      const inputId = ensureMappedId(inputIdMap, field.pointer);
+      const valueKind = mapInputValueKind(field.type);
+      const valueFields = buildInputValueFields(valueKind, field.value, field.provenance);
+      return {
+        id: inputId,
+        runId,
+        pointer: field.pointer,
+        label: field.label,
+        domain: field.group,
+        required: field.required,
+        fieldType: field.type,
+        options: field.options ?? null,
+        provenance: field.provenance,
+        updatedBy: mapUpdatedBy(field.provenance),
+        updatedAt: timestamp,
+        evidenceSnippet: field.snippet ?? null,
+        sourceIds: field.sourceId ? [ensureMappedId(sourceIdMap, field.sourceId)] : [],
+        ...valueFields
+      };
+    });
+
+    const constraints: PcivConstraintV1[] = draftToPersist.constraints.map((constraint) => {
+      const constraintId = ensureMappedId(constraintIdMap, constraint.id ?? constraint.key);
+      const valueFields = mapConstraintValueFields(constraint.value);
+      return {
+        id: constraintId,
+        runId,
+        key: constraint.key,
+        domain: constraint.domain,
+        label: constraint.label,
+        provenance: constraint.provenance,
+        sourceId: constraint.sourceId ? ensureMappedId(sourceIdMap, constraint.sourceId) : null,
+        snippet: constraint.snippet ?? null,
+        createdAt: timestamp,
+        ...valueFields
+      };
+    });
+
+    const inputSources: PcivInputSourceV1[] = Object.values(draftToPersist.fields)
+      .filter((field) => Boolean(field.sourceId))
+      .map((field) => ({
+        inputId: ensureMappedId(inputIdMap, field.pointer),
+        sourceId: ensureMappedId(sourceIdMap, field.sourceId as string)
+      }));
+
+    await upsertSources(runId, sources);
+    await upsertInputs(runId, inputs);
+    await upsertConstraints(runId, constraints);
+    await linkInputSources(runId, inputSources);
+    await updateDraftRun(runId);
+  }, []);
 
   useEffect(() => {
-    const loaded = loadPcivRun(projectId, userId ?? null);
-    setRun(loaded);
-  }, [projectId, userId]);
+    let isCancelled = false;
+    sourceIdMapRef.current = new Map();
+    inputIdMapRef.current = new Map();
+    constraintIdMapRef.current = new Map();
+    createDraftRun(projectId, userId ?? null)
+      .then((createdRun) => {
+        if (isCancelled) return;
+        runIdRef.current = createdRun.id;
+        const draft = buildDefaultDraft(createdRun.id);
+        setRun({
+          id: createdRun.id,
+          projectId,
+          userId: userId ?? null,
+          runId: createdRun.id,
+          status: 'draft',
+          draft,
+          commit: null,
+          metrics: computePcivMetrics(draft),
+          createdAt: createdRun.createdAt,
+          updatedAt: createdRun.updatedAt
+        });
+      })
+      .catch(() => {
+        if (isCancelled) return;
+        setRun(null);
+      });
+    return () => {
+      isCancelled = true;
+    };
+  }, [buildDefaultDraft, projectId, userId]);
 
   useEffect(() => {
     if (initialStage) {
@@ -43,13 +306,21 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
   const draft = run?.draft;
   const metrics = run?.metrics;
 
-  const updateDraft = (updater: PcivDraft | ((draft: PcivDraft) => PcivDraft)) => {
+  const updateDraft = useCallback((updater: PcivDraft | ((draft: PcivDraft) => PcivDraft)) => {
     setRun((prev) => {
       if (!prev) return prev;
       const nextDraft = typeof updater === 'function' ? updater(prev.draft) : updater;
-      return updatePcivDraft(prev, nextDraft);
+      const metricsSnapshot = computePcivMetrics(nextDraft);
+      void persistDraft(nextDraft);
+      return {
+        ...prev,
+        status: 'draft',
+        draft: nextDraft,
+        metrics: metricsSnapshot,
+        updatedAt: now()
+      };
     });
-  };
+  }, [persistDraft]);
 
   const handleLocationHintChange = (value: string) => {
     if (!draft || !run) return;
@@ -76,12 +347,23 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
     }
   };
 
-  const handleCommit = (allowPartial: boolean) => {
+  const handleCommit = useCallback(async (allowPartial: boolean) => {
     if (!run) return;
-    const result = commitPcivDraft(run, allowPartial);
-    setRun(result.run);
-    onComplete(result.commit);
-  };
+    const runId = runIdRef.current;
+    if (!runId) return;
+    await persistDraft(run.draft);
+    const committedRun = await commitRun(runId, allowPartial);
+    setRun((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: committedRun.status,
+            updatedAt: committedRun.updatedAt
+          }
+        : prev
+    );
+    onComplete(committedRun);
+  }, [onComplete, persistDraft, run]);
 
   const headerMetrics = useMemo(() => metrics ?? ({
     sources_count: 0,
@@ -109,7 +391,7 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs text-slate-400 uppercase tracking-wide">Context intake</p>
-            <h1 className="text-lg font-semibold text-slate-800">PCIV v0 · Context Intake</h1>
+            <h1 className="text-lg font-semibold text-slate-800">PCIV v1 · Context Intake</h1>
           </div>
           <div className="flex items-center gap-2">
             {onCancel && (

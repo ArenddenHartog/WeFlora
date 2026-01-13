@@ -2,6 +2,7 @@ import type { Agent } from '../types.ts';
 import { runSiteRegulatoryAnalysis } from '../../skills/siteRegulatoryAnalysis.ts';
 import { buildContextPatchesFromDerivedConstraints, buildDerivedInputs } from '../../orchestrator/derivedConstraints.ts';
 import { buildRegistryInputs } from '../../orchestrator/pointerInputRegistry.ts';
+import { getContextViewForSkill } from '../../skills/context/getContextView.ts';
 import {
   buildArtifactNodeId,
   buildClaimNodeId,
@@ -29,6 +30,22 @@ const getPointerLabels = () => {
   }, {});
 };
 
+const readPcivValue = (input?: { valueKind: string; valueString?: string | null; valueNumber?: number | null; valueBoolean?: boolean | null; valueEnum?: string | null; valueJson?: unknown | null }) => {
+  if (!input) return undefined;
+  switch (input.valueKind) {
+    case 'number':
+      return input.valueNumber ?? undefined;
+    case 'boolean':
+      return input.valueBoolean ?? undefined;
+    case 'enum':
+      return input.valueEnum ?? undefined;
+    case 'json':
+      return input.valueJson ?? undefined;
+    default:
+      return input.valueString ?? undefined;
+  }
+};
+
 export const siteRegulatoryAnalysis: Agent = {
   id: 'site-regulatory-analysis',
   title: 'Strategic site & regulatory analysis',
@@ -38,7 +55,20 @@ export const siteRegulatoryAnalysis: Agent = {
   run: async ({ context, step, state }) => {
     const stepId = step?.id ?? 'site:strategic-site-regulatory-analysis';
     const selectedDocs = context.selectedDocs ?? [];
-    const locationHint = (context.site as any)?.geo?.locationHint as string | undefined;
+    const scopeId = context.scopeId;
+    let locationHint = (context.site as any)?.geo?.locationHint as string | undefined;
+
+    if (!locationHint && scopeId) {
+      try {
+        const view = await getContextViewForSkill({ scopeId });
+        const value = readPcivValue(view.inputsByPointer['/context/site/geo/locationHint']);
+        if (typeof value === 'string' && value.trim()) {
+          locationHint = value;
+        }
+      } catch {
+        // ignore resolver errors for optional enrichment
+      }
+    }
 
     if (selectedDocs.length === 0 && !locationHint) {
       pushStepLog(state, stepId, 'Awaiting documents or a location hint to begin analysis');

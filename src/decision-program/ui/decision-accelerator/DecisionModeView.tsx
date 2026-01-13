@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import type { ExecutionState, DecisionProgram, EvidenceRef } from '../../types';
-import type { PcivConstraint } from '../../pciv/v0/types';
+import type { PcivConstraintV1 } from '../../pciv/v1/schemas';
 import type { StepperStepViewModel } from './RightSidebarStepper';
 import RightSidebarStepper from './RightSidebarStepper';
 import DraftMatrixTable from './DraftMatrixTable';
@@ -28,7 +28,7 @@ export interface DecisionModeViewProps {
     Promise<any>;
   onPromoteToWorksheet?: (payload: { matrixId: string; rowIds?: string[] }) => void;
   onApplyDerivedInput?: (args: { pointer: string; value?: unknown; mode: 'accept' | 'ignore' | 'edit' }) => void;
-  pcivConstraints?: PcivConstraint[];
+  pcivConstraints?: PcivConstraintV1[];
   inputChangeNotice?: {
     changedInputs: string[];
     impactedSteps: string[];
