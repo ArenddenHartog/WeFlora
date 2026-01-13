@@ -21,6 +21,7 @@
     "test:pciv-stabilization:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
     "test:pciv:db": "node --test tests/integration/pcivSupabaseContract.test.ts",
     "pciv:db:audit": "node --experimental-strip-types scripts/pciv-db-audit.ts",
+    "test:db-contract": "node scripts/test-db-contract.mjs",
     "check": "npm run lint && npm run guard:temp-ids && npm run guard:toast-icons && npm run build"
   },
   "dependencies": {
@@ -42,6 +43,7 @@
     "@typescript-eslint/parser": "^8.50.0",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.23",
+    "dotenv": "^17.2.3",
     "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-react": "^7.37.5",

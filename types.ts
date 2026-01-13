@@ -345,6 +345,7 @@ export interface ConditionalFormattingRule {
 
 export interface SkillConfiguration {
     id: string; 
+    templateId?: string;
     name: string;           // e.g. "Zoning Validator"
     description?: string;   // e.g. "Checks species against 2024 City Policy"
     
