@@ -126,7 +126,7 @@ const uniqueExpectations: Record<TableName, string[][]> = {
 const requiredColumnGroups: Record<TableName, string[][]> = {
   pciv_runs: [
     ['id'],
-    ['scope_id', 'project_id'],
+    ['scope_id'],
     ['status'],
     ['created_at'],
     ['updated_at'],
@@ -138,7 +138,6 @@ const requiredColumnGroups: Record<TableName, string[][]> = {
   pciv_sources: [
     ['id'],
     ['run_id'],
-    ['scope_id', 'project_id'],
     ['type', 'kind'],
     ['name', 'title'],
     ['mime_type'],
@@ -149,7 +148,6 @@ const requiredColumnGroups: Record<TableName, string[][]> = {
   pciv_inputs: [
     ['id'],
     ['run_id'],
-    ['scope_id', 'project_id'],
     ['pointer'],
     ['label'],
     ['domain'],
@@ -164,7 +162,6 @@ const requiredColumnGroups: Record<TableName, string[][]> = {
   pciv_constraints: [
     ['id'],
     ['run_id'],
-    ['scope_id', 'project_id'],
     ['key'],
     ['domain'],
     ['label'],
@@ -177,7 +174,6 @@ const requiredColumnGroups: Record<TableName, string[][]> = {
   pciv_artifacts: [
     ['id'],
     ['run_id'],
-    ['scope_id', 'project_id'],
     ['type'],
     ['payload_json', 'payload'],
     ['created_at']
@@ -331,6 +327,19 @@ const indexSatisfies = (indexColumns: string[], expectedColumns: string[]) => {
 const indexDefinitionHasColumns = (definition: string, expectedColumns: string[]) =>
   indexSatisfies(findIndexColumns(definition), expectedColumns);
 
+const hasForeignKeyDefinition = (
+  constraints: Array<{ definition: string }>,
+  column: string,
+  referenceTable: string,
+  referenceColumn: string
+) => {
+  const pattern = new RegExp(
+    `foreign key\\s*\\(${column}\\)\\s*references\\s+["\\w\\.]*${referenceTable}["\\w\\.]*\\s*\\(${referenceColumn}\\)`,
+    'i'
+  );
+  return constraints.some((constraint) => pattern.test(constraint.definition ?? ''));
+};
+
 describe('PCIV v1 Supabase DB contract', () => {
   const env = resolveSupabaseEnv();
 
@@ -416,6 +425,53 @@ describe('PCIV v1 Supabase DB contract', () => {
       });
     });
 
+    const runColumns = columnsByTable.pciv_runs ?? [];
+    const runColumnLookup = new Map(runColumns.map((row) => [row.name, row]));
+    assert.ok(runColumnLookup.has('id'), 'Expected pciv_runs.id column to exist.');
+    assert.ok(runColumnLookup.has('scope_id'), 'Expected pciv_runs.scope_id column to exist.');
+    assert.equal(
+      runColumnLookup.get('id')?.is_nullable,
+      'NO',
+      'Expected pciv_runs.id to be NOT NULL.'
+    );
+    assert.equal(
+      runColumnLookup.get('scope_id')?.is_nullable,
+      'NO',
+      'Expected pciv_runs.scope_id to be NOT NULL.'
+    );
+
+    const childTables: Array<'pciv_sources' | 'pciv_inputs' | 'pciv_constraints' | 'pciv_artifacts'> = [
+      'pciv_sources',
+      'pciv_inputs',
+      'pciv_constraints',
+      'pciv_artifacts'
+    ];
+    childTables.forEach((tableName) => {
+      const tableColumns = columnsByTable[tableName] ?? [];
+      const columnLookup = new Map(tableColumns.map((row) => [row.name, row]));
+      assert.ok(columnLookup.has('run_id'), `Expected ${tableName}.run_id column to exist.`);
+      assert.equal(
+        columnLookup.get('run_id')?.is_nullable,
+        'NO',
+        `Expected ${tableName}.run_id to be NOT NULL.`
+      );
+    });
+
+    const joinColumns = columnsByTable.pciv_input_sources ?? [];
+    const joinColumnLookup = new Map(joinColumns.map((row) => [row.name, row]));
+    assert.ok(joinColumnLookup.has('input_id'), 'Expected pciv_input_sources.input_id column to exist.');
+    assert.ok(joinColumnLookup.has('source_id'), 'Expected pciv_input_sources.source_id column to exist.');
+    assert.equal(
+      joinColumnLookup.get('input_id')?.is_nullable,
+      'NO',
+      'Expected pciv_input_sources.input_id to be NOT NULL.'
+    );
+    assert.equal(
+      joinColumnLookup.get('source_id')?.is_nullable,
+      'NO',
+      'Expected pciv_input_sources.source_id to be NOT NULL.'
+    );
+
     const constraintsByTable = new Map<string, {
       primaryKeys: Array<{ name: string; columns: string[] }>;
       uniques: Array<{ name: string; columns: string[] }>;
@@ -455,6 +511,42 @@ describe('PCIV v1 Supabase DB contract', () => {
 
       constraintsByTable.set(tableName, tableConstraints);
     });
+
+    const runIdForeignKeyPattern = (tableName: TableName) => {
+      const constraints = tables[tableName]?.constraints ?? [];
+      return hasForeignKeyDefinition(constraints, 'run_id', 'pciv_runs', 'id');
+    };
+
+    ['pciv_sources', 'pciv_inputs', 'pciv_constraints', 'pciv_artifacts'].forEach((tableName) => {
+      const hasFk = runIdForeignKeyPattern(tableName as TableName);
+      assert.ok(
+        hasFk,
+        `Expected FK on ${tableName}(run_id) REFERENCES pciv_runs(id).`
+      );
+    });
+
+    const joinConstraints = tables.pciv_input_sources?.constraints ?? [];
+    const hasJoinPk = joinConstraints.some(
+      (constraint: { name: string; type: string }) =>
+        constraint.type === 'p' && constraint.name === 'pciv_input_sources_pkey'
+    );
+    assert.ok(hasJoinPk, 'Expected pciv_input_sources to have primary key pciv_input_sources_pkey.');
+    const joinConstraintSummary = constraintsByTable.get('pciv_input_sources');
+    const hasJoinPkColumns = joinConstraintSummary?.primaryKeys.some((constraint) =>
+      indexSatisfies(constraint.columns, ['input_id', 'source_id'])
+    );
+    assert.ok(
+      hasJoinPkColumns,
+      'Expected pciv_input_sources primary key on (input_id, source_id).'
+    );
+    assert.ok(
+      hasForeignKeyDefinition(joinConstraints, 'input_id', 'pciv_inputs', 'id'),
+      'Expected FK on pciv_input_sources(input_id) REFERENCES pciv_inputs(id).'
+    );
+    assert.ok(
+      hasForeignKeyDefinition(joinConstraints, 'source_id', 'pciv_sources', 'id'),
+      'Expected FK on pciv_input_sources(source_id) REFERENCES pciv_sources(id).'
+    );
 
     tableNames.forEach((tableName) => {
       const constraints = constraintsByTable.get(tableName);
@@ -497,24 +589,26 @@ describe('PCIV v1 Supabase DB contract', () => {
     );
 
     const runIndexes = indexesByTable.pciv_runs ?? [];
-    const hasRunIndex = runIndexes.some((index) => {
-      const columns = findIndexColumns(index.definition);
-      const hasScope = indexSatisfies(columns, ['scope_id']) || indexSatisfies(columns, ['project_id']);
-      const hasUpdated = indexSatisfies(columns, ['updated_at']);
-      return hasScope && hasUpdated;
-    });
-    assert.ok(
-      hasRunIndex,
-      'Expected pciv_runs index covering (scope_id, updated_at desc) or equivalent.'
+    const hasRunIndex = runIndexes.some(
+      (index) => index.name === 'pciv_runs_scope_id_idx' || indexDefinitionHasColumns(index.definition, ['scope_id'])
     );
+    assert.ok(hasRunIndex, 'Expected pciv_runs index named pciv_runs_scope_id_idx or covering (scope_id).');
+
+    const childTablesForIndexes: Array<'pciv_sources' | 'pciv_inputs' | 'pciv_constraints' | 'pciv_artifacts'> = [
+      'pciv_sources',
+      'pciv_inputs',
+      'pciv_constraints',
+      'pciv_artifacts'
+    ];
+    childTablesForIndexes.forEach((tableName) => {
+      const indexes = indexesByTable[tableName] ?? [];
+      const hasRunIdIndex = indexes.some((index) => indexDefinitionHasColumns(index.definition, ['run_id']));
+      assert.ok(hasRunIdIndex, `Expected ${tableName} index covering (run_id).`);
+    });
 
     const inputIndexes = indexesByTable.pciv_inputs ?? [];
     const hasInputIndex = inputIndexes.some((index) => indexDefinitionHasColumns(index.definition, ['run_id', 'pointer']));
     assert.ok(hasInputIndex, 'Expected pciv_inputs index covering (run_id, pointer).');
-
-    const sourceIndexes = indexesByTable.pciv_sources ?? [];
-    const hasSourceIndex = sourceIndexes.some((index) => indexDefinitionHasColumns(index.definition, ['run_id']));
-    assert.ok(hasSourceIndex, 'Expected pciv_sources index covering (run_id).');
   });
 
   test('draft → commit → resolve context view roundtrip', async (t) => {
