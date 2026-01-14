@@ -88,9 +88,9 @@ export const PcivRunV1Schema = z
     userId: z.string().uuid().nullable().optional(),
     status: PcivRunStatusV1Schema,
     allowPartial: z.boolean(),
-    committedAt: z.string().datetime().nullable(),
-    createdAt: z.string().datetime(),
-    updatedAt: z.string().datetime()
+    committedAt: z.string().datetime({ offset: true }).nullable(),
+    createdAt: z.string().datetime({ offset: true }),
+    updatedAt: z.string().datetime({ offset: true })
   })
   .strict();
 
@@ -107,7 +107,7 @@ export const PcivSourceV1Schema = z
     parseStatus: PcivSourceParseStatusV1Schema,
     excerpt: z.string().nullable().optional(),
     rawMeta: z.record(z.string(), z.unknown()).optional().default({}),
-    createdAt: z.string().datetime()
+    createdAt: z.string().datetime({ offset: true })
   })
   .strict();
 
@@ -122,7 +122,7 @@ export const PcivInputV1Schema = PcivValueFieldsV1Schema.extend({
   options: z.array(z.string()).nullable().optional(),
   provenance: PcivProvenanceV1Schema,
   updatedBy: PcivUpdatedByV1Schema,
-  updatedAt: z.string().datetime(),
+  updatedAt: z.string().datetime({ offset: true }),
   evidenceSnippet: z.string().nullable().optional(),
   sourceIds: z.array(z.string().uuid()).optional()
 })
@@ -169,7 +169,7 @@ export const PcivConstraintV1Schema = PcivValueFieldsV1Schema.extend({
   provenance: PcivProvenanceV1Schema,
   sourceId: z.string().uuid().nullable().optional(),
   snippet: z.string().nullable().optional(),
-  createdAt: z.string().datetime()
+  createdAt: z.string().datetime({ offset: true })
 })
   .strict()
   .superRefine((data, ctx) => {
@@ -203,7 +203,7 @@ export const PcivArtifactV1Schema = z
     type: z.string().min(1),
     title: z.string().min(1),
     payload: z.record(z.string(), z.unknown()).optional().default({}),
-    createdAt: z.string().datetime()
+    createdAt: z.string().datetime({ offset: true })
   })
   .strict();
 

@@ -4,6 +4,7 @@ import {
   type ResolveContextViewArgs
 } from './schemas.ts';
 import * as storage from './storage/supabase.ts';
+import { assertContextViewInvariants } from './runtimeInvariants.ts';
 
 const toTimestamp = (value?: string | null) => (value ? new Date(value).getTime() : 0);
 
@@ -64,9 +65,19 @@ const normalizeContextView = (view: PcivContextViewV1): PcivContextViewV1 => {
 
 export type { ResolveContextViewArgs } from './schemas.ts';
 
+export type ResolveContextViewOptions = {
+  /**
+   * Skip runtime invariant assertions. ONLY for tests.
+   * Production code MUST NOT pass true.
+   * @default false
+   */
+  skipInvariants?: boolean;
+};
+
 export const resolveContextView = async (
   args: ResolveContextViewArgs,
-  deps: Pick<typeof storage, 'listRunsForScope' | 'fetchContextViewByRunId'> = storage
+  deps: Pick<typeof storage, 'listRunsForScope' | 'fetchContextViewByRunId'> = storage,
+  options: ResolveContextViewOptions = {}
 ): Promise<PcivContextViewV1> => {
   const prefer = args.prefer ?? 'latest_commit';
   let runId = args.runId ?? null;
@@ -83,5 +94,11 @@ export const resolveContextView = async (
 
   const view = await deps.fetchContextViewByRunId(runId);
   const normalized = normalizeContextView(view);
+  
+  // Runtime invariant validation (opt-out for tests only)
+  if (!options.skipInvariants) {
+    assertContextViewInvariants(normalized);
+  }
+  
   return PcivContextViewV1Schema.parse(normalized);
 };

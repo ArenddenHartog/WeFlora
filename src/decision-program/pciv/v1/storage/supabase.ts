@@ -16,6 +16,49 @@ import {
   type PcivRunV1,
   type PcivSourceV1
 } from '../schemas.ts';
+import { PcivRlsDeniedError, PcivAuthRequiredError } from './rls-errors.ts';
+
+// ============================================================================
+// Auth & RLS Helpers
+// ============================================================================
+
+/**
+ * Get the current authenticated user ID from Supabase session.
+ * Returns null if no user is authenticated.
+ */
+const getCurrentUserId = async (): Promise<string | null> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user?.id ?? null;
+};
+
+/**
+ * Handle Supabase errors with RLS/auth classification.
+ * Throws PcivAuthRequiredError for 401/PGRST301 (missing/invalid auth).
+ * Throws PcivRlsDeniedError for 403/42501 (RLS policy denial).
+ * Rethrows other errors unchanged.
+ */
+const handleSupabaseError = (error: any, operation: string): never => {
+  // Check HTTP status and PostgREST error codes
+  const isAuthError = error?.status === 401 || error?.code === 'PGRST301';
+  const isRlsError = error?.status === 403 || error?.code === '42501';
+
+  if (isAuthError) {
+    throw new PcivAuthRequiredError(
+      `Authentication required for ${operation}: ${error.message}`,
+      error
+    );
+  }
+
+  if (isRlsError) {
+    throw new PcivRlsDeniedError(
+      `Access denied by RLS policy for ${operation}: ${error.message}`,
+      error
+    );
+  }
+
+  // Unknown error - rethrow as-is
+  throw new Error(`${operation} failed: ${error.message}`);
+};
 
 const parseSchema = <T>(schema: z.ZodType<T>, data: unknown, label: string): T => {
   const result = schema.safeParse(data);
@@ -301,26 +344,39 @@ export const fetchLatestCommittedContextView = async (
   return fetchContextViewByRunId(run.id);
 };
 
-export const createDraftRun = async (scopeId: string, userId?: string | null): Promise<PcivRunV1> => {
+export interface CreateRunOptions {
+  ownership?: 'owned' | 'shared';
+}
+
+export const createDraftRun = async (
+  scopeId: string,
+  options: CreateRunOptions = {}
+): Promise<PcivRunV1> => {
+  const { ownership = 'owned' } = options;
+  const userId = ownership === 'owned' ? await getCurrentUserId() : null;
+
   const payload = {
     scope_id: scopeId,
-    user_id: userId ?? null,
+    user_id: userId,
     status: 'draft',
     allow_partial: false,
     committed_at: null
   };
 
-  const { data, error } = await supabase
-    .from('pciv_runs')
-    .insert(payload)
-    .select('*')
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('pciv_runs')
+      .insert(payload)
+      .select('*')
+      .single();
 
-  if (error || !data) {
-    throw new Error(`Failed to create draft run: ${error?.message ?? 'missing row'}`);
+    if (error) throw error;
+    if (!data) throw new Error('missing row');
+
+    return mapRunRow(data);
+  } catch (error: any) {
+    handleSupabaseError(error, 'createDraftRun');
   }
-
-  return mapRunRow(data);
 };
 
 export const updateDraftRun = async (runId: string): Promise<PcivRunV1> => {
@@ -369,12 +425,13 @@ export const upsertInputs = async (runId: string, inputs: PcivInputV1[]): Promis
     evidence_snippet: input.evidenceSnippet ?? null
   }));
 
-  const { error } = await supabase
-    .from('pciv_inputs')
-    .upsert(payload, { onConflict: 'run_id,pointer' });
-
-  if (error) {
-    throw new Error(`Failed to upsert inputs: ${error.message}`);
+  try {
+    const { error } = await supabase
+      .from('pciv_inputs')
+      .upsert(payload, { onConflict: 'run_id,pointer' });
+    if (error) throw error;
+  } catch (error: any) {
+    handleSupabaseError(error, 'upsertInputs');
   }
 };
 
@@ -402,10 +459,11 @@ export const upsertConstraints = async (runId: string, constraints: PcivConstrai
     created_at: constraint.createdAt
   }));
 
-  const { error } = await supabase.from('pciv_constraints').upsert(payload, { onConflict: 'id' });
-
-  if (error) {
-    throw new Error(`Failed to upsert constraints: ${error.message}`);
+  try {
+    const { error } = await supabase.from('pciv_constraints').upsert(payload, { onConflict: 'id' });
+    if (error) throw error;
+  } catch (error: any) {
+    handleSupabaseError(error, 'upsertConstraints');
   }
 };
 
@@ -430,10 +488,11 @@ export const upsertSources = async (runId: string, sources: PcivSourceV1[]): Pro
     created_at: source.createdAt
   }));
 
-  const { error } = await supabase.from('pciv_sources').upsert(payload, { onConflict: 'id' });
-
-  if (error) {
-    throw new Error(`Failed to upsert sources: ${error.message}`);
+  try {
+    const { error } = await supabase.from('pciv_sources').upsert(payload, { onConflict: 'id' });
+    if (error) throw error;
+  } catch (error: any) {
+    handleSupabaseError(error, 'upsertSources');
   }
 };
 
@@ -449,12 +508,37 @@ export const linkInputSources = async (runId: string, links: PcivInputSourceV1[]
 
   if (payload.length === 0) return;
 
-  const { error } = await supabase
-    .from('pciv_input_sources')
-    .upsert(payload, { onConflict: 'input_id,source_id' });
+  try {
+    const { error } = await supabase
+      .from('pciv_input_sources')
+      .upsert(payload, { onConflict: 'input_id,source_id' });
+    if (error) throw error;
+  } catch (error: any) {
+    handleSupabaseError(error, 'linkInputSources');
+  }
+};
 
-  if (error) {
-    throw new Error(`Failed to link input sources for run ${runId}: ${error.message}`);
+export const upsertArtifacts = async (artifacts: PcivArtifactV1[]): Promise<void> => {
+  if (artifacts.length === 0) return;
+
+  const parsed = artifacts.map((artifact, index) =>
+    parseSchema(PcivArtifactV1Schema, artifact, `PcivArtifactV1[${index}]`)
+  );
+
+  const payload = parsed.map((artifact) => ({
+    id: artifact.id,
+    run_id: artifact.runId,
+    type: artifact.type,
+    title: artifact.title,
+    payload: artifact.payload,
+    created_at: artifact.createdAt
+  }));
+
+  try {
+    const { error } = await supabase.from('pciv_artifacts').upsert(payload, { onConflict: 'id' });
+    if (error) throw error;
+  } catch (error: any) {
+    handleSupabaseError(error, 'upsertArtifacts');
   }
 };
 
@@ -462,21 +546,105 @@ export const commitRun = async (runId: string, allowPartial: boolean): Promise<P
   const status = allowPartial ? 'partial_committed' : 'committed';
   const timestamp = new Date().toISOString();
 
-  const { data, error } = await supabase
-    .from('pciv_runs')
-    .update({
-      status,
-      allow_partial: allowPartial,
-      committed_at: timestamp,
-      updated_at: timestamp
-    })
-    .eq('id', runId)
-    .select('*')
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('pciv_runs')
+      .update({
+        status,
+        allow_partial: allowPartial,
+        committed_at: timestamp,
+        updated_at: timestamp
+      })
+      .eq('id', runId)
+      .select('*')
+      .single();
 
-  if (error || !data) {
-    throw new Error(`Failed to commit run ${runId}: ${error?.message ?? 'missing row'}`);
+    if (error) throw error;
+    if (!data) throw new Error('missing row');
+
+    return mapRunRow(data);
+  } catch (error: any) {
+    handleSupabaseError(error, 'commitRun');
+  }
+};
+
+export const deleteRun = async (runId: string): Promise<void> => {
+  try {
+    const { error } = await supabase.from('pciv_runs').delete().eq('id', runId);
+    if (error) throw error;
+  } catch (error: any) {
+    handleSupabaseError(error, 'deleteRun');
+  }
+};
+
+// ============================================================================
+// TEST-ONLY HELPERS (for provoking DB constraint failures in tests)
+// ============================================================================
+
+/**
+ * TEST-ONLY: Write a raw input row with potentially invalid data.
+ * This bypasses adapter validation to test DB-level constraints.
+ * Only available when NODE_ENV === 'test'.
+ */
+export const __pcivTestWriteRawInputRowUnsafe = async (
+  runId: string,
+  pointer: string,
+  valueKind: string,
+  conflictingValues: Record<string, any>
+): Promise<void> => {
+  if (process.env.NODE_ENV !== 'test') {
+    throw new Error('__pcivTestWriteRawInputRowUnsafe only available in test mode');
   }
 
-  return mapRunRow(data);
+  const payload = {
+    run_id: runId,
+    pointer,
+    label: `test-${pointer}`,
+    domain: 'site',
+    required: false,
+    field_type: 'text',
+    value_kind: valueKind,
+    provenance: 'user-entered',
+    updated_by: 'user',
+    updated_at: new Date().toISOString(),
+    ...conflictingValues
+  };
+
+  const { error } = await supabase.from('pciv_inputs').insert(payload);
+
+  if (error) {
+    throw new Error(`DB rejected invalid input (expected): ${error.message}`);
+  }
+};
+
+/**
+ * TEST-ONLY: Write a raw run row with potentially invalid committed_at state.
+ * This bypasses adapter validation to test DB-level constraints.
+ * Only available when NODE_ENV === 'test'.
+ */
+export const __pcivTestWriteRawRunRowUnsafe = async (
+  scopeId: string,
+  status: string,
+  committedAt: string | null
+): Promise<string> => {
+  if (process.env.NODE_ENV !== 'test') {
+    throw new Error('__pcivTestWriteRawRunRowUnsafe only available in test mode');
+  }
+
+  const payload = {
+    scope_id: scopeId,
+    status,
+    allow_partial: false,
+    committed_at: committedAt,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  const { data, error } = await supabase.from('pciv_runs').insert(payload).select('id').single();
+
+  if (error) {
+    throw new Error(`DB rejected invalid run (expected): ${error.message}`);
+  }
+
+  return data.id;
 };

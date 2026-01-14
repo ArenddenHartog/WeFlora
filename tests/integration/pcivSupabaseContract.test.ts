@@ -158,7 +158,7 @@ const requiredColumnGroups: Record<TableName, string[][]> = {
     ['provenance'],
     ['created_at', 'updated_at']
   ],
-  pciv_input_sources: [['input_id'], ['source_id'], ['snippet'], ['created_at']],
+  pciv_input_sources: [['input_id'], ['source_id']],
   pciv_constraints: [
     ['id'],
     ['run_id'],
@@ -746,20 +746,16 @@ describe('PCIV v1 Supabase DB contract', () => {
         }
       ]);
 
-      const { error: artifactError } = await supabase
-        .from('pciv_artifacts')
-        .insert({
+      await storage.upsertArtifacts([
+        {
           id: artifactId,
-          run_id: runId,
+          runId,
           type: 'summary',
           title: 'Contract artifact',
           payload: { note: 'roundtrip' },
-          created_at: now
-        });
-
-      if (artifactError) {
-        throw new Error(`Failed to insert artifact: ${artifactError.message}`);
-      }
+          createdAt: now
+        }
+      ]);
 
       await storage.commitRun(runId, false);
 

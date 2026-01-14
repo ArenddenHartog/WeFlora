@@ -18,5 +18,7 @@ export const FEATURES = {
     ? env.VITE_PCIV === 'true'
     : env.VITE_PCIV_V0
         ? env.VITE_PCIV_V0 === 'true'
-        : env.NODE_ENV !== 'production'
+        : env.NODE_ENV !== 'production',
+  // PCIV v1.2: Allow fallback to v0 localStorage (default: false in production, true in dev only for migration)
+  pcivV0Fallback: env.VITE_PCIV_V0_FALLBACK === 'true' || (env.NODE_ENV !== 'production' && env.VITE_PCIV_V0_FALLBACK !== 'false')
 } as const;

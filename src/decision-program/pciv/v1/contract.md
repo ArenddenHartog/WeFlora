@@ -84,3 +84,58 @@ Only the resolver boundary may serve PCIV v1 context to consumers.
 ## NO SCHEMA SPRAWL
 
 All PCIV v1 schemas/types live **only** in `src/decision-program/pciv/v1/schemas.ts`.
+
+## Ownership & Sharing Model (v1.3)
+
+PCIV runs support two ownership models:
+
+- **Owned runs** (`user_id` set): Private to the user who created the run. Only the owner can read/write.
+- **Shared runs** (`user_id` NULL): Readable and writable by all authenticated users.
+
+The adapter's `createDraftRun()` accepts an `ownership` parameter:
+- `ownership: 'owned'` (default): Creates a run owned by the current authenticated user.
+- `ownership: 'shared'`: Creates a run accessible to all authenticated users.
+
+## Row Level Security (RLS) (v1.3)
+
+All PCIV tables enforce Row Level Security:
+
+- **Owned runs**: Only the owner (matching `auth.uid()`) can access the run and its child records.
+- **Shared runs**: All authenticated users can access the run and its child records.
+- **Service role**: Bypasses RLS for admin operations.
+- **Child tables** (sources, inputs, constraints, etc.): Inherit access rules from parent run via `EXISTS` clauses.
+
+### Access Rules
+
+| Run Type | Authenticated User Access | Anonymous Access |
+|----------|---------------------------|------------------|
+| Owned (user_id set) | Owner only (read/write) | Denied |
+| Shared (user_id NULL) | All users (read/write) | Denied |
+
+### Error Handling
+
+The adapter distinguishes between authentication and authorization failures:
+
+- **PcivAuthRequiredError**: Thrown when operation requires authentication (HTTP 401 / PGRST301). User needs to log in.
+- **PcivRlsDeniedError**: Thrown when authenticated user lacks permission (HTTP 403 / 42501). User is logged in but doesn't own the resource.
+- Generic errors: Thrown for other failures (network, validation, etc.).
+
+Consumers should catch these errors and provide appropriate UX:
+- `PcivAuthRequiredError` → Show login prompt
+- `PcivRlsDeniedError` → Show "access denied" message
+- Other errors → Show generic error
+
+## Adapter-Only Database Access
+
+All database operations MUST go through the storage adapter (`src/decision-program/pciv/v1/storage/supabase.ts`).
+
+- No direct Supabase queries outside the adapter.
+- No localStorage for PCIV data persistence.
+- Adapter handles RLS error classification automatically.
+
+## Version History
+
+- **v1.0**: Initial schema pack, storage adapter, and migrations.
+- **v1.1**: Database-level invariants (committed_at consistency, value_kind enforcement).
+- **v1.3**: Row Level Security, ownership model, auth-aware adapter, RLS error classes.
+

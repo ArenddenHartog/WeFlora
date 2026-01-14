@@ -1,6 +1,7 @@
 import type { PcivCommittedContext, PcivContextIntakeRun, PcivDraft, PcivSource } from './types.ts';
 import { buildPcivFields } from './map.ts';
 import { computePcivMetrics } from './metrics.ts';
+import { FEATURES } from '../../../config/features.ts';
 
 const STORAGE_PREFIX = 'pciv_v0_context';
 const MAX_STORAGE_CHARS = 2_000_000;
@@ -84,6 +85,12 @@ const defaultRun = (projectId: string, userId?: string | null): PcivContextIntak
 };
 
 export const loadPcivRun = (projectId: string, userId?: string | null): PcivContextIntakeRun => {
+  // PCIV v1.2 kill-switch: block v0 localStorage access when fallback disabled
+  if (!FEATURES.pcivV0Fallback) {
+    console.warn('pciv_v0_access_blocked: v0 fallback disabled, returning fresh draft');
+    return defaultRun(projectId, userId);
+  }
+  
   const raw = window.localStorage.getItem(storageKey(projectId));
   if (!raw) return defaultRun(projectId, userId);
   try {
@@ -111,6 +118,12 @@ export const loadPcivCommit = (projectId: string, userId?: string | null) => {
 };
 
 export const savePcivRun = (run: PcivContextIntakeRun) => {
+  // PCIV v1.2 kill-switch: block v0 localStorage writes when fallback disabled
+  if (!FEATURES.pcivV0Fallback) {
+    console.warn('pciv_v0_write_blocked: v0 fallback disabled, skipping localStorage write');
+    return;
+  }
+  
   const sanitized = sanitizePcivRun(run);
   let serialized = JSON.stringify(sanitized);
   if (serialized.length > MAX_STORAGE_CHARS) {
