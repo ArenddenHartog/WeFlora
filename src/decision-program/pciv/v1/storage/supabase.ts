@@ -8,13 +8,16 @@ import {
   PcivInputV1Schema,
   PcivRunV1Schema,
   PcivSourceV1Schema,
+  PcivScopeMemberV1Schema,
   type PcivArtifactV1,
   type PcivConstraintV1,
   type PcivContextViewV1,
   type PcivInputSourceV1,
   type PcivInputV1,
   type PcivRunV1,
-  type PcivSourceV1
+  type PcivSourceV1,
+  type PcivScopeMemberV1,
+  type PcivScopeMemberRole
 } from '../schemas.ts';
 import { PcivRlsDeniedError, PcivAuthRequiredError } from './rls-errors.ts';
 
@@ -175,6 +178,98 @@ const ensureRunMatch = (runId: string, records: { runId?: string }[], label: str
     }
   });
 };
+
+const mapMembershipRow = (row: any): PcivScopeMemberV1 =>
+  parseSchema(
+    PcivScopeMemberV1Schema,
+    {
+      scopeId: row.scope_id,
+      userId: row.user_id,
+      role: row.role,
+      createdAt: row.created_at,
+      createdBy: row.created_by
+    },
+    'PcivScopeMemberV1'
+  );
+
+// ============================================================================
+// Scope Membership Helpers (v1.4)
+// ============================================================================
+
+/**
+ * List all members of a scope.
+ * Requires viewer role or higher for the scope.
+ */
+export const listScopeMembers = async (scopeId: string): Promise<PcivScopeMemberV1[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('pciv_scope_members')
+      .select('*')
+      .eq('scope_id', scopeId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    return (data ?? []).map(mapMembershipRow);
+  } catch (error: any) {
+    handleSupabaseError(error, 'listScopeMembers');
+  }
+};
+
+/**
+ * Add or update a scope member.
+ * Requires owner role for the scope.
+ */
+export const upsertScopeMember = async (
+  scopeId: string,
+  userId: string,
+  role: PcivScopeMemberRole
+): Promise<PcivScopeMemberV1> => {
+  const currentUserId = await getCurrentUserId();
+  
+  try {
+    const { data, error } = await supabase
+      .from('pciv_scope_members')
+      .upsert({
+        scope_id: scopeId,
+        user_id: userId,
+        role,
+        created_by: currentUserId
+      }, { onConflict: 'scope_id,user_id' })
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    if (!data) throw new Error('missing row');
+
+    return mapMembershipRow(data);
+  } catch (error: any) {
+    handleSupabaseError(error, 'upsertScopeMember');
+  }
+};
+
+/**
+ * Remove a scope member.
+ * Requires owner role for the scope.
+ * Protected by last-owner trigger (cannot remove last owner).
+ */
+export const removeScopeMember = async (scopeId: string, userId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('pciv_scope_members')
+      .delete()
+      .eq('scope_id', scopeId)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+  } catch (error: any) {
+    handleSupabaseError(error, 'removeScopeMember');
+  }
+};
+
+// ============================================================================
+// Run Queries
+// ============================================================================
 
 export const fetchLatestCommittedRun = async (scopeId: string, userId?: string | null): Promise<PcivRunV1 | null> => {
   let query = supabase
@@ -353,6 +448,37 @@ export const createDraftRun = async (
   options: CreateRunOptions = {}
 ): Promise<PcivRunV1> => {
   const { ownership = 'owned' } = options;
+
+  // For owned scopes, try bootstrap RPC first
+  if (ownership === 'owned') {
+    try {
+      const { data, error } = await supabase.rpc('pciv_bootstrap_scope', {
+        p_scope_id: scopeId,
+        p_create_draft_run: true
+      });
+
+      if (error) {
+        // If scope already initialized, fall through to normal insert
+        if (error.message?.includes('pciv_scope_already_initialized') || 
+            error.code === '23505') {
+          // Continue to normal insert below
+        } else {
+          throw error;
+        }
+      } else if (data && data.length > 0 && data[0].run_id) {
+        // Bootstrap succeeded, fetch and return the created run
+        return await fetchRunById(data[0].run_id);
+      }
+    } catch (error: any) {
+      // Only rethrow auth/RLS errors; scope already initialized is expected
+      if (error instanceof PcivAuthRequiredError || error instanceof PcivRlsDeniedError) {
+        throw error;
+      }
+      // For pciv_scope_already_initialized, fall through to normal insert
+    }
+  }
+
+  // Fallback: normal insert (for shared or if bootstrap already happened)
   const userId = ownership === 'owned' ? await getCurrentUserId() : null;
 
   const payload = {

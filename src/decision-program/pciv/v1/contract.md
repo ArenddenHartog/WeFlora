@@ -96,21 +96,64 @@ The adapter's `createDraftRun()` accepts an `ownership` parameter:
 - `ownership: 'owned'` (default): Creates a run owned by the current authenticated user.
 - `ownership: 'shared'`: Creates a run accessible to all authenticated users.
 
-## Row Level Security (RLS) (v1.3)
+**Note**: As of v1.4, ownership model is superseded by membership-based authorization (see below).
+
+## Authorization Model (v1.4)
+
+PCIV scopes use membership-based authorization via the `pciv_scope_members` table.
+
+### Membership Roles
+
+Three roles define access levels:
+
+| Role | Permissions |
+|------|-------------|
+| **viewer** | Read-only access to all PCIV data for the scope |
+| **editor** | Read/write access to sources, inputs, constraints, artifacts; can create and commit runs |
+| **owner** | Full access including run deletion and membership management |
+
+### Role Assignment
+
+- **Planning + CTIV**: Users should have `editor` or `owner` role to create/modify planning context.
+- **Skills/Agents**: Default to `viewer` role for read-only context access. Grant `editor` role if skill needs to update context.
+- **Collaboration**: Owners can invite users and assign roles via `upsertScopeMember()`.
+
+### Bootstrap Process
+
+New scopes are initialized via `pciv_bootstrap_scope()` RPC:
+- Requires authenticated user
+- Creates first owner membership for the calling user
+- Optionally creates initial draft run
+- Refuses to reinitialize existing scopes (safe against foot-guns)
+
+The adapter's `createDraftRun()` automatically calls bootstrap on first use for owned scopes.
+
+### Membership Management
+
+Adapter exports:
+- `listScopeMembers(scopeId)`: List all members (requires viewer role)
+- `upsertScopeMember(scopeId, userId, role)`: Add/update member (requires owner role)
+- `removeScopeMember(scopeId, userId)`: Remove member (requires owner role)
+
+Protected invariant: Cannot remove or downgrade the last owner (enforced by DB trigger).
+
+## Row Level Security (RLS) (v1.3+)
 
 All PCIV tables enforce Row Level Security:
 
-- **Owned runs**: Only the owner (matching `auth.uid()`) can access the run and its child records.
-- **Shared runs**: All authenticated users can access the run and its child records.
+- **Membership-based** (v1.4): Access determined by `pciv_scope_members` role.
 - **Service role**: Bypasses RLS for admin operations.
-- **Child tables** (sources, inputs, constraints, etc.): Inherit access rules from parent run via `EXISTS` clauses.
+- **Child tables** (sources, inputs, constraints, etc.): Inherit access from parent run's scope membership.
 
 ### Access Rules
 
-| Run Type | Authenticated User Access | Anonymous Access |
-|----------|---------------------------|------------------|
-| Owned (user_id set) | Owner only (read/write) | Denied |
-| Shared (user_id NULL) | All users (read/write) | Denied |
+| Role | Read Access | Write Access | Delete Runs | Manage Members |
+|------|-------------|--------------|-------------|----------------|
+| viewer | ✅ All scope data | ❌ No | ❌ No | ❌ No |
+| editor | ✅ All scope data | ✅ Sources, inputs, constraints, artifacts, runs | ❌ No | ❌ No |
+| owner | ✅ All scope data | ✅ All operations | ✅ Yes | ✅ Yes |
+
+Non-members have no access to the scope.
 
 ### Error Handling
 
@@ -132,10 +175,12 @@ All database operations MUST go through the storage adapter (`src/decision-progr
 - No direct Supabase queries outside the adapter.
 - No localStorage for PCIV data persistence.
 - Adapter handles RLS error classification automatically.
+- Includes membership table: `pciv_scope_members` access only via adapter.
 
 ## Version History
 
 - **v1.0**: Initial schema pack, storage adapter, and migrations.
 - **v1.1**: Database-level invariants (committed_at consistency, value_kind enforcement).
 - **v1.3**: Row Level Security, ownership model, auth-aware adapter, RLS error classes.
+- **v1.4**: Membership-based authorization, scope bootstrap RPC, role hierarchy (viewer/editor/owner).
 

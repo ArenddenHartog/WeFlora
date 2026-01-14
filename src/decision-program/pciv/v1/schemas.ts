@@ -240,3 +240,20 @@ export type ResolveContextViewArgs = {
   prefer?: 'latest_commit' | 'runId';
   debug?: boolean;
 };
+
+// ============================================================================
+// PCIV v1.4: Scope Membership
+// ============================================================================
+
+export const PcivScopeMemberRoleV1Schema = z.enum(['owner', 'editor', 'viewer']);
+
+export const PcivScopeMemberV1Schema = z.object({
+  scopeId: z.string(),
+  userId: z.string().uuid(),
+  role: PcivScopeMemberRoleV1Schema,
+  createdAt: z.string().datetime(),
+  createdBy: z.string().uuid().nullable()
+});
+
+export type PcivScopeMemberV1 = z.infer<typeof PcivScopeMemberV1Schema>;
+export type PcivScopeMemberRole = z.infer<typeof PcivScopeMemberRoleV1Schema>;

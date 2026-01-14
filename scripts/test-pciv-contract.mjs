@@ -61,6 +61,8 @@ async function checkAdapterOnlyAccess() {
     const lines = txt.split('\n');
 
     // Check for direct pciv_* table access patterns
+    // Covers: pciv_runs, pciv_sources, pciv_inputs, pciv_input_sources, 
+    //         pciv_constraints, pciv_artifacts, pciv_scope_members
     const patterns = [
       /supabase\.from\(\s*['"]pciv_/g,
       /\.from\(\s*['"]pciv_/g
