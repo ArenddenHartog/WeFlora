@@ -74,6 +74,9 @@ async function checkAdapterOnlyAccess() {
       
       for (const pattern of patterns) {
         if (pattern.test(line)) {
+          // Allow integration tests to directly access PCIV tables for testing RLS, invariants, etc.
+          if (f.includes('tests/integration/')) continue;
+          
           // Allow RPC calls in tests (e.g., supabase.rpc())
           if (f.includes('tests/') && (line.includes('.rpc(') || line.includes('.delete()'))) continue;
 
