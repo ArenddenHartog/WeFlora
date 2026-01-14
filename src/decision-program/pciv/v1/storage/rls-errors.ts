@@ -11,9 +11,12 @@
  * User is authenticated but lacks permission for the operation.
  */
 export class PcivRlsDeniedError extends Error {
-  constructor(message: string, public cause?: unknown) {
+  cause?: unknown;
+  
+  constructor(message: string, cause?: unknown) {
     super(message);
     this.name = 'PcivRlsDeniedError';
+    this.cause = cause;
   }
 }
 
@@ -23,8 +26,11 @@ export class PcivRlsDeniedError extends Error {
  * User needs to log in to perform the operation.
  */
 export class PcivAuthRequiredError extends Error {
-  constructor(message: string, public cause?: unknown) {
+  cause?: unknown;
+  
+  constructor(message: string, cause?: unknown) {
     super(message);
     this.name = 'PcivAuthRequiredError';
+    this.cause = cause;
   }
 }

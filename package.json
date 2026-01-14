@@ -27,7 +27,9 @@
     "test:pciv:smoke": "node --test tests/integration/pcivProdSmoke.test.ts",
     "test:db-contract": "node scripts/test-db-contract.mjs",
     "test:pciv-contract": "node scripts/test-pciv-contract.mjs",
-    "check": "npm run lint && npm run guard:temp-ids && npm run guard:toast-icons && npm run test:pciv-contract && npm run build"
+    "test:planning-contract": "node scripts/test-planning-contract.mjs",
+    "test:planning:unit": "node --test tests/unit/planningPcivPersistence.test.ts",
+    "check": "npm run lint && npm run guard:temp-ids && npm run guard:toast-icons && npm run test:pciv-contract && npm run test:planning-contract && npm run build"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",

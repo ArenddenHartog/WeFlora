@@ -21,6 +21,7 @@ import { extractReferencedSourceIds } from '../src/floragpt/utils/extractReferen
 import { detectUserLanguage } from '../src/floragpt/utils/detectUserLanguage';
 import { guardEvidencePack } from '../src/floragpt/orchestrator/guardEvidencePack';
 import { decodeMessageFromDb, encodeMessageForDb } from '../src/persistence/messageCodec';
+import { loadLatestPlanningRunForScope, savePlanningRunSnapshot, deriveScopeId } from '../src/decision-program/planning/storage/planningPcivAdapter';
 
 interface ChatContextType {
     chats: { [projectId: string]: Chat[] };
@@ -131,25 +132,27 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         };
         const fetchPlanningRuns = async () => {
-            const userId = (await supabase.auth.getUser()).data.user?.id;
-            if (!userId) return;
-            const { data } = await supabase
-                .from('planning_runs')
-                .select('*')
-                .eq('user_id', userId)
-                .order('updated_at', { ascending: false });
-            if (data) {
-                setPlanningRuns(
-                    data.map((row: any) => ({
-                        runId: row.run_id,
-                        programId: row.program_id,
-                        executionState: row.execution_state,
-                        status: row.status,
-                        projectId: row.project_id,
-                        createdAt: row.created_at,
-                        updatedAt: row.updated_at
-                    }))
-                );
+            // Load latest Planning run from PCIV storage
+            // For now, we fetch for the default scope 'project'
+            // TODO: Support per-project Planning runs
+            const scopeId = deriveScopeId(null); // Uses 'project' as default
+            const snapshot = await loadLatestPlanningRunForScope(supabase, scopeId);
+            
+            if (snapshot) {
+                setPlanningRuns([
+                    {
+                        runId: snapshot.runId,
+                        programId: snapshot.programId,
+                        executionState: snapshot.executionState,
+                        status: snapshot.status,
+                        projectId: snapshot.projectId || undefined,
+                        createdAt: snapshot.updatedAt,
+                        updatedAt: snapshot.updatedAt,
+                    },
+                ]);
+            } else {
+                // No saved run or access denied - start fresh
+                setPlanningRuns([]);
             }
         };
         fetchThreads();
@@ -239,22 +242,22 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const upsertPlanningRun = useCallback(async (run: PlanningRun) => {
         if (!user) return;
+        
+        // Update local state optimistically
         setPlanningRuns((prev) => {
             const next = prev.filter((entry) => entry.runId !== run.runId);
             return [run, ...next];
         });
-        const userId = (await supabase.auth.getUser()).data.user?.id;
-        if (!userId) return;
-        const payload = {
-            run_id: run.runId,
-            program_id: run.programId,
-            execution_state: run.executionState,
+        
+        // Persist to PCIV storage
+        const scopeId = deriveScopeId(run.projectId);
+        await savePlanningRunSnapshot(supabase, scopeId, {
+            runId: run.runId,
+            programId: run.programId,
+            executionState: run.executionState,
             status: run.status,
-            project_id: run.projectId ?? null,
-            user_id: userId,
-            updated_at: new Date().toISOString()
-        };
-        await supabase.from('planning_runs').upsert(payload, { onConflict: 'run_id' });
+            projectId: run.projectId ?? null,
+        });
     }, [user]);
 
     // --- Main Global Chat ---

@@ -744,6 +744,34 @@ export const __pcivTestWriteRawInputRowUnsafe = async (
 };
 
 /**
+ * Get the latest artifact of a specific type for a given run.
+ * Returns null if no matching artifact exists.
+ */
+export const getLatestArtifactByType = async (
+  runId: string,
+  type: string
+): Promise<PcivArtifactV1 | null> => {
+  const { data, error } = await supabase
+    .from('pciv_artifacts')
+    .select('*')
+    .eq('run_id', runId)
+    .eq('type', type)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    handleSupabaseError(error, 'getLatestArtifactByType');
+  }
+
+  return data ? PcivArtifactV1Schema.parse(data) : null;
+};
+
+// ============================================================================
+// TEST-ONLY HELPERS
+// ============================================================================
+
+/**
  * TEST-ONLY: Write a raw run row with potentially invalid committed_at state.
  * This bypasses adapter validation to test DB-level constraints.
  * Only available when NODE_ENV === 'test'.
