@@ -22,7 +22,8 @@ import {
   createDraftRun,
   upsertArtifacts,
   fetchRunById,
-  getLatestArtifactForScopeByType,
+  getLatestCommittedRunForScope,
+  fetchContextViewByRunId,
 } from '../../pciv/v1/storage/supabase.ts';
 import { PcivAuthRequiredError, PcivRlsDeniedError } from '../../pciv/v1/storage/rls-errors.ts';
 
@@ -88,7 +89,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
  * Load the latest Planning run snapshot for a given scope.
  * Returns null if no run exists or if access is denied.
  *
- * Uses direct artifact lookup (no listRunsForScope dependency).
+ * Uses getLatestCommittedRunForScope to find the run, then fetches the full context view.
  * Includes 8-second timeout to prevent infinite spinners.
  */
 export async function loadLatestPlanningRunForScope(
@@ -96,12 +97,27 @@ export async function loadLatestPlanningRunForScope(
   scopeId: string
 ): Promise<PlanningRunSnapshot | null> {
   try {
-    // Direct artifact lookup with timeout (no run listing)
-    const artifact = await withTimeout(
-      getLatestArtifactForScopeByType(scopeId, PLANNING_ARTIFACT_TYPE),
+    // Get the latest committed/partial_committed run for this scope
+    const run = await withTimeout(
+      getLatestCommittedRunForScope(scopeId),
       8000,
-      'loadLatestPlanningRunForScope'
+      'loadLatestPlanningRunForScope (get run)'
     );
+
+    if (!run) {
+      return null;
+    }
+
+    // Fetch full context view for this run (includes artifacts)
+    const contextView = await withTimeout(
+      fetchContextViewByRunId(run.id),
+      8000,
+      'loadLatestPlanningRunForScope (fetch context view)'
+    );
+
+    // Find the planning execution state artifact
+    const artifacts = contextView.artifactsByType[PLANNING_ARTIFACT_TYPE] ?? [];
+    const artifact = artifacts[0]; // Get first (should only be one)
 
     if (!artifact) {
       return null;

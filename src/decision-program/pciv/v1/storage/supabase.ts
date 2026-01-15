@@ -272,6 +272,64 @@ export const removeScopeMember = async (scopeId: string, userId: string): Promis
 // Run Queries
 // ============================================================================
 
+/**
+ * Get the latest run for a scope with flexible filtering.
+ * 
+ * @param scopeId - The scope ID to query
+ * @param opts - Optional filtering and ordering preferences
+ * @param opts.status - Filter by specific statuses (default: ['committed', 'partial_committed'] if preferCommitted is true)
+ * @param opts.preferCommitted - If true (default), prefer committed/partial_committed runs over drafts
+ * @returns The latest matching run or null if none found
+ */
+export async function getLatestRunForScope(
+  scopeId: string,
+  opts?: {
+    status?: Array<'draft' | 'committed' | 'partial_committed'>;
+    preferCommitted?: boolean;
+  }
+): Promise<PcivRunV1 | null> {
+  const { status, preferCommitted = true } = opts ?? {};
+
+  // Determine which statuses to query
+  const targetStatuses = status ?? (preferCommitted ? ['committed', 'partial_committed'] : ['draft', 'committed', 'partial_committed']);
+
+  try {
+    const { data, error } = await supabase
+      .from('pciv_runs')
+      .select('*')
+      .eq('scope_id', scopeId)
+      .in('status', targetStatuses)
+      .order('committed_at', { ascending: false, nullsFirst: false })
+      .order('updated_at', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) return null;
+
+    return mapRunRow(data[0]);
+  } catch (error: any) {
+    handleSupabaseError(error, 'getLatestRunForScope');
+  }
+}
+
+/**
+ * Get the latest committed or partially committed run for a scope.
+ * Convenience wrapper around getLatestRunForScope.
+ * 
+ * @param scopeId - The scope ID to query
+ * @returns The latest committed/partial_committed run or null if none found
+ */
+export async function getLatestCommittedRunForScope(
+  scopeId: string
+): Promise<PcivRunV1 | null> {
+  return getLatestRunForScope(scopeId, {
+    status: ['committed', 'partial_committed'],
+    preferCommitted: true
+  });
+}
+
 export const fetchLatestCommittedRun = async (scopeId: string, userId?: string | null): Promise<PcivRunV1 | null> => {
   let query = supabase
     .from('pciv_runs')
