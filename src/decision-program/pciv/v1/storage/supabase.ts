@@ -296,6 +296,21 @@ export const fetchLatestCommittedRun = async (scopeId: string, userId?: string |
 };
 
 export const listRunsForScope = async (scopeId: string, userId?: string | null): Promise<PcivRunV1[]> => {
+  // UUID guard: prevent email strings from being used as userId
+  if (userId !== undefined && userId !== null) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(userId)) {
+      throw new Error(
+        `pciv_invalid_user_id_expected_uuid: userId must be a valid UUID, got: ${userId.substring(0, 50)}`
+      );
+    }
+  }
+
+  // Dev-only breadcrumb for debugging userId usage
+  if (import.meta.env.DEV && userId !== undefined) {
+    console.warn('[PCIV] listRunsForScope called with userId filter:', { scopeId, userId });
+  }
+
   let query = supabase
     .from('pciv_runs')
     .select('*')
@@ -762,6 +777,31 @@ export const getLatestArtifactByType = async (
 
   if (error) {
     handleSupabaseError(error, 'getLatestArtifactByType');
+  }
+
+  return data ? PcivArtifactV1Schema.parse(data) : null;
+};
+
+/**
+ * Get the latest artifact of a specific type for any run in a given scope.
+ * Useful for finding the most recent Planning snapshot or similar cross-run queries.
+ * Returns null if no matching artifact exists.
+ */
+export const getLatestArtifactForScopeByType = async (
+  scopeId: string,
+  type: string
+): Promise<PcivArtifactV1 | null> => {
+  const { data, error } = await supabase
+    .from('pciv_artifacts')
+    .select('*, pciv_runs!inner(scope_id)')
+    .eq('pciv_runs.scope_id', scopeId)
+    .eq('type', type)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    handleSupabaseError(error, 'getLatestArtifactForScopeByType');
   }
 
   return data ? PcivArtifactV1Schema.parse(data) : null;

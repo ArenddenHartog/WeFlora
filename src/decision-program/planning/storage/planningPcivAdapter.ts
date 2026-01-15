@@ -21,8 +21,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   createDraftRun,
   upsertArtifacts,
-  listRunsForScope,
-  getLatestArtifactByType,
+  fetchRunById,
+  getLatestArtifactForScopeByType,
 } from '../../pciv/v1/storage/supabase.ts';
 import { PcivAuthRequiredError, PcivRlsDeniedError } from '../../pciv/v1/storage/rls-errors.ts';
 
@@ -64,6 +64,22 @@ function stableArtifactId(runId: string, type: string): string {
   return `${runId}:${type}`;
 }
 
+/**
+ * Timeout wrapper to prevent infinite spinners.
+ * Throws if promise doesn't resolve within specified milliseconds.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${label} timed out after ${ms}ms`)),
+        ms
+      )
+    ),
+  ]);
+}
+
 // ============================================================================
 // Public API
 // ============================================================================
@@ -72,26 +88,21 @@ function stableArtifactId(runId: string, type: string): string {
  * Load the latest Planning run snapshot for a given scope.
  * Returns null if no run exists or if access is denied.
  *
- * Gracefully handles auth/RLS errors by returning null.
+ * Uses direct artifact lookup (no listRunsForScope dependency).
+ * Includes 8-second timeout to prevent infinite spinners.
  */
 export async function loadLatestPlanningRunForScope(
   supabase: SupabaseClient,
   scopeId: string
 ): Promise<PlanningRunSnapshot | null> {
   try {
-    // Get all runs for scope (existing function doesn't have ordering/limit)
-    const allRuns = await listRunsForScope(scopeId);
-    if (allRuns.length === 0) {
-      return null;
-    }
+    // Direct artifact lookup with timeout (no run listing)
+    const artifact = await withTimeout(
+      getLatestArtifactForScopeByType(scopeId, PLANNING_ARTIFACT_TYPE),
+      8000,
+      'loadLatestPlanningRunForScope'
+    );
 
-    // Sort by updated_at descending and take the most recent
-    const latestRun = allRuns.sort((a, b) => 
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    )[0];
-
-    // Get Planning execution state artifact
-    const artifact = await getLatestArtifactByType(latestRun.id, PLANNING_ARTIFACT_TYPE);
     if (!artifact) {
       return null;
     }
@@ -100,7 +111,7 @@ export async function loadLatestPlanningRunForScope(
     const payload = artifact.payload as any;
 
     return {
-      runId: payload.runId || latestRun.id,
+      runId: payload.runId || artifact.runId,
       programId: payload.programId || '',
       executionState: payload.executionState || {},
       status: payload.status || 'unknown',
@@ -113,7 +124,7 @@ export async function loadLatestPlanningRunForScope(
       console.warn('Planning: Cannot load run (auth/RLS):', error.message);
       return null;
     }
-    // Rethrow unexpected errors
+    // Timeout or other errors - rethrow for UI to handle
     throw error;
   }
 }
@@ -122,6 +133,8 @@ export async function loadLatestPlanningRunForScope(
  * Save a Planning run snapshot to PCIV storage.
  * Creates a new draft run if needed, then upserts the execution state artifact.
  *
+ * Uses fetchRunById pattern (no listRunsForScope dependency).
+ * Includes 8-second timeout to prevent infinite spinners.
  * Gracefully handles auth/RLS errors by no-op (logs warning).
  */
 export async function savePlanningRunSnapshot(
@@ -136,17 +149,21 @@ export async function savePlanningRunSnapshot(
   }
 ): Promise<void> {
   try {
-    // Check if we need to create a new PCIV run
-    // For simplicity, we'll use the Planning runId as PCIV run ID if possible
-    // Otherwise, create a draft run and store the Planning runId in the payload
-    
-    // Try to find existing run
-    const runs = await listRunsForScope(scopeId);
-    let pcivRunId = runs.find(r => r.id === run.runId)?.id;
+    // Try to fetch existing run directly (no run listing)
+    let pcivRunId = run.runId;
+    const existingRun = await withTimeout(
+      fetchRunById(pcivRunId).catch(() => null),
+      8000,
+      'savePlanningRunSnapshot (fetch)'
+    );
 
-    if (!pcivRunId) {
+    if (!existingRun) {
       // Create new draft run with ownership
-      const newRun = await createDraftRun(scopeId, { ownership: 'owned' });
+      const newRun = await withTimeout(
+        createDraftRun(scopeId, { ownership: 'owned' }),
+        8000,
+        'savePlanningRunSnapshot (create)'
+      );
       pcivRunId = newRun.id;
     }
 
@@ -154,29 +171,33 @@ export async function savePlanningRunSnapshot(
     const artifactId = stableArtifactId(pcivRunId, PLANNING_ARTIFACT_TYPE);
     const now = new Date().toISOString();
 
-    await upsertArtifacts(pcivRunId, [
-      {
-        id: artifactId,
-        runId: pcivRunId,
-        type: PLANNING_ARTIFACT_TYPE,
-        payload: {
-          runId: run.runId,
-          programId: run.programId,
-          executionState: run.executionState,
-          status: run.status,
-          projectId: run.projectId || scopeId,
+    await withTimeout(
+      upsertArtifacts(pcivRunId, [
+        {
+          id: artifactId,
+          runId: pcivRunId,
+          type: PLANNING_ARTIFACT_TYPE,
+          payload: {
+            runId: run.runId,
+            programId: run.programId,
+            executionState: run.executionState,
+            status: run.status,
+            projectId: run.projectId || scopeId,
+          },
+          createdAt: now,
+          updatedAt: now,
         },
-        createdAt: now,
-        updatedAt: now,
-      },
-    ]);
+      ]),
+      8000,
+      'savePlanningRunSnapshot (upsert)'
+    );
   } catch (error) {
     // Gracefully handle auth/RLS errors
     if (error instanceof PcivAuthRequiredError || error instanceof PcivRlsDeniedError) {
       console.warn('Planning: Cannot save run (auth/RLS):', error.message);
       return; // No-op
     }
-    // Rethrow unexpected errors
+    // Timeout or other errors - rethrow for UI to handle
     throw error;
   }
 }

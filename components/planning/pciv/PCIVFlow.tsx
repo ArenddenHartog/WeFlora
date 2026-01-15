@@ -166,6 +166,7 @@ const mapSourceKind = (source: PcivSource): PcivSourceV1['kind'] =>
 const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, onComplete, onCancel }) => {
   const [stage, setStage] = useState<'import' | 'map' | 'validate'>(initialStage ?? 'import');
   const [run, setRun] = useState<PcivContextIntakeRun | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const runIdRef = useRef<string | null>(null);
   const sourceIdMapRef = useRef<Map<string, string>>(new Map());
   const inputIdMapRef = useRef<Map<string, string>>(new Map());
@@ -270,6 +271,7 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
     sourceIdMapRef.current = new Map();
     inputIdMapRef.current = new Map();
     constraintIdMapRef.current = new Map();
+    setError(null);
     createDraftRun(projectId, userId ?? null)
       .then((createdRun) => {
         if (isCancelled) return;
@@ -288,9 +290,10 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
           updatedAt: createdRun.updatedAt
         });
       })
-      .catch(() => {
+      .catch((err) => {
         if (isCancelled) return;
         setRun(null);
+        setError(err?.message || 'Failed to initialize context intake');
       });
     return () => {
       isCancelled = true;
@@ -377,6 +380,42 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
 
   const stageLabel = STAGES.find((entry) => entry.id === stage)?.label ?? 'Import';
 
+  // Error state
+  if (error) {
+    return (
+      <div className="h-full flex items-center justify-center bg-slate-50">
+        <div className="max-w-md text-center space-y-4">
+          <div className="text-red-600 font-semibold text-lg">Couldn't load context intake</div>
+          <div className="text-sm text-slate-600">{error}</div>
+          <div className="flex gap-2 justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setRun(null);
+                // Trigger re-initialization via useEffect dependency
+                setStage(initialStage ?? 'import');
+              }}
+              className="px-4 py-2 text-sm font-semibold rounded-lg bg-weflora-teal text-white hover:bg-weflora-dark"
+            >
+              Retry
+            </button>
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-4 py-2 text-sm font-semibold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state
   if (!draft || !run) {
     return (
       <div className="h-full flex items-center justify-center text-sm text-slate-500 bg-slate-50">
