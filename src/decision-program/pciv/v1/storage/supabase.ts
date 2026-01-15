@@ -20,6 +20,7 @@ import {
   type PcivScopeMemberRole
 } from '../schemas.ts';
 import { PcivRlsDeniedError, PcivAuthRequiredError } from './rls-errors.ts';
+import { invariantPCIVValueColumnsMatchKind } from '../runtimeInvariants.ts';
 
 // ============================================================================
 // Auth & RLS Helpers
@@ -545,6 +546,20 @@ export const upsertInputs = async (runId: string, inputs: PcivInputV1[]): Promis
   );
   ensureRunMatch(runId, parsed, 'PcivInputV1');
 
+  // Runtime invariant check for each input
+  for (const input of parsed) {
+    invariantPCIVValueColumnsMatchKind({
+      value_kind: input.valueKind,
+      value_string: input.valueString ?? null,
+      value_number: input.valueNumber ?? null,
+      value_boolean: input.valueBoolean ?? null,
+      value_enum: input.valueEnum ?? null,
+      value_json: input.valueJson ?? null,
+      runId,
+      pointer: input.pointer
+    });
+  }
+
   const payload = parsed.map((input) => ({
     id: input.id,
     run_id: runId,
@@ -581,6 +596,20 @@ export const upsertConstraints = async (runId: string, constraints: PcivConstrai
     parseSchema(PcivConstraintV1Schema, constraint, `PcivConstraintV1[${index}]`)
   );
   ensureRunMatch(runId, parsed, 'PcivConstraintV1');
+
+  // Runtime invariant check for each constraint
+  for (const constraint of parsed) {
+    invariantPCIVValueColumnsMatchKind({
+      value_kind: constraint.valueKind,
+      value_string: constraint.valueString ?? null,
+      value_number: constraint.valueNumber ?? null,
+      value_boolean: constraint.valueBoolean ?? null,
+      value_enum: constraint.valueEnum ?? null,
+      value_json: constraint.valueJson ?? null,
+      runId,
+      pointer: constraint.key
+    });
+  }
 
   const payload = parsed.map((constraint) => ({
     id: constraint.id,

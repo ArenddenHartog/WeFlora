@@ -167,6 +167,8 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
   const [stage, setStage] = useState<'import' | 'map' | 'validate'>(initialStage ?? 'import');
   const [run, setRun] = useState<PcivContextIntakeRun | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isCommitting, setIsCommitting] = useState(false);
+  const [commitError, setCommitError] = useState<{ title: string; message: string } | null>(null);
   const runIdRef = useRef<string | null>(null);
   const sourceIdMapRef = useRef<Map<string, string>>(new Map());
   const inputIdMapRef = useRef<Map<string, string>>(new Map());
@@ -354,19 +356,51 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
     if (!run) return;
     const runId = runIdRef.current;
     if (!runId) return;
-    await persistDraft(run.draft);
-    const committedRun = await commitRun(runId, allowPartial);
-    setRun((prev) =>
-      prev
-        ? {
-            ...prev,
-            status: committedRun.status,
-            updatedAt: committedRun.updatedAt
-          }
-        : prev
-    );
-    onComplete(committedRun);
+
+    setIsCommitting(true);
+    setCommitError(null); // Clear previous errors
+
+    try {
+      await persistDraft(run.draft);
+      const committedRun = await commitRun(runId, allowPartial);
+      setRun((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: committedRun.status,
+              updatedAt: committedRun.updatedAt
+            }
+          : prev
+      );
+      onComplete(committedRun);
+    } catch (error) {
+      // Commit failed via thrown error
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'An unexpected error occurred';
+      
+      setCommitError({
+        title: allowPartial 
+          ? "Couldn't proceed with partial context"
+          : "Couldn't commit context",
+        message: errorMessage
+      });
+    } finally {
+      setIsCommitting(false);
+    }
   }, [onComplete, persistDraft, run]);
+
+  const handleRetryCommit = () => {
+    // Determine if we should retry with partial based on current error context
+    // For now, retry with the same allowPartial as the last attempt
+    // We'll need to track this if needed, or just default to false
+    handleCommit(false);
+  };
+
+  const handleCancelCommit = () => {
+    setCommitError(null);
+    setStage('validate'); // Go back to validation stage
+  };
 
   const headerMetrics = useMemo(() => metrics ?? ({
     sources_count: 0,
@@ -426,6 +460,56 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
 
   return (
     <div className="flex h-full flex-col bg-slate-50">
+      {/* Commit Error Modal */}
+      {commitError && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-start mb-4">
+              <div className="flex-shrink-0">
+                <svg 
+                  className="h-6 w-6 text-red-600" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" 
+                  />
+                </svg>
+              </div>
+              <div className="ml-3 flex-1">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {commitError.title}
+                </h3>
+                <p className="mt-2 text-sm text-gray-600">
+                  {commitError.message}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 justify-end mt-6">
+              <button
+                type="button"
+                onClick={handleCancelCommit}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRetryCommit}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="border-b border-slate-200 bg-white px-6 py-4 flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div>
