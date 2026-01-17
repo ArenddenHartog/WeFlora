@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { getPlanningScopeId } from '../../src/lib/planningScope';
-import { createIntervention, listInterventionsForScope, setGeometry } from '../../src/planner-pack/v1/storage/supabase';
+import { bootstrapIntervention, listInterventionsForScope, setGeometry } from '../../src/planner-pack/v1/storage/supabase';
 import type { PlannerIntervention } from '../../src/planner-pack/v1/schemas';
 import { plannerPackCompose } from '../../src/planner-pack/v1/workers/plannerPackCompose';
 import { useUI } from '../../contexts/UIContext';
@@ -63,18 +63,20 @@ const PlannerPackIndex: React.FC = () => {
       if (window.localStorage.getItem(DEMO_STORAGE_KEY)) return;
 
       try {
-        const demo = await createIntervention(supabase, {
+        const demoName = 'Kanaalstraat corridor vergroening';
+        const demoMunicipality = 'Utrecht';
+        const demo = await bootstrapIntervention(supabase, {
           scopeId,
-          name: 'Kanaalstraat corridor vergroening',
-          municipality: 'Utrecht',
+          name: demoName,
+          municipality: demoMunicipality,
           interventionType: 'corridor'
         });
-        await setGeometry(supabase, demo.id, demoGeometry);
+        await setGeometry(supabase, demo.interventionId, demoGeometry);
         await plannerPackCompose({
           supabase,
-          interventionId: demo.id,
-          municipality: demo.municipality,
-          interventionName: demo.name,
+          interventionId: demo.interventionId,
+          municipality: demoMunicipality,
+          interventionName: demoName,
           geometry: demoGeometry,
           inventorySummary: null,
           sourceIds: []
@@ -97,18 +99,18 @@ const PlannerPackIndex: React.FC = () => {
 
     setIsCreating(true);
     try {
-      const created = await createIntervention(supabase, {
+      const created = await bootstrapIntervention(supabase, {
         scopeId,
         name: formName.trim(),
         municipality: formMunicipality.trim() || null,
         interventionType: formType
       });
-      showNotification('Intervention created.', 'success');
+      showNotification('WeFlora created the record and set you as owner.', 'success');
       setFormOpen(false);
       setFormName('');
       setFormMunicipality('');
       setFormType('corridor');
-      navigate(`/planner-pack/${created.id}`);
+      navigate(`/planner-pack/${created.interventionId}`);
     } catch (error) {
       console.error(error);
       showNotification('Failed to create intervention.', 'error');

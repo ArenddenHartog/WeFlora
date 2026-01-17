@@ -2,11 +2,15 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { useUI } from '../../contexts/UIContext';
-import type { PlannerArtifact, PlannerGeometry } from '../../src/planner-pack/v1/schemas';
+import { useAuth } from '../../contexts/AuthContext';
+import type { PlannerArtifact, PlannerGeometry, PlannerScopeMember } from '../../src/planner-pack/v1/schemas';
 import {
   getIntervention,
   listArtifacts,
-  setGeometry
+  listScopeMembers,
+  removeScopeMember,
+  setGeometry,
+  updateScopeMemberRole
 } from '../../src/planner-pack/v1/storage/supabase';
 import { inventoryIngest } from '../../src/planner-pack/v1/workers/inventoryIngest';
 import { plannerPackCompose } from '../../src/planner-pack/v1/workers/plannerPackCompose';
@@ -16,6 +20,7 @@ import RunsPanel from './RunsPanel';
 import ArtifactsPanel from './ArtifactsPanel';
 import { addUploadSource } from '../../src/planner-pack/v1/storage/supabase';
 import { uploadFile } from '../../services/fileService';
+import ScopeAccessPanel from './ScopeAccessPanel';
 
 const DEFAULT_GEOMETRY = {
   kind: 'corridor' as const,
@@ -79,6 +84,7 @@ const runWithTimeout = async <T,>(promise: Promise<T>, timeoutMs = 8000): Promis
 const PlannerPackDetail: React.FC = () => {
   const { id } = useParams();
   const { showNotification } = useUI();
+  const { user } = useAuth();
   const [intervention, setIntervention] = useState<any>(null);
   const [artifacts, setArtifacts] = useState<Partial<Record<PlannerArtifact['type'], PlannerArtifact>>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -89,6 +95,8 @@ const PlannerPackDetail: React.FC = () => {
   const [inventoryError, setInventoryError] = useState<string | null>(null);
   const [composeError, setComposeError] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
+  const [members, setMembers] = useState<PlannerScopeMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
 
   const [kind, setKind] = useState<'polygon' | 'corridor'>('corridor');
   const [geojsonText, setGeojsonText] = useState('');
@@ -121,14 +129,18 @@ const PlannerPackDetail: React.FC = () => {
   const loadIntervention = useCallback(async () => {
     if (!id) return;
     setIsLoading(true);
+    setMembersLoading(true);
     try {
       const record = await getIntervention(supabase, id);
       setIntervention(record);
       await loadArtifacts(id);
+      const scopeMembers = await listScopeMembers(supabase, record.scopeId);
+      setMembers(scopeMembers);
     } catch (error) {
       console.error(error);
       showNotification('Unable to load Planner Pack.', 'error');
     } finally {
+      setMembersLoading(false);
       setIsLoading(false);
     }
   }, [id, loadArtifacts, showNotification]);
@@ -383,6 +395,41 @@ const PlannerPackDetail: React.FC = () => {
 
   const statusLabel = intervention?.status?.replace('_', ' ') ?? 'draft';
 
+  const handleRoleChange = async (memberId: string, role: 'owner' | 'editor' | 'viewer') => {
+    try {
+      await updateScopeMemberRole(supabase, memberId, role);
+      const refreshed = await listScopeMembers(supabase, intervention.scopeId);
+      setMembers(refreshed);
+      showNotification('Member role updated.', 'success');
+    } catch (error) {
+      console.error(error);
+      showNotification('Unable to update role.', 'error');
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    try {
+      await removeScopeMember(supabase, memberId);
+      const refreshed = await listScopeMembers(supabase, intervention.scopeId);
+      setMembers(refreshed);
+      showNotification('Member removed.', 'success');
+    } catch (error) {
+      console.error(error);
+      showNotification('Unable to remove member.', 'error');
+    }
+  };
+
+  const handleCopyInvite = async () => {
+    try {
+      const link = `${window.location.origin}/planner-pack?scope=${intervention.scopeId}`;
+      await navigator.clipboard.writeText(link);
+      showNotification('Invite link copied.', 'success');
+    } catch (error) {
+      console.error(error);
+      showNotification('Unable to copy invite link.', 'error');
+    }
+  };
+
   if (isLoading || !intervention) {
     return (
       <div className="p-6 text-sm text-slate-500">Loading Planner Pack…</div>
@@ -435,6 +482,17 @@ const PlannerPackDetail: React.FC = () => {
             onRunInventory={handleRunInventory}
             onCompose={handleCompose}
           />
+          <div className="mt-6">
+            <ScopeAccessPanel
+              scopeId={intervention.scopeId}
+              members={members}
+              currentUserId={user?.id ?? null}
+              onRoleChange={handleRoleChange}
+              onRemove={handleRemoveMember}
+              onCopyInvite={handleCopyInvite}
+              isLoading={membersLoading}
+            />
+          </div>
         </aside>
       </div>
     </div>

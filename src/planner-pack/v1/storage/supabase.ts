@@ -6,12 +6,14 @@ import {
   PlannerInterventionSchema,
   PlannerRunSchema,
   PlannerSourceSchema,
+  PlannerScopeMemberSchema,
   type PlannerArtifact,
   type PlannerGeometry,
   type PlannerGeometryInput,
   type PlannerIntervention,
   type PlannerRun,
-  type PlannerSource
+  type PlannerSource,
+  type PlannerScopeMember
 } from '../schemas.ts';
 import { handleSupabaseError } from './errors.ts';
 
@@ -107,6 +109,19 @@ const mapArtifactRow = (row: any): PlannerArtifact =>
     'PlannerArtifact'
   );
 
+const mapScopeMemberRow = (row: any): PlannerScopeMember =>
+  parseSchema(
+    PlannerScopeMemberSchema,
+    {
+      id: row.id,
+      scopeId: row.scope_id,
+      userId: row.user_id,
+      role: row.role,
+      createdAt: row.created_at
+    },
+    'PlannerScopeMember'
+  );
+
 export const createIntervention = async (
   supabase: SupabaseClient,
   args: { scopeId: string; name: string; municipality?: string | null; interventionType: string }
@@ -123,6 +138,24 @@ export const createIntervention = async (
   const { data, error } = await supabase.from('planner_interventions').insert(payload).select('*').single();
   if (error) handleSupabaseError(error, 'createIntervention');
   return mapInterventionRow(data);
+};
+
+export const bootstrapIntervention = async (
+  supabase: SupabaseClient,
+  args: { scopeId: string; name: string; municipality?: string | null; interventionType: string }
+): Promise<{ interventionId: string; scopeId: string }> => {
+  const { data, error } = await supabase.rpc('planner_bootstrap_intervention', {
+    p_scope_id: args.scopeId,
+    p_name: args.name,
+    p_municipality: args.municipality ?? null,
+    p_intervention_type: args.interventionType
+  });
+  if (error) handleSupabaseError(error, 'bootstrapIntervention');
+  const row = data?.[0];
+  if (!row?.intervention_id) {
+    throw new Error('bootstrapIntervention failed: no intervention id returned');
+  }
+  return { interventionId: row.intervention_id, scopeId: row.scope_id };
 };
 
 export const setGeometry = async (
@@ -312,4 +345,34 @@ export const listInterventionsForScope = async (
     .order('created_at', { ascending: false });
   if (error) handleSupabaseError(error, 'listInterventionsForScope');
   return (data ?? []).map(mapInterventionRow);
+};
+
+export const listScopeMembers = async (
+  supabase: SupabaseClient,
+  scopeId: string
+): Promise<PlannerScopeMember[]> => {
+  const { data, error } = await supabase
+    .from('pciv_scope_members')
+    .select('*')
+    .eq('scope_id', scopeId)
+    .order('created_at', { ascending: true });
+  if (error) handleSupabaseError(error, 'listScopeMembers');
+  return (data ?? []).map(mapScopeMemberRow);
+};
+
+export const updateScopeMemberRole = async (
+  supabase: SupabaseClient,
+  memberId: string,
+  role: PlannerScopeMember['role']
+): Promise<void> => {
+  const { error } = await supabase.from('pciv_scope_members').update({ role }).eq('id', memberId);
+  if (error) handleSupabaseError(error, 'updateScopeMemberRole');
+};
+
+export const removeScopeMember = async (
+  supabase: SupabaseClient,
+  memberId: string
+): Promise<void> => {
+  const { error } = await supabase.from('pciv_scope_members').delete().eq('id', memberId);
+  if (error) handleSupabaseError(error, 'removeScopeMember');
 };

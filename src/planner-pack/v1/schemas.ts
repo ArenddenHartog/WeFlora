@@ -90,10 +90,19 @@ export const PlannerArtifactSchema = z.object({
   updatedAt: z.string()
 });
 
+export const PlannerScopeMemberSchema = z.object({
+  id: z.string().uuid(),
+  scopeId: z.string(),
+  userId: z.string().uuid(),
+  role: z.enum(['owner', 'editor', 'viewer']),
+  createdAt: z.string()
+});
+
 export type PlannerIntervention = z.infer<typeof PlannerInterventionSchema>;
 export type PlannerGeometry = z.infer<typeof PlannerGeometrySchema>;
 export type PlannerSource = z.infer<typeof PlannerSourceSchema>;
 export type PlannerRun = z.infer<typeof PlannerRunSchema>;
 export type PlannerArtifact = z.infer<typeof PlannerArtifactSchema>;
+export type PlannerScopeMember = z.infer<typeof PlannerScopeMemberSchema>;
 
 export type PlannerGeometryInput = Omit<PlannerGeometry, 'id' | 'interventionId' | 'createdAt'>;

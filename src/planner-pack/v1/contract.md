@@ -40,3 +40,19 @@ Submission-ready means:
 - One-click export (HTML download or print-to-PDF)
 
 Email draft is provided but not sent by the system in v1.
+
+## Testing semantics
+**Smoke tests (service role)** verify:
+- Schema and adapter correctness
+- Worker execution end-to-end
+
+**RLS tests (authenticated token)** verify:
+- Security contract for membership-based access
+- Viewer vs editor/owner permissions
+
+## Role rules
+- Viewer: read-only access
+- Editor/Owner: can create, update, and generate artifacts
+
+## Elevation flow
+Workers run as viewers by default. Any elevation to editor/owner requires explicit user consent per run.
