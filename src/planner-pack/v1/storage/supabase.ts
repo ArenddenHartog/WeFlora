@@ -6,15 +6,19 @@ import {
   PlannerInterventionSchema,
   PlannerRunSchema,
   PlannerSourceSchema,
-  PlannerScopeMemberSchema,
   type PlannerArtifact,
   type PlannerGeometry,
   type PlannerGeometryInput,
   type PlannerIntervention,
   type PlannerRun,
-  type PlannerSource,
-  type PlannerScopeMember
+  type PlannerSource
 } from '../schemas.ts';
+import {
+  listScopeMembers as listPcivScopeMembers,
+  upsertScopeMember as upsertPcivScopeMember,
+  removeScopeMember as removePcivScopeMember
+} from '../../../decision-program/pciv/v1/storage/supabase.ts';
+import type { PcivScopeMemberRole, PcivScopeMemberV1 } from '../../../decision-program/pciv/v1/schemas.ts';
 import { handleSupabaseError } from './errors.ts';
 
 const parseSchema = <T>(schema: z.ZodType<T>, data: unknown, label: string): T => {
@@ -109,18 +113,6 @@ const mapArtifactRow = (row: any): PlannerArtifact =>
     'PlannerArtifact'
   );
 
-const mapScopeMemberRow = (row: any): PlannerScopeMember =>
-  parseSchema(
-    PlannerScopeMemberSchema,
-    {
-      id: row.id,
-      scopeId: row.scope_id,
-      userId: row.user_id,
-      role: row.role,
-      createdAt: row.created_at
-    },
-    'PlannerScopeMember'
-  );
 
 export const createIntervention = async (
   supabase: SupabaseClient,
@@ -347,32 +339,17 @@ export const listInterventionsForScope = async (
   return (data ?? []).map(mapInterventionRow);
 };
 
-export const listScopeMembers = async (
-  supabase: SupabaseClient,
-  scopeId: string
-): Promise<PlannerScopeMember[]> => {
-  const { data, error } = await supabase
-    .from('pciv_scope_members')
-    .select('*')
-    .eq('scope_id', scopeId)
-    .order('created_at', { ascending: true });
-  if (error) handleSupabaseError(error, 'listScopeMembers');
-  return (data ?? []).map(mapScopeMemberRow);
-};
+export const listScopeMembers = async (scopeId: string): Promise<PcivScopeMemberV1[]> =>
+  listPcivScopeMembers(scopeId);
 
 export const updateScopeMemberRole = async (
-  supabase: SupabaseClient,
-  memberId: string,
-  role: PlannerScopeMember['role']
+  scopeId: string,
+  userId: string,
+  role: PcivScopeMemberRole
 ): Promise<void> => {
-  const { error } = await supabase.from('pciv_scope_members').update({ role }).eq('id', memberId);
-  if (error) handleSupabaseError(error, 'updateScopeMemberRole');
+  await upsertPcivScopeMember(scopeId, userId, role);
 };
 
-export const removeScopeMember = async (
-  supabase: SupabaseClient,
-  memberId: string
-): Promise<void> => {
-  const { error } = await supabase.from('pciv_scope_members').delete().eq('id', memberId);
-  if (error) handleSupabaseError(error, 'removeScopeMember');
+export const removeScopeMember = async (scopeId: string, userId: string): Promise<void> => {
+  await removePcivScopeMember(scopeId, userId);
 };

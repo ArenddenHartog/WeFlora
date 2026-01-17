@@ -3,7 +3,8 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { useUI } from '../../contexts/UIContext';
 import { useAuth } from '../../contexts/AuthContext';
-import type { PlannerArtifact, PlannerGeometry, PlannerScopeMember } from '../../src/planner-pack/v1/schemas';
+import type { PlannerArtifact, PlannerGeometry } from '../../src/planner-pack/v1/schemas';
+import type { PcivScopeMemberV1 } from '../../src/decision-program/pciv/v1/schemas';
 import {
   getIntervention,
   listArtifacts,
@@ -42,7 +43,13 @@ const DEFAULT_GEOMETRY = {
 
 const storageKey = (id: string) => `planner-pack-geometry-${id}`;
 
-const parseGeojson = (text: string) => JSON.parse(text);
+const safeParseGeojson = (text: string) => {
+  try {
+    return { value: JSON.parse(text), error: null } as { value: any; error: string | null };
+  } catch (error) {
+    return { value: null, error: 'Invalid GeoJSON. Please fix the JSON syntax.' };
+  }
+};
 
 const extractGeometry = (geojson: any) => {
   if (!geojson) return null;
@@ -95,7 +102,7 @@ const PlannerPackDetail: React.FC = () => {
   const [inventoryError, setInventoryError] = useState<string | null>(null);
   const [composeError, setComposeError] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
-  const [members, setMembers] = useState<PlannerScopeMember[]>([]);
+  const [members, setMembers] = useState<PcivScopeMemberV1[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
 
   const [kind, setKind] = useState<'polygon' | 'corridor'>('corridor');
@@ -134,7 +141,7 @@ const PlannerPackDetail: React.FC = () => {
       const record = await getIntervention(supabase, id);
       setIntervention(record);
       await loadArtifacts(id);
-      const scopeMembers = await listScopeMembers(supabase, record.scopeId);
+      const scopeMembers = await listScopeMembers(record.scopeId);
       setMembers(scopeMembers);
     } catch (error) {
       console.error(error);
@@ -178,11 +185,16 @@ const PlannerPackDetail: React.FC = () => {
   }, [id, kind, geojsonText, corridorWidthM, metrics]);
 
   const buildGeometryFromState = useCallback(() => {
-    const parsed = parseGeojson(geojsonText);
+    const parsed = safeParseGeojson(geojsonText);
+    if (!parsed.value) {
+      setGeojsonError(parsed.error);
+      return null;
+    }
+    setGeojsonError(null);
     return {
       kind,
       corridorWidthM: kind === 'corridor' ? corridorWidthM : undefined,
-      geojson: parsed,
+      geojson: parsed.value,
       areaM2: metrics.areaM2 ?? null,
       lengthM: metrics.lengthM ?? null
     } as PlannerGeometry;
@@ -192,9 +204,8 @@ const PlannerPackDetail: React.FC = () => {
     const ensurePack = async () => {
       if (!id || !intervention) return;
       if (artifacts.memo) return;
-      const geometryToUse = geojsonText.trim()
-        ? buildGeometryFromState()
-        : (DEFAULT_GEOMETRY as PlannerGeometry);
+      const derivedGeometry = geojsonText.trim() ? buildGeometryFromState() : null;
+      const geometryToUse = derivedGeometry ?? (DEFAULT_GEOMETRY as PlannerGeometry);
 
       try {
         if (!geojsonText.trim()) {
@@ -242,7 +253,12 @@ const PlannerPackDetail: React.FC = () => {
   const handleComputeMetrics = async () => {
     setGeojsonError(null);
     try {
-      const parsed = parseGeojson(geojsonText);
+      const parsedResult = safeParseGeojson(geojsonText);
+      if (!parsedResult.value) {
+        setGeojsonError(parsedResult.error);
+        return;
+      }
+      const parsed = parsedResult.value;
       const geometry = extractGeometry(parsed);
       if (!geometry) {
         throw new Error('GeoJSON must contain a geometry.');
@@ -395,10 +411,10 @@ const PlannerPackDetail: React.FC = () => {
 
   const statusLabel = intervention?.status?.replace('_', ' ') ?? 'draft';
 
-  const handleRoleChange = async (memberId: string, role: 'owner' | 'editor' | 'viewer') => {
+  const handleRoleChange = async (userId: string, role: 'owner' | 'editor' | 'viewer') => {
     try {
-      await updateScopeMemberRole(supabase, memberId, role);
-      const refreshed = await listScopeMembers(supabase, intervention.scopeId);
+      await updateScopeMemberRole(intervention.scopeId, userId, role);
+      const refreshed = await listScopeMembers(intervention.scopeId);
       setMembers(refreshed);
       showNotification('Member role updated.', 'success');
     } catch (error) {
@@ -407,10 +423,10 @@ const PlannerPackDetail: React.FC = () => {
     }
   };
 
-  const handleRemoveMember = async (memberId: string) => {
+  const handleRemoveMember = async (userId: string) => {
     try {
-      await removeScopeMember(supabase, memberId);
-      const refreshed = await listScopeMembers(supabase, intervention.scopeId);
+      await removeScopeMember(intervention.scopeId, userId);
+      const refreshed = await listScopeMembers(intervention.scopeId);
       setMembers(refreshed);
       showNotification('Member removed.', 'success');
     } catch (error) {

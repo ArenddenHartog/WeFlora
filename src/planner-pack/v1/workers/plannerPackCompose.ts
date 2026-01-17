@@ -55,6 +55,14 @@ const buildEvidence = (args: {
   return evidence;
 };
 
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 const buildMemoHtml = (payload: Record<string, unknown>) => {
   const sections = payload.sections as Array<{ title: string; body: string | string[] }>;
   return `
@@ -62,10 +70,11 @@ const buildMemoHtml = (payload: Record<string, unknown>) => {
       <h2>Compliance Memo</h2>
       ${sections
         .map((section) => {
+          const safeTitle = escapeHtml(section.title);
           const body = Array.isArray(section.body)
-            ? `<ul>${section.body.map((item) => `<li>${item}</li>`).join('')}</ul>`
-            : `<p>${section.body}</p>`;
-          return `<section><h3>${section.title}</h3>${body}</section>`;
+            ? `<ul>${section.body.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+            : `<p>${escapeHtml(section.body)}</p>`;
+          return `<section><h3>${safeTitle}</h3>${body}</section>`;
         })
         .join('')}
     </article>

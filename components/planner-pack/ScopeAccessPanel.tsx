@@ -1,12 +1,12 @@
 import React from 'react';
-import type { PlannerScopeMember } from '../../src/planner-pack/v1/schemas';
+import type { PcivScopeMemberV1 } from '../../src/decision-program/pciv/v1/schemas';
 
 interface ScopeAccessPanelProps {
   scopeId: string;
-  members: PlannerScopeMember[];
+  members: PcivScopeMemberV1[];
   currentUserId?: string | null;
-  onRoleChange: (memberId: string, role: PlannerScopeMember['role']) => void;
-  onRemove: (memberId: string) => void;
+  onRoleChange: (userId: string, role: PcivScopeMemberV1['role']) => void;
+  onRemove: (userId: string) => void;
   onCopyInvite: () => void;
   isLoading: boolean;
 }
@@ -43,7 +43,7 @@ const ScopeAccessPanel: React.FC<ScopeAccessPanelProps> = ({
           {members.map((member) => {
             const isSelf = member.userId === currentUserId;
             return (
-              <div key={member.id} className="border border-slate-200 rounded-lg p-2 text-xs">
+              <div key={member.userId} className="border border-slate-200 rounded-lg p-2 text-xs">
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col">
                     <span className="font-semibold text-slate-700">
@@ -53,7 +53,7 @@ const ScopeAccessPanel: React.FC<ScopeAccessPanelProps> = ({
                   </div>
                   <select
                     value={member.role}
-                    onChange={(event) => onRoleChange(member.id, event.target.value as PlannerScopeMember['role'])}
+                    onChange={(event) => onRoleChange(member.userId, event.target.value as PcivScopeMemberV1['role'])}
                     className="border border-slate-200 rounded-lg px-2 py-1 text-[10px]"
                   >
                     <option value="owner">Owner</option>
@@ -63,7 +63,7 @@ const ScopeAccessPanel: React.FC<ScopeAccessPanelProps> = ({
                 </div>
                 <div className="flex justify-end mt-2">
                   <button
-                    onClick={() => onRemove(member.id)}
+                    onClick={() => onRemove(member.userId)}
                     className="text-[10px] text-red-600 hover:text-red-700"
                   >
                     Remove
