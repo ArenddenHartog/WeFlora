@@ -25,6 +25,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ChevronRightIcon, FlowerIcon } from '../icons';
 import type { PcivContextViewV1 } from '../../src/decision-program/pciv/v1/schemas';
 import { resolveContextView } from '../../src/decision-program/pciv/v1/resolveContextView';
+import { getLatestCommittedRunForScope, fetchContextViewByRunId } from '../../src/decision-program/pciv/v1/storage/supabase';
 import { getPlanningScopeId } from '../../src/lib/planningScope';
 import { resolvePlanningProject } from '../../src/lib/projects/resolvePlanningProject';
 import {
@@ -278,19 +279,39 @@ const PlanningView: React.FC = () => {
       startPlanningRun(planningProjectId ?? null);
       return;
     }
+
+    setIsStarting(true);
+
     try {
-      const view = await resolveContextView({
-        scopeId: planningScopeId,
-        userId: user?.email ?? null,
-        prefer: 'latest_commit'
-      });
+      if (!planningScopeId) throw new Error('Missing planningScopeId');
+
+      // 1) Find latest committed/partial PCIV run for this scope (adapter)
+      const latestRun = await getLatestCommittedRunForScope(planningScopeId);
+
+      // No committed run yet -> open CTIV
+      if (!latestRun) {
+        await openContextIntake('import', { autoStart: true });
+        return;
+      }
+
+      // 2) Fetch ContextView by run id (direct adapter call)
+      const view = await fetchContextViewByRunId(latestRun.id);
+
       setPcivContextView(view);
-      startPlanningRun(planningProjectId ?? null, view);
-      return;
-    } catch {
+      await startPlanningRun(planningProjectId ?? null, view);
+    } catch (e) {
+      console.error(e);
       await openContextIntake('import', { autoStart: true });
+    } finally {
+      setIsStarting(false);
     }
-  }, [openContextIntake, pcivEnabled, planningProjectId, planningScopeId, startPlanningRun, user?.email]);
+  }, [
+    openContextIntake,
+    pcivEnabled,
+    planningProjectId,
+    planningScopeId,
+    startPlanningRun
+  ]);
 
   const stepsVM = useMemo(() => {
     const evidenceIndex = planningState?.evidenceIndex ?? {};

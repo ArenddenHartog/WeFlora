@@ -28,8 +28,9 @@
     "test:db-contract": "node scripts/test-db-contract.mjs",
     "test:pciv-contract": "node scripts/test-pciv-contract.mjs",
     "test:planning-contract": "node scripts/test-planning-contract.mjs",
+    "test:planner-pack-contract": "node scripts/test-planner-pack-contract.mjs",
     "test:planning:unit": "node --test tests/unit/planningPcivPersistence.test.ts",
-    "check": "npm run lint && npm run guard:temp-ids && npm run guard:toast-icons && npm run test:pciv-contract && npm run test:planning-contract && npm run build"
+    "check": "npm run lint && npm run guard:temp-ids && npm run guard:toast-icons && npm run test:pciv-contract && npm run test:planning-contract && npm run test:planner-pack-contract && npm run build"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",
