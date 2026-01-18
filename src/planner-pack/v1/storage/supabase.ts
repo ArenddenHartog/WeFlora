@@ -224,7 +224,7 @@ export const updateSourceParseStatus = async (
 export const createRun = async (
   supabase: SupabaseClient,
   interventionId: string,
-  workerType: 'inventory_ingest' | 'planner_pack_compose',
+  workerType: 'inventory_ingest' | 'planner_pack_compose' | 'maintenance_lifecycle',
   assumptions: Record<string, unknown>
 ): Promise<PlannerRun> => {
   const payload = {

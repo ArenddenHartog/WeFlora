@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { describe, it, before, afterEach } from 'node:test';
+import assert from 'node:assert/strict';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   createDraftRun,
@@ -17,7 +18,7 @@ describe('PCIV Supabase Partial Commit with Unset Inputs', () => {
   const testScopeId = 'test-scope-partial-unset-' + Date.now();
   const createdRunIds: string[] = [];
 
-  beforeAll(() => {
+  before(() => {
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       console.warn('Skipping integration test: Supabase env vars not set');
       return;
@@ -49,8 +50,8 @@ describe('PCIV Supabase Partial Commit with Unset Inputs', () => {
     const run = await createDraftRun(testScopeId, { ownership: 'owned' });
     createdRunIds.push(run.id);
 
-    expect(run.id).toBeTruthy();
-    expect(run.status).toBe('draft');
+    assert.ok(run.id);
+    assert.equal(run.status, 'draft');
 
     // 2. Upsert required input with unset value (all value_* columns null)
     const timestamp = new Date().toISOString();
@@ -85,26 +86,26 @@ describe('PCIV Supabase Partial Commit with Unset Inputs', () => {
     const committedRun = await commitRun(run.id, true);
 
     // 4. Assertions on committed run
-    expect(committedRun.status).toBe('partial_committed');
-    expect(committedRun.allowPartial).toBe(true);
-    expect(committedRun.committedAt).toBeTruthy();
+    assert.equal(committedRun.status, 'partial_committed');
+    assert.equal(committedRun.allowPartial, true);
+    assert.ok(committedRun.committedAt);
 
     // 5. Resolve context view
     const contextView = await fetchContextViewByRunId(run.id);
 
-    expect(contextView.run.status).toBe('partial_committed');
-    expect(contextView.run.allowPartial).toBe(true);
-    expect(contextView.run.committedAt).toBeTruthy();
+    assert.equal(contextView.run.status, 'partial_committed');
+    assert.equal(contextView.run.allowPartial, true);
+    assert.ok(contextView.run.committedAt);
 
     // Check that the input exists and shows unset state
     const input = contextView.inputsByPointer['/test/required-field'];
-    expect(input).toBeTruthy();
-    expect(input.valueKind).toBe('string');
-    expect(input.valueString).toBeNull();
-    expect(input.valueNumber).toBeNull();
-    expect(input.valueBoolean).toBeNull();
-    expect(input.valueEnum).toBeNull();
-    expect(input.valueJson).toBeNull();
+    assert.ok(input);
+    assert.equal(input.valueKind, 'string');
+    assert.equal(input.valueString, null);
+    assert.equal(input.valueNumber, null);
+    assert.equal(input.valueBoolean, null);
+    assert.equal(input.valueEnum, null);
+    assert.equal(input.valueJson, null);
   });
 
   it('should fail to commit if value column mismatches value_kind', async () => {
@@ -143,9 +144,10 @@ describe('PCIV Supabase Partial Commit with Unset Inputs', () => {
       }
     ];
 
-    await expect(
-      upsertInputs(run.id, inputs)
-    ).rejects.toThrow(/pciv_v1_runtime_invariant_failed/);
+    await assert.rejects(
+      upsertInputs(run.id, inputs),
+      /pciv_v1_runtime_invariant_failed/
+    );
   });
 
   it('should succeed with correctly set value matching value_kind', async () => {
@@ -188,8 +190,8 @@ describe('PCIV Supabase Partial Commit with Unset Inputs', () => {
     // Verify it persisted correctly
     const contextView = await fetchContextViewByRunId(run.id);
     const input = contextView.inputsByPointer['/test/correct-field'];
-    expect(input.valueString).toBe('test value');
-    expect(input.valueNumber).toBeNull();
-    expect(input.valueBoolean).toBeNull();
+    assert.equal(input.valueString, 'test value');
+    assert.equal(input.valueNumber, null);
+    assert.equal(input.valueBoolean, null);
   });
 });

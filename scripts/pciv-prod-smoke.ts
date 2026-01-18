@@ -147,7 +147,7 @@ const main = async () => {
 
     // Step 5: Commit run
     console.log('5️⃣  Committing run...');
-    const committedRun = await adapter.commitDraftRun(run.id, false);
+    const committedRun = await adapter.commitRun(run.id, false);
     console.log(`   ✓ Status: ${committedRun.status}`);
     console.log(`   ✓ Committed at: ${committedRun.committedAt}`);
 
