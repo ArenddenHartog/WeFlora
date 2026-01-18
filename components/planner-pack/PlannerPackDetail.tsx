@@ -5,6 +5,7 @@ import { useUI } from '../../contexts/UIContext';
 import { useAuth } from '../../contexts/AuthContext';
 import type { PlannerArtifact, PlannerGeometry } from '../../src/planner-pack/v1/schemas';
 import type { PcivScopeMemberV1 } from '../../src/decision-program/pciv/v1/schemas';
+import { PcivSchemaMismatchError } from '../../src/decision-program/pciv/v1/storage/rls-errors';
 import {
   getIntervention,
   listArtifacts,
@@ -93,6 +94,11 @@ const PlannerPackDetail: React.FC = () => {
   const { showNotification } = useUI();
   const { user } = useAuth();
   const [intervention, setIntervention] = useState<any>(null);
+  
+  const notifyRef = useRef(showNotification);
+  useEffect(() => {
+    notifyRef.current = showNotification;
+  }, [showNotification]);
   const [artifacts, setArtifacts] = useState<Partial<Record<PlannerArtifact['type'], PlannerArtifact>>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [sources, setSources] = useState<PlannerSourceItem[]>([]);
@@ -146,12 +152,17 @@ const PlannerPackDetail: React.FC = () => {
       setMembers(scopeMembers);
     } catch (error) {
       console.error(error);
-      showNotification('Unable to load Planner Pack.', 'error');
+      if (error instanceof PcivSchemaMismatchError) {
+        notifyRef.current('Database schema mismatch detected. Please refresh the page or contact support.', 'error');
+        // Don't retry on schema mismatch - fail fast
+        return;
+      }
+      notifyRef.current('Unable to load Planner Pack.', 'error');
     } finally {
       setMembersLoading(false);
       setIsLoading(false);
     }
-  }, [id, loadArtifacts, showNotification]);
+  }, [id, loadArtifacts]);
 
   useEffect(() => {
     loadIntervention();

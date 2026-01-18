@@ -34,3 +34,33 @@ export class PcivAuthRequiredError extends Error {
     this.cause = cause;
   }
 }
+
+/**
+ * Thrown when a database query references columns that don't exist in the schema.
+ * HTTP 400 or PostgREST error PGRST204 (column not found).
+ * Indicates a schema mismatch - do not retry.
+ */
+export class PcivSchemaMismatchError extends Error {
+  cause?: unknown;
+  
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'PcivSchemaMismatchError';
+    this.cause = cause;
+  }
+}
+
+/**
+ * Thrown when a database query references columns that don't exist in the schema.
+ * HTTP 400 or PostgREST error PGRST204 (column not found).
+ * Indicates a schema mismatch - do not retry.
+ */
+export class PcivSchemaMismatchError extends Error {
+  cause?: unknown;
+  
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'PcivAuthRequiredError';
+    this.cause = cause;
+  }
+}
