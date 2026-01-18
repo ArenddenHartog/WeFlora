@@ -348,7 +348,7 @@ const PlannerPackDetail: React.FC = () => {
     }
     setInventoryStatus('running');
     try {
-      await runWithTimeout(
+      const result = await runWithTimeout(
         inventoryIngest({
           supabase,
           interventionId: id,
@@ -357,6 +357,12 @@ const PlannerPackDetail: React.FC = () => {
           geometryId: null
         })
       );
+      if (!result) {
+        setInventoryStatus('failed');
+        setSources((prev) => prev.map((item) => (item.id === source.id ? { ...item, parseStatus: 'failed' } : item)));
+        setInventoryError('Inventory ingest failed to parse any rows.');
+        return;
+      }
       setInventoryStatus('succeeded');
       setSources((prev) => prev.map((item) => (item.id === source.id ? { ...item, parseStatus: 'parsed' } : item)));
       await loadArtifacts(id);
