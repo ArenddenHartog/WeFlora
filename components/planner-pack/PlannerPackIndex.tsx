@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { getPlanningScopeId } from '../../src/lib/planningScope';
-import { bootstrapIntervention, listInterventionsForScope, setGeometry } from '../../src/planner-pack/v1/storage/supabase';
+import { listInterventionsForScope, setGeometry } from '../../src/planner-pack/v1/storage/supabase';
 import type { PlannerIntervention } from '../../src/planner-pack/v1/schemas';
 import { plannerPackCompose } from '../../src/planner-pack/v1/workers/plannerPackCompose';
 import { useUI } from '../../contexts/UIContext';
@@ -65,6 +65,26 @@ const PlannerPackIndex: React.FC = () => {
     }
   }, [scopeId, showNotification]);
 
+  const bootstrapIntervention = useCallback(
+    async (args: { scopeId: string; name: string; municipality?: string | null; interventionType: string }) => {
+      const { data, error } = await supabase.rpc('planner_bootstrap_intervention', {
+        p_scope_id: args.scopeId,
+        p_name: args.name,
+        p_municipality: args.municipality ?? null,
+        p_intervention_type: args.interventionType
+      });
+      if (error) {
+        throw new Error(error.message);
+      }
+      const row = data?.[0];
+      if (!row?.intervention_id) {
+        throw new Error('bootstrapIntervention failed: no intervention id returned');
+      }
+      return { interventionId: row.intervention_id, scopeId: row.scope_id };
+    },
+    []
+  );
+
   useEffect(() => {
     loadInterventions();
   }, [loadInterventions]);
@@ -104,7 +124,7 @@ const PlannerPackIndex: React.FC = () => {
     if (!isLoading) {
       seedDemo();
     }
-  }, [interventions.length, isLoading, scopeId, loadInterventions]);
+  }, [interventions.length, isLoading, scopeId, loadInterventions, bootstrapIntervention]);
 
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
