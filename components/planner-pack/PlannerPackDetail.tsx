@@ -130,6 +130,7 @@ const PlannerPackDetail: React.FC = () => {
     if (byType.options) logEntries.push('✔ Option set prepared');
     if (byType.procurement) logEntries.push('✔ Procurement pack prepared');
     if (byType.email_draft) logEntries.push('✔ Email draft ready');
+    if (byType.maintenance) logEntries.push('✔ Maintenance plan generated');
     setLogs(logEntries);
   }, []);
 
@@ -372,7 +373,16 @@ const PlannerPackDetail: React.FC = () => {
     setComposeStatus('running');
 
     try {
-      const inventorySummary = (artifacts.check_report?.payload as any)?.inventorySummary ?? null;
+      const inventoryPayload = artifacts.check_report?.payload as any;
+      const inventorySummary = inventoryPayload?.inventorySummary
+        ? {
+            ...inventoryPayload.inventorySummary,
+            speciesDistribution: inventoryPayload.speciesMix?.speciesDistribution,
+            genusDistribution: inventoryPayload.speciesMix?.genusDistribution,
+            familyDistribution: inventoryPayload.speciesMix?.familyDistribution,
+            tenTwentyThirtyViolations: inventoryPayload.speciesMix?.violations
+          }
+        : null;
       const geometry = geojsonText.trim() ? buildGeometryFromState() : (DEFAULT_GEOMETRY as PlannerGeometry);
 
       await runWithTimeout(
@@ -453,7 +463,8 @@ const PlannerPackDetail: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="h-full overflow-y-auto bg-slate-50">
+      <div className="p-6 space-y-6">
       <header className="border border-slate-200 rounded-xl p-4 bg-white">
         <div className="flex items-center justify-between">
           <div>
@@ -511,7 +522,7 @@ const PlannerPackDetail: React.FC = () => {
           </div>
         </aside>
       </div>
-    </div>
+      </div>
   );
 };
 

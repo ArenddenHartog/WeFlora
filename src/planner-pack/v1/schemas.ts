@@ -70,7 +70,7 @@ export const PlannerSourceSchema = z.object({
 export const PlannerRunSchema = z.object({
   id: z.string().uuid(),
   interventionId: z.string().uuid(),
-  workerType: z.enum(['inventory_ingest', 'planner_pack_compose']),
+  workerType: z.enum(['inventory_ingest', 'planner_pack_compose', 'maintenance_lifecycle']),
   status: z.enum(['running', 'succeeded', 'failed']),
   assumptions: z.record(z.any()).default({}),
   inputsHash: z.string().nullable().optional(),
@@ -82,7 +82,7 @@ export const PlannerArtifactSchema = z.object({
   id: z.string().uuid(),
   interventionId: z.string().uuid(),
   runId: z.string().uuid().nullable().optional(),
-  type: z.enum(['memo', 'options', 'procurement', 'email_draft', 'check_report']),
+  type: z.enum(['memo', 'options', 'procurement', 'email_draft', 'check_report', 'maintenance', 'species_mix']),
   version: z.number().int().min(1),
   payload: z.record(z.any()),
   renderedHtml: z.string().nullable().optional(),

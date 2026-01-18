@@ -33,6 +33,26 @@ const resolveColumn = (headers: string[], candidates: string[]) => {
   return match?.header ?? null;
 };
 
+const computeDistribution = (values: string[]) => {
+  const total = values.length;
+  const counts = values.reduce<Record<string, number>>((acc, value) => {
+    acc[value] = (acc[value] ?? 0) + 1;
+    return acc;
+  }, {});
+  const top = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, count]) => ({ name, count, pct: total ? count / total : 0 }));
+  return { total, top };
+};
+
+const computeTenTwentyThirty = (distribution: { top: Array<{ name: string; pct: number }> }) => {
+  const violations: string[] = [];
+  distribution.top.forEach((entry) => {
+    if (entry.pct > 0.1) violations.push(`Species ${entry.name} exceeds 10% (${Math.round(entry.pct * 100)}%)`);
+  });
+  return violations;
+};
+
 export const parseInventoryCsv = (fileText: string) => {
   const rows = parseCsv(fileText);
   if (!rows.length) {
@@ -55,6 +75,10 @@ export const parseInventoryCsv = (fileText: string) => {
   const genusSet = new Set<string>();
   const familySet = new Set<string>();
 
+  const speciesValues: string[] = [];
+  const genusValues: string[] = [];
+  const familyValues: string[] = [];
+
   rows.forEach((row) => {
     const species = speciesHeader ? row[speciesHeader] ?? '' : '';
     const genus = genusHeader ? row[genusHeader] ?? '' : '';
@@ -64,15 +88,25 @@ export const parseInventoryCsv = (fileText: string) => {
     if (!species?.trim()) {
       missingSpecies += 1;
     } else {
-      speciesSet.add(normalizeSpecies(species));
+      const normalized = normalizeSpecies(species);
+      speciesSet.add(normalized);
+      speciesValues.push(normalized);
     }
 
     if (!dbh?.trim()) {
       missingDbh += 1;
     }
 
-    if (genus?.trim()) genusSet.add(titleCase(genus));
-    if (family?.trim()) familySet.add(titleCase(family));
+    if (genus?.trim()) {
+      const normalized = titleCase(genus);
+      genusSet.add(normalized);
+      genusValues.push(normalized);
+    }
+    if (family?.trim()) {
+      const normalized = titleCase(family);
+      familySet.add(normalized);
+      familyValues.push(normalized);
+    }
   });
 
   const treesCount = rows.length;
@@ -83,6 +117,19 @@ export const parseInventoryCsv = (fileText: string) => {
   if (!speciesHeader) qualityFlags.push('No species column detected');
   if (missingSpeciesPct > 0.25) qualityFlags.push('High missing species rate');
   if (missingDbhPct > 0.25) qualityFlags.push('High missing DBH rate');
+
+  const speciesDistribution = computeDistribution(speciesValues);
+  const genusDistribution = computeDistribution(genusValues);
+  const familyDistribution = computeDistribution(familyValues);
+  const tenTwentyThirtyViolations = [
+    ...computeTenTwentyThirty(speciesDistribution),
+    ...genusDistribution.top
+      .filter((entry) => entry.pct > 0.2)
+      .map((entry) => `Genus ${entry.name} exceeds 20% (${Math.round(entry.pct * 100)}%)`),
+    ...familyDistribution.top
+      .filter((entry) => entry.pct > 0.3)
+      .map((entry) => `Family ${entry.name} exceeds 30% (${Math.round(entry.pct * 100)}%)`)
+  ];
 
   const parseReport = {
     rows: treesCount,
@@ -95,7 +142,11 @@ export const parseInventoryCsv = (fileText: string) => {
     familyCount: familySet.size,
     missingSpeciesPct,
     missingDbhPct,
-    qualityFlags
+    qualityFlags,
+    speciesDistribution,
+    genusDistribution,
+    familyDistribution,
+    tenTwentyThirtyViolations
   };
 
   const summary = {
@@ -103,7 +154,11 @@ export const parseInventoryCsv = (fileText: string) => {
     speciesCount: speciesSet.size,
     genusCount: genusSet.size,
     missingSpeciesPct,
-    missingDbhPct
+    missingDbhPct,
+    speciesDistribution,
+    genusDistribution,
+    familyDistribution,
+    tenTwentyThirtyViolations
   };
 
   return { rows, parseReport, summary };
@@ -157,7 +212,14 @@ export const inventoryIngest = async (args: {
         missingSpeciesPct: summary.missingSpeciesPct,
         missingDbhPct: summary.missingDbhPct
       },
-      qualityFlags: 'qualityFlags' in parseReport ? parseReport.qualityFlags ?? [] : []
+      qualityFlags: 'qualityFlags' in parseReport ? parseReport.qualityFlags ?? [] : [],
+      speciesMix: {
+        mode: 'inventory',
+        speciesDistribution: summary.speciesDistribution,
+        genusDistribution: summary.genusDistribution,
+        familyDistribution: summary.familyDistribution,
+        violations: summary.tenTwentyThirtyViolations
+      }
     };
 
     await upsertArtifact(args.supabase, args.interventionId, {

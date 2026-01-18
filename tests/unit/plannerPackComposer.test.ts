@@ -2,8 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildPlannerPackArtifacts } from '../../src/planner-pack/v1/workers/plannerPackCompose.ts';
 
-test('planner pack composer emits memo/options/procurement/email with required phrases', () => {
-  const { memoPayload, optionsPayload, procurementPayload, emailDraftPayload } = buildPlannerPackArtifacts({
+test('planner pack composer emits memo/options/procurement/email/species mix/maintenance with required phrases', () => {
+  const {
+    memoPayload,
+    optionsPayload,
+    procurementPayload,
+    emailDraftPayload,
+    speciesMixPayload,
+    maintenancePayload
+  } = buildPlannerPackArtifacts({
     municipality: 'Utrecht',
     interventionName: 'Kanaalstraat corridor vergroening',
     geometry: {
@@ -27,8 +34,16 @@ test('planner pack composer emits memo/options/procurement/email with required p
   assert.ok(memoSections.includes('WeFlora concludes that, under the stated assumptions'));
   assert.ok(memoSections.includes('Here is the evidence supporting compliance'));
 
-  for (const payload of [memoPayload, optionsPayload, procurementPayload, emailDraftPayload]) {
+  for (const payload of [
+    memoPayload,
+    optionsPayload,
+    procurementPayload,
+    emailDraftPayload,
+    speciesMixPayload,
+    maintenancePayload
+  ]) {
     assert.ok(Array.isArray(payload.assumptions));
+    assert.ok(Array.isArray(payload.assumptionsDetailed));
     assert.ok(Array.isArray(payload.evidence));
   }
 });
