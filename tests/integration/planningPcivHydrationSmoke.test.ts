@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, before } from 'node:test';
+import assert from 'node:assert/strict';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
   createDraftRun,
@@ -17,7 +18,7 @@ describe('Planning PCIV Hydration Smoke Test', () => {
   const testScopeId = `pciv-planning-smoke-${Date.now()}`;
   let testRunId: string;
 
-  beforeAll(() => {
+  before(() => {
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       console.warn('Skipping Planning hydration smoke test: Supabase env vars not set');
       return;
@@ -34,7 +35,7 @@ describe('Planning PCIV Hydration Smoke Test', () => {
     // 1. Create a draft run (owned) for the new scopeId
     const run = await createDraftRun(testScopeId, { ownership: 'owned' });
     testRunId = run.id;
-    expect(testRunId).toBeTruthy();
+    assert.ok(testRunId);
 
     // 2. Upsert one required input with UNSET value and one optional input with a value
     await upsertInputs(testRunId, [
@@ -62,9 +63,9 @@ describe('Planning PCIV Hydration Smoke Test', () => {
         runId: testRunId,
         pointer: '/test/optional-budget',
         label: 'Test Budget',
-        domain: 'project',
+        domain: 'site',
         required: false,
-        fieldType: 'number',
+        fieldType: 'text',
         provenance: 'user-entered',
         valueKind: 'number',
         valueString: null,
@@ -79,8 +80,8 @@ describe('Planning PCIV Hydration Smoke Test', () => {
 
     // 3. Commit run with allowPartial=true
     const committedRun = await commitRun(testRunId, true);
-    expect(committedRun.status).toBe('partial_committed');
-    expect(committedRun.allowPartial).toBe(true);
+    assert.equal(committedRun.status, 'partial_committed');
+    assert.equal(committedRun.allowPartial, true);
 
     // 4. Upsert planning.execution_state.v1 artifact for this run
     const artifactId = `${testRunId}:planning.execution_state.v1`;
@@ -96,14 +97,14 @@ describe('Planning PCIV Hydration Smoke Test', () => {
       projectId: testScopeId
     };
 
-    await upsertArtifacts(testRunId, [
+    await upsertArtifacts([
       {
         id: artifactId,
         runId: testRunId,
         type: 'planning.execution_state.v1',
+        title: 'Planning execution state',
         payload: artifactPayload,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt: new Date().toISOString()
       }
     ]);
 
@@ -111,17 +112,16 @@ describe('Planning PCIV Hydration Smoke Test', () => {
     const snapshot = await loadLatestPlanningRunForScope(supabase, testScopeId);
 
     // Must return a snapshot
-    expect(snapshot).toBeTruthy();
-    expect(snapshot).not.toBeNull();
+    assert.ok(snapshot);
 
     // Snapshot runId must match the PCIV run id used
-    expect(snapshot!.runId).toBe(testRunId);
+    assert.equal(snapshot!.runId, testRunId);
 
     // Artifact payload returned must equal what was stored
-    expect(snapshot!.programId).toBe('test-program');
-    expect(snapshot!.executionState).toEqual(artifactPayload.executionState);
-    expect(snapshot!.status).toBe('active');
-    expect(snapshot!.projectId).toBe(testScopeId);
+    assert.equal(snapshot!.programId, 'test-program');
+    assert.deepEqual(snapshot!.executionState, artifactPayload.executionState);
+    assert.equal(snapshot!.status, 'active');
+    assert.equal(snapshot!.projectId, testScopeId);
 
     // 6. Cleanup - delete run
     await deleteRun(testRunId);
@@ -148,7 +148,7 @@ describe('Planning PCIV Hydration Smoke Test', () => {
         runId: oldRun.id,
         pointer: '/test/field',
         label: 'Test Field',
-        domain: 'test',
+        domain: 'site',
         required: false,
         fieldType: 'text',
         provenance: 'user-entered',
@@ -165,19 +165,19 @@ describe('Planning PCIV Hydration Smoke Test', () => {
     await commitRun(oldRun.id, false);
     
     // Create artifact for old run
-    await upsertArtifacts(oldRun.id, [
+    await upsertArtifacts([
       {
         id: `${oldRun.id}:planning.execution_state.v1`,
         runId: oldRun.id,
         type: 'planning.execution_state.v1',
+        title: 'Planning execution state',
         payload: {
           runId: oldRun.id,
           programId: 'old-program',
           executionState: { version: 'old' },
           status: 'old'
         },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt: new Date().toISOString()
       }
     ]);
 
@@ -192,7 +192,7 @@ describe('Planning PCIV Hydration Smoke Test', () => {
         runId: newRun.id,
         pointer: '/test/field',
         label: 'Test Field',
-        domain: 'test',
+        domain: 'site',
         required: false,
         fieldType: 'text',
         provenance: 'user-entered',
@@ -209,29 +209,29 @@ describe('Planning PCIV Hydration Smoke Test', () => {
     await commitRun(newRun.id, false);
     
     // Create artifact for new run
-    await upsertArtifacts(newRun.id, [
+    await upsertArtifacts([
       {
         id: `${newRun.id}:planning.execution_state.v1`,
         runId: newRun.id,
         type: 'planning.execution_state.v1',
+        title: 'Planning execution state',
         payload: {
           runId: newRun.id,
           programId: 'new-program',
           executionState: { version: 'new' },
           status: 'new'
         },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt: new Date().toISOString()
       }
     ]);
 
     // Load latest - should get the NEW run (latest by committed_at)
     const snapshot = await loadLatestPlanningRunForScope(supabase, multiRunScopeId);
 
-    expect(snapshot).toBeTruthy();
-    expect(snapshot!.runId).toBe(newRun.id);
-    expect(snapshot!.programId).toBe('new-program');
-    expect(snapshot!.status).toBe('new');
+    assert.ok(snapshot);
+    assert.equal(snapshot!.runId, newRun.id);
+    assert.equal(snapshot!.programId, 'new-program');
+    assert.equal(snapshot!.status, 'new');
 
     // Cleanup
     await deleteRun(oldRun.id);
@@ -250,19 +250,19 @@ describe('Planning PCIV Hydration Smoke Test', () => {
     const run = await createDraftRun(unsetScopeId, { ownership: 'owned' });
 
     // Create input with all value columns null (UNSET)
-    await expect(
+    await assert.doesNotReject(
       upsertInputs(run.id, [
         {
           id: crypto.randomUUID(),
           runId: run.id,
           pointer: '/test/unset-field',
           label: 'Unset Field',
-          domain: 'test',
+          domain: 'site',
           required: true,
           fieldType: 'text',
           provenance: 'unknown',
           valueKind: 'string',
-          valueString: null,  // All value columns NULL
+          valueString: null,
           valueNumber: null,
           valueBoolean: null,
           valueEnum: null,
@@ -271,11 +271,11 @@ describe('Planning PCIV Hydration Smoke Test', () => {
           updatedAt: new Date().toISOString()
         }
       ])
-    ).resolves.not.toThrow();
+    );
 
     // Should be able to commit with allowPartial
     const committedRun = await commitRun(run.id, true);
-    expect(committedRun.status).toBe('partial_committed');
+    assert.equal(committedRun.status, 'partial_committed');
 
     // Cleanup
     await deleteRun(run.id);

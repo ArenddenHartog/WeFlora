@@ -77,6 +77,8 @@ if (!hasEnv) {
 
     assert.ok(types.has('memo'));
     assert.ok(types.has('options'));
+    assert.ok(types.has('species_mix'));
+    assert.ok(types.has('maintenance'));
     assert.ok(types.has('procurement'));
     assert.ok(types.has('email_draft'));
     assert.ok(types.has('check_report'));

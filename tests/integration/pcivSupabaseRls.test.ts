@@ -30,6 +30,16 @@ if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
 }
 
 const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+const testPassword = 'test-password-123';
+
+const signInWithPassword = async (email: string) => {
+  const client = createClient(supabaseUrl, supabaseAnonKey);
+  const { data, error } = await client.auth.signInWithPassword({ email, password: testPassword });
+  if (error || !data.session) {
+    throw new Error(`Failed to sign in test user: ${error?.message ?? 'missing session'}`);
+  }
+  return client;
+};
 
 test('PCIV RLS: Shared runs readable/writable by authenticated users', async () => {
   // Create shared run using service role
@@ -52,23 +62,13 @@ test('PCIV RLS: Shared runs readable/writable by authenticated users', async () 
   // Create test user session
   const { data: { user } } = await serviceClient.auth.admin.createUser({
     email: `test-${Date.now()}@example.com`,
-    password: 'test-password-123',
+    password: testPassword,
     email_confirm: true
   });
 
   assert.ok(user, 'Failed to create test user');
 
-  const { data: sessionData } = await serviceClient.auth.admin.generateLink({
-    type: 'magiclink',
-    email: user.email!
-  });
-
-  // Create authenticated client
-  const userClient = createClient(supabaseUrl, supabaseAnonKey);
-  await userClient.auth.setSession({
-    access_token: sessionData.properties!.access_token,
-    refresh_token: sessionData.properties!.refresh_token
-  });
+  const userClient = await signInWithPassword(user.email!);
 
   // Verify user can read shared run
   const { data: readRun, error: readError } = await userClient
@@ -102,13 +102,13 @@ test('PCIV RLS: Owned runs isolated from non-owners', async () => {
   // Create two test users
   const { data: { user: owner } } = await serviceClient.auth.admin.createUser({
     email: `owner-${Date.now()}@example.com`,
-    password: 'test-password-123',
+    password: testPassword,
     email_confirm: true
   });
 
   const { data: { user: nonOwner } } = await serviceClient.auth.admin.createUser({
     email: `nonowner-${Date.now()}@example.com`,
-    password: 'test-password-123',
+    password: testPassword,
     email_confirm: true
   });
 
@@ -131,16 +131,7 @@ test('PCIV RLS: Owned runs isolated from non-owners', async () => {
   const runId = runData.id;
 
   // Create client for non-owner
-  const { data: nonOwnerSession } = await serviceClient.auth.admin.generateLink({
-    type: 'magiclink',
-    email: nonOwner.email!
-  });
-
-  const nonOwnerClient = createClient(supabaseUrl, supabaseAnonKey);
-  await nonOwnerClient.auth.setSession({
-    access_token: nonOwnerSession.properties!.access_token,
-    refresh_token: nonOwnerSession.properties!.refresh_token
-  });
+  const nonOwnerClient = await signInWithPassword(nonOwner.email!);
 
   // Verify non-owner cannot read owned run
   const { data: readRun } = await nonOwnerClient
@@ -205,16 +196,7 @@ test('PCIV RLS: Child tables inherit parent run access', async () => {
     email_confirm: true
   });
 
-  const { data: sessionData } = await serviceClient.auth.admin.generateLink({
-    type: 'magiclink',
-    email: user!.email!
-  });
-
-  const userClient = createClient(supabaseUrl, supabaseAnonKey);
-  await userClient.auth.setSession({
-    access_token: sessionData.properties!.access_token,
-    refresh_token: sessionData.properties!.refresh_token
-  });
+  const userClient = await signInWithPassword(user!.email!);
 
   // Verify user can read child table (sources)
   const { data: sourceData, error } = await userClient

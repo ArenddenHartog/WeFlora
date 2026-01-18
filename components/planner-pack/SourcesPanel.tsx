@@ -35,7 +35,9 @@ const SourcesPanel: React.FC<SourcesPanelProps> = ({ sources, isUploading, onUpl
 
       <div className="space-y-2">
         {sources.length === 0 ? (
-          <div className="text-xs text-slate-400">No uploads yet.</div>
+          <div className="text-xs text-slate-400">
+            Not connected yet — upload a file or connect later. WeFlora will flag assumptions.
+          </div>
         ) : (
           sources.map((source) => (
             <div key={source.id} className="border border-slate-200 rounded-lg p-2 text-xs">

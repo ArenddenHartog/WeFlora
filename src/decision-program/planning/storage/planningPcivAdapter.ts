@@ -132,7 +132,7 @@ export async function loadLatestPlanningRunForScope(
       executionState: payload.executionState || {},
       status: payload.status || 'unknown',
       projectId: payload.projectId || scopeId,
-      updatedAt: artifact.updatedAt,
+      updatedAt: artifact.createdAt,
     };
   } catch (error) {
     // Gracefully handle auth/RLS errors
@@ -188,11 +188,12 @@ export async function savePlanningRunSnapshot(
     const now = new Date().toISOString();
 
     await withTimeout(
-      upsertArtifacts(pcivRunId, [
+      upsertArtifacts([
         {
           id: artifactId,
           runId: pcivRunId,
           type: PLANNING_ARTIFACT_TYPE,
+          title: 'Planning execution state',
           payload: {
             runId: run.runId,
             programId: run.programId,
@@ -201,7 +202,6 @@ export async function savePlanningRunSnapshot(
             projectId: run.projectId || scopeId,
           },
           createdAt: now,
-          updatedAt: now,
         },
       ]),
       8000,

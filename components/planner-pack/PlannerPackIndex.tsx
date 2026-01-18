@@ -30,7 +30,20 @@ const demoGeometry = {
 const PlannerPackIndex: React.FC = () => {
   const navigate = useNavigate();
   const { showNotification } = useUI();
-  const scopeId = useMemo(() => getPlanningScopeId(), []);
+  const scopeId = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return getPlanningScopeId();
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const invitedScope = params.get('scope');
+    if (invitedScope) {
+      window.localStorage.setItem('planning_workspace_scope', invitedScope);
+      return invitedScope;
+    }
+
+    return getPlanningScopeId();
+  }, []);
   const [interventions, setInterventions] = useState<PlannerIntervention[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);

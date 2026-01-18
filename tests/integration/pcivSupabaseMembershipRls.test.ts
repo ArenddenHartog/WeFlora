@@ -33,6 +33,16 @@ if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
 }
 
 const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+const testPassword = 'test-password-123';
+
+const signInWithPassword = async (email: string) => {
+  const client = createClient(supabaseUrl, supabaseAnonKey);
+  const { data, error } = await client.auth.signInWithPassword({ email, password: testPassword });
+  if (error || !data.session) {
+    throw new Error(`Failed to sign in test user: ${error?.message ?? 'missing session'}`);
+  }
+  return client;
+};
 
 test('PCIV Membership: Bootstrap requires auth', async () => {
   // Create anon client (no session)
@@ -64,26 +74,14 @@ test('PCIV Membership: Bootstrap creates scope membership + first run', async ()
   const testEmail = `membership-test-${Date.now()}@example.com`;
   const { data: { user } } = await serviceClient.auth.admin.createUser({
     email: testEmail,
-    password: 'test-password-123',
+    password: testPassword,
     email_confirm: true
   });
 
   assert.ok(user, 'Failed to create test user');
 
   // Get user session
-  const { data: sessionData } = await serviceClient.auth.admin.generateLink({
-    type: 'magiclink',
-    email: user.email!
-  });
-
-  assert.ok(sessionData.properties, 'Failed to generate session');
-
-  // Create authenticated client
-  const userClient = createClient(supabaseUrl, supabaseAnonKey);
-  await userClient.auth.setSession({
-    access_token: sessionData.properties.access_token,
-    refresh_token: sessionData.properties.refresh_token
-  });
+  const userClient = await signInWithPassword(user.email!);
 
   const scopeId = `membership-test-bootstrap-${Date.now()}`;
 
@@ -135,13 +133,13 @@ test('PCIV Membership: Viewer cannot write', async () => {
   
   const { data: { user: owner } } = await serviceClient.auth.admin.createUser({
     email: ownerEmail,
-    password: 'test-password-123',
+    password: testPassword,
     email_confirm: true
   });
 
   const { data: { user: viewer } } = await serviceClient.auth.admin.createUser({
     email: viewerEmail,
-    password: 'test-password-123',
+    password: testPassword,
     email_confirm: true
   });
 
@@ -169,16 +167,7 @@ test('PCIV Membership: Viewer cannot write', async () => {
       });
 
     // Create viewer client
-    const { data: viewerSession } = await serviceClient.auth.admin.generateLink({
-      type: 'magiclink',
-      email: viewer.email!
-    });
-
-    const viewerClient = createClient(supabaseUrl, supabaseAnonKey);
-    await viewerClient.auth.setSession({
-      access_token: viewerSession.properties!.access_token,
-      refresh_token: viewerSession.properties!.refresh_token
-    });
+    const viewerClient = await signInWithPassword(viewer.email!);
 
     // Viewer should be able to read
     const { data: readRun, error: readError } = await viewerClient
@@ -218,7 +207,7 @@ test('PCIV Membership: Editor can write', async () => {
   
   const { data: { user: editor } } = await serviceClient.auth.admin.createUser({
     email: editorEmail,
-    password: 'test-password-123',
+    password: testPassword,
     email_confirm: true
   });
 
@@ -240,7 +229,7 @@ test('PCIV Membership: Editor can write', async () => {
     const ownerEmail = `owner2-${Date.now()}@example.com`;
     const { data: { user: owner } } = await serviceClient.auth.admin.createUser({
       email: ownerEmail,
-      password: 'test-password-123',
+      password: testPassword,
       email_confirm: true
     });
 
@@ -261,16 +250,7 @@ test('PCIV Membership: Editor can write', async () => {
       .eq('user_id', editor.id);
 
     // Create editor client
-    const { data: editorSession } = await serviceClient.auth.admin.generateLink({
-      type: 'magiclink',
-      email: editor.email!
-    });
-
-    const editorClient = createClient(supabaseUrl, supabaseAnonKey);
-    await editorClient.auth.setSession({
-      access_token: editorSession.properties!.access_token,
-      refresh_token: editorSession.properties!.refresh_token
-    });
+    const editorClient = await signInWithPassword(editor.email!);
 
     // Editor should be able to write sources
     const sourceId = crypto.randomUUID();
@@ -332,13 +312,13 @@ test('PCIV Membership: Non-member cannot access scope', async () => {
   
   const { data: { user: member } } = await serviceClient.auth.admin.createUser({
     email: memberEmail,
-    password: 'test-password-123',
+    password: testPassword,
     email_confirm: true
   });
 
   const { data: { user: nonMember } } = await serviceClient.auth.admin.createUser({
     email: nonMemberEmail,
-    password: 'test-password-123',
+    password: testPassword,
     email_confirm: true
   });
 
@@ -356,16 +336,7 @@ test('PCIV Membership: Non-member cannot access scope', async () => {
     const runId = bootstrapData[0].run_id;
 
     // Create non-member client
-    const { data: nonMemberSession } = await serviceClient.auth.admin.generateLink({
-      type: 'magiclink',
-      email: nonMember.email!
-    });
-
-    const nonMemberClient = createClient(supabaseUrl, supabaseAnonKey);
-    await nonMemberClient.auth.setSession({
-      access_token: nonMemberSession.properties!.access_token,
-      refresh_token: nonMemberSession.properties!.refresh_token
-    });
+    const nonMemberClient = await signInWithPassword(nonMember.email!);
 
     // Non-member should NOT be able to read
     const { data: readRun } = await nonMemberClient

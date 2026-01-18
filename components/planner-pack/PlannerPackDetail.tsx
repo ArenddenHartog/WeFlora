@@ -130,6 +130,7 @@ const PlannerPackDetail: React.FC = () => {
     if (byType.options) logEntries.push('✔ Option set prepared');
     if (byType.procurement) logEntries.push('✔ Procurement pack prepared');
     if (byType.email_draft) logEntries.push('✔ Email draft ready');
+    if (byType.maintenance) logEntries.push('✔ Maintenance plan generated');
     setLogs(logEntries);
   }, []);
 
@@ -347,7 +348,7 @@ const PlannerPackDetail: React.FC = () => {
     }
     setInventoryStatus('running');
     try {
-      await runWithTimeout(
+      const result = await runWithTimeout(
         inventoryIngest({
           supabase,
           interventionId: id,
@@ -356,6 +357,12 @@ const PlannerPackDetail: React.FC = () => {
           geometryId: null
         })
       );
+      if (!result) {
+        setInventoryStatus('failed');
+        setSources((prev) => prev.map((item) => (item.id === source.id ? { ...item, parseStatus: 'failed' } : item)));
+        setInventoryError('Inventory ingest failed to parse any rows.');
+        return;
+      }
       setInventoryStatus('succeeded');
       setSources((prev) => prev.map((item) => (item.id === source.id ? { ...item, parseStatus: 'parsed' } : item)));
       await loadArtifacts(id);
@@ -372,7 +379,16 @@ const PlannerPackDetail: React.FC = () => {
     setComposeStatus('running');
 
     try {
-      const inventorySummary = (artifacts.check_report?.payload as any)?.inventorySummary ?? null;
+      const inventoryPayload = artifacts.check_report?.payload as any;
+      const inventorySummary = inventoryPayload?.inventorySummary
+        ? {
+            ...inventoryPayload.inventorySummary,
+            speciesDistribution: inventoryPayload.speciesMix?.speciesDistribution,
+            genusDistribution: inventoryPayload.speciesMix?.genusDistribution,
+            familyDistribution: inventoryPayload.speciesMix?.familyDistribution,
+            tenTwentyThirtyViolations: inventoryPayload.speciesMix?.violations
+          }
+        : null;
       const geometry = geojsonText.trim() ? buildGeometryFromState() : (DEFAULT_GEOMETRY as PlannerGeometry);
 
       await runWithTimeout(
@@ -453,63 +469,65 @@ const PlannerPackDetail: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <header className="border border-slate-200 rounded-xl p-4 bg-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">{intervention.name}</h1>
-            <p className="text-xs text-slate-500">
-              Prepared by WeFlora on behalf of {intervention.municipality ?? 'Municipality'}
-            </p>
+    <div className="h-full overflow-y-auto bg-slate-50">
+      <div className="p-6 space-y-6">
+        <header className="border border-slate-200 rounded-xl p-4 bg-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-slate-900">{intervention.name}</h1>
+              <p className="text-xs text-slate-500">
+                Prepared by WeFlora on behalf of {intervention.municipality ?? 'Municipality'}
+              </p>
+            </div>
+            <div className="text-xs font-semibold text-weflora-dark bg-weflora-mint/20 px-3 py-1 rounded-full">
+              Status: {statusLabel} · Confidence: High
+            </div>
           </div>
-          <div className="text-xs font-semibold text-weflora-dark bg-weflora-mint/20 px-3 py-1 rounded-full">
-            Status: {statusLabel} · Confidence: High
-          </div>
-        </div>
-      </header>
+        </header>
 
-      <div className="grid grid-cols-12 gap-4">
-        <aside className="col-span-12 xl:col-span-3 space-y-6">
-          <GeometryStep
-            kind={kind}
-            geojsonText={geojsonText}
-            corridorWidthM={corridorWidthM}
-            metrics={metrics}
-            error={geojsonError}
-            onKindChange={setKind}
-            onGeojsonChange={setGeojsonText}
-            onCorridorWidthChange={setCorridorWidthM}
-            onCompute={handleComputeMetrics}
-          />
-          <SourcesPanel sources={sources} isUploading={isUploading} onUpload={handleUpload} />
-        </aside>
-
-        <section className="col-span-12 xl:col-span-6">
-          <ArtifactsPanel artifacts={artifacts} onExport={handleExport} />
-        </section>
-
-        <aside className="col-span-12 xl:col-span-3">
-          <RunsPanel
-            inventoryStatus={inventoryStatus}
-            composeStatus={composeStatus}
-            inventoryError={inventoryError}
-            composeError={composeError}
-            logs={logs}
-            onRunInventory={handleRunInventory}
-            onCompose={handleCompose}
-          />
-          <div className="mt-6">
-            <ScopeAccessPanel
-              scopeId={intervention.scopeId}
-              members={members}
-              currentUserId={user?.id ?? null}
-              onRoleChange={handleRoleChange}
-              onRemove={handleRemoveMember}
-              onCopyInvite={handleCopyInvite}
-              isLoading={membersLoading}
+        <div className="grid grid-cols-12 gap-4">
+          <aside className="col-span-12 xl:col-span-3 space-y-6">
+            <GeometryStep
+              kind={kind}
+              geojsonText={geojsonText}
+              corridorWidthM={corridorWidthM}
+              metrics={metrics}
+              error={geojsonError}
+              onKindChange={setKind}
+              onGeojsonChange={setGeojsonText}
+              onCorridorWidthChange={setCorridorWidthM}
+              onCompute={handleComputeMetrics}
             />
-          </div>
-        </aside>
+            <SourcesPanel sources={sources} isUploading={isUploading} onUpload={handleUpload} />
+          </aside>
+
+          <section className="col-span-12 xl:col-span-6">
+            <ArtifactsPanel artifacts={artifacts} onExport={handleExport} />
+          </section>
+
+          <aside className="col-span-12 xl:col-span-3">
+            <RunsPanel
+              inventoryStatus={inventoryStatus}
+              composeStatus={composeStatus}
+              inventoryError={inventoryError}
+              composeError={composeError}
+              logs={logs}
+              onRunInventory={handleRunInventory}
+              onCompose={handleCompose}
+            />
+            <div className="mt-6">
+              <ScopeAccessPanel
+                scopeId={intervention.scopeId}
+                members={members}
+                currentUserId={user?.id ?? null}
+                onRoleChange={handleRoleChange}
+                onRemove={handleRemoveMember}
+                onCopyInvite={handleCopyInvite}
+                isLoading={membersLoading}
+              />
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
   );

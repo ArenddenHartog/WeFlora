@@ -1,4 +1,5 @@
 import React from 'react';
+import MapPreview from './MapPreview';
 
 interface GeometryStepProps {
   kind: 'polygon' | 'corridor';
@@ -63,6 +64,9 @@ const GeometryStep: React.FC<GeometryStepProps> = ({
             onChange={(event) => onCorridorWidthChange(Number(event.target.value))}
             className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-xs"
           />
+          <div className="mt-1 text-[10px] text-slate-400">
+            Corridor = line buffered by width to evaluate greening impact (area + quantities).
+          </div>
         </label>
       )}
 
@@ -100,6 +104,8 @@ const GeometryStep: React.FC<GeometryStepProps> = ({
           </div>
         </div>
       </div>
+
+      <MapPreview geojsonText={geojsonText} kind={kind} corridorWidthM={corridorWidthM} />
     </section>
   );
 };

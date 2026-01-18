@@ -91,10 +91,39 @@ export const buildPlannerPackArtifacts = (args: {
     genusCount?: number;
     missingSpeciesPct: number;
     missingDbhPct: number;
+    speciesDistribution?: { top: Array<{ name: string; pct: number }> };
+    genusDistribution?: { top: Array<{ name: string; pct: number }> };
+    familyDistribution?: { top: Array<{ name: string; pct: number }> };
+    tenTwentyThirtyViolations?: string[];
   } | null;
   sourceIds: string[];
 }) => {
   const geometryProvided = Boolean(args.geometry?.geojson);
+  const assumptionsDetailed = [
+    {
+      id: 'zoning-proxy',
+      statement: 'Zoning plan is planner-provided or proxy until official dataset is attached.',
+      basis: 'proxy',
+      how_to_validate: 'Attach official zoning plan dataset when available.',
+      confidence: 'Medium'
+    },
+    {
+      id: 'baseline-proxy',
+      statement: 'Baseline proxy dataset used for existing conditions unless overridden by uploaded sources.',
+      basis: 'proxy',
+      how_to_validate: 'Upload or connect authoritative baseline dataset.',
+      confidence: 'Medium'
+    },
+    {
+      id: 'biodiversity-heuristic',
+      statement: 'Biodiversity heuristic (Santamour 10-20-30) applied based on available inventory.',
+      basis: 'heuristic',
+      how_to_validate: 'Verify inventory completeness and distribution.',
+      confidence: 'Low'
+    }
+  ];
+  const assumptions = assumptionsDetailed.map((item) => item.statement);
+
   const memoSections = [
     {
       title: 'WeFlora concludes that, under the stated assumptions, the proposed intervention complies with applicable municipal and EU-level greening requirements.',
@@ -128,7 +157,8 @@ export const buildPlannerPackArtifacts = (args: {
 
   const memoPayload = {
     title: 'Compliance Memo',
-    assumptions: defaultAssumptions,
+    assumptions,
+    assumptionsDetailed,
     evidence: buildEvidence({
       sourceIds: args.sourceIds,
       hasInventory: Boolean(args.inventorySummary),
@@ -139,7 +169,8 @@ export const buildPlannerPackArtifacts = (args: {
 
   const optionsPayload = {
     title: 'Option Set',
-    assumptions: defaultAssumptions,
+    assumptions,
+    assumptionsDetailed,
     evidence: buildEvidence({
       sourceIds: args.sourceIds,
       hasInventory: Boolean(args.inventorySummary),
@@ -147,23 +178,39 @@ export const buildPlannerPackArtifacts = (args: {
     }),
     options: [
       {
-        title: 'Shade-first street trees',
-        summary: 'Prioritize canopy coverage with resilient native street trees.'
+        title: 'Option A — Native green verge',
+        intent: 'Baseline greening with native verge planting.',
+        plantingMix: 'Diversified native mix aligned with 10-20-30 heuristic.',
+        quantities: 'Per 100 m: ~18 trees, 320 shrubs, 180 m² groundcover',
+        capexOpex: 'Capex €€ · Opex €€',
+        tradeoffs: 'Balanced canopy and biodiversity; moderate maintenance.',
+        whenToChoose: 'When baseline compliance and biodiversity gains are the priority.'
       },
       {
-        title: 'Water-first bioswale + trees',
-        summary: 'Integrate bioswales with tree rows for cooling and stormwater control.'
+        title: 'Option B — Rain-adaptive verge',
+        intent: 'Water buffering with bioswale planting and resilient trees.',
+        plantingMix: 'Moisture-tolerant mix with drought resilience.',
+        quantities: 'Per 100 m: ~14 trees, 260 shrubs, 220 m² swale planting',
+        capexOpex: 'Capex €€€ · Opex €€',
+        tradeoffs: 'Higher capex for water capture; improved stormwater performance.',
+        whenToChoose: 'When runoff mitigation and cooling are key objectives.'
       },
       {
-        title: 'Biodiversity-first pocket habitats',
-        summary: 'Introduce habitat pockets and diverse species mix for resilience.'
+        title: 'Option C — Low-maintenance verge',
+        intent: 'Operations-first, reduced upkeep burden.',
+        plantingMix: 'Durable mix with fewer species and slower growth.',
+        quantities: 'Per 100 m: ~10 trees, 180 shrubs, 140 m² groundcover',
+        capexOpex: 'Capex € · Opex €',
+        tradeoffs: 'Lower biodiversity gains; highest operational efficiency.',
+        whenToChoose: 'When maintenance capacity is constrained.'
       }
     ]
   };
 
   const procurementPayload = {
     title: 'Procurement Pack',
-    assumptions: defaultAssumptions,
+    assumptions,
+    assumptionsDetailed,
     evidence: buildEvidence({
       sourceIds: args.sourceIds,
       hasInventory: Boolean(args.inventorySummary),
@@ -179,7 +226,8 @@ export const buildPlannerPackArtifacts = (args: {
 
   const emailDraftPayload = {
     title: 'Email Draft',
-    assumptions: defaultAssumptions,
+    assumptions,
+    assumptionsDetailed,
     evidence: buildEvidence({
       sourceIds: args.sourceIds,
       hasInventory: Boolean(args.inventorySummary),
@@ -193,11 +241,58 @@ Attached is the Planner Pack for ${args.interventionName}. It includes the compl
 Prepared by WeFlora.`
   };
 
+  const speciesMixPayload = {
+    title: 'Species mix (10-20-30)',
+    assumptions,
+    assumptionsDetailed,
+    evidence: buildEvidence({
+      sourceIds: args.sourceIds,
+      hasInventory: Boolean(args.inventorySummary),
+      geometryProvided
+    }),
+    mode: args.inventorySummary ? 'inventory' : 'baseline',
+    baselineNote: args.inventorySummary
+      ? 'Inventory distribution analyzed against 10-20-30 heuristic.'
+      : 'Baseline heuristic mix (no inventory).',
+    distribution: args.inventorySummary
+      ? {
+          species: args.inventorySummary.speciesDistribution?.top ?? [],
+          genus: args.inventorySummary.genusDistribution?.top ?? [],
+          family: args.inventorySummary.familyDistribution?.top ?? []
+        }
+      : null,
+    violations: args.inventorySummary?.tenTwentyThirtyViolations ?? [],
+    recommendation: args.inventorySummary
+      ? 'Reduce dominant species/genus/family to meet 10-20-30 targets.'
+      : 'Use diversified template mix across species, genus, and family.'
+  };
+
+  const maintenancePayload = {
+    title: 'Maintenance & Lifecycle Plan',
+    preparedBy: `Prepared by WeFlora on behalf of ${args.municipality ?? 'Municipality'}`,
+    assumptions,
+    assumptionsDetailed,
+    evidence: buildEvidence({
+      sourceIds: args.sourceIds,
+      hasInventory: Boolean(args.inventorySummary),
+      geometryProvided
+    }),
+    schedule: [
+      { phase: 'Year 0–1 Establishment', tasks: ['Weekly watering', 'Monthly health inspection'] },
+      { phase: 'Year 2–5 Growth', tasks: ['Seasonal pruning', 'Annual safety inspection'] },
+      { phase: 'Year 5+ Steady State', tasks: ['Annual pruning', 'Replacement planning'] }
+    ],
+    mowingGuidance: ['Native verge: 6–8 cuts/year', 'Rain-adaptive: 4–6 cuts/year', 'Low-maintenance: 2–4 cuts/year'],
+    opexBands: ['€12–€18 per m² annually (establishment)', '€6–€10 per m² annually (steady state)']
+  };
+
   return {
     memoPayload,
     optionsPayload,
     procurementPayload,
     emailDraftPayload,
+    speciesMixPayload,
+    maintenancePayload,
     memoHtml: buildMemoHtml(memoPayload)
   };
 };
@@ -224,7 +319,15 @@ export const plannerPackCompose = async (args: {
   const run = await createRun(args.supabase, args.interventionId, 'planner_pack_compose', assumptions);
 
   try {
-    const { memoPayload, optionsPayload, procurementPayload, emailDraftPayload, memoHtml } =
+    const {
+      memoPayload,
+      optionsPayload,
+      procurementPayload,
+      emailDraftPayload,
+      speciesMixPayload,
+      maintenancePayload,
+      memoHtml
+    } =
       buildPlannerPackArtifacts({
         municipality: args.municipality,
         interventionName: args.interventionName,
@@ -261,13 +364,29 @@ export const plannerPackCompose = async (args: {
       renderedHtml: null
     });
 
+    await upsertArtifact(args.supabase, args.interventionId, {
+      runId: run.id,
+      type: 'species_mix',
+      payload: speciesMixPayload,
+      renderedHtml: null
+    });
+
+    await upsertArtifact(args.supabase, args.interventionId, {
+      runId: run.id,
+      type: 'maintenance',
+      payload: maintenancePayload,
+      renderedHtml: null
+    });
+
     await finishRun(args.supabase, run.id, 'succeeded');
 
     return {
       memo: memoPayload,
       options: optionsPayload,
       procurement: procurementPayload,
-      emailDraft: emailDraftPayload
+      emailDraft: emailDraftPayload,
+      speciesMix: speciesMixPayload,
+      maintenance: maintenancePayload
     };
   } catch (error) {
     await finishRun(args.supabase, run.id, 'failed');
