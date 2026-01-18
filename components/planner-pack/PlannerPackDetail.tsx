@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { useUI } from '../../contexts/UIContext';
@@ -19,10 +19,12 @@ import { plannerPackCompose } from '../../src/planner-pack/v1/workers/plannerPac
 import GeometryStep from './GeometryStep';
 import SourcesPanel, { type PlannerSourceItem } from './SourcesPanel';
 import RunsPanel from './RunsPanel';
-import ArtifactsPanel from './ArtifactsPanel';
+import LivingRecordPanel from './LivingRecordPanel';
 import { addUploadSource } from '../../src/planner-pack/v1/storage/supabase';
 import { uploadFile } from '../../services/fileService';
 import ScopeAccessPanel from './ScopeAccessPanel';
+import type { AssumptionItem } from './AssumptionsModule';
+import { sanitizeHtml } from './documentSanitizer';
 
 const DEFAULT_GEOMETRY = {
   kind: 'corridor' as const,
@@ -110,14 +112,20 @@ const PlannerPackDetail: React.FC = () => {
   const [logs, setLogs] = useState<string[]>([]);
   const [members, setMembers] = useState<PcivScopeMemberV1[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [schemaMismatch, setSchemaMismatch] = useState(false);
 
   const [kind, setKind] = useState<'polygon' | 'corridor'>('corridor');
   const [geojsonText, setGeojsonText] = useState('');
   const [corridorWidthM, setCorridorWidthM] = useState(12);
   const [metrics, setMetrics] = useState<{ areaM2?: number | null; lengthM?: number | null }>({});
   const [geojsonError, setGeojsonError] = useState<string | null>(null);
+  const [metricsNote, setMetricsNote] = useState<string | null>(null);
 
   const fileCache = useRef<Record<string, string>>({});
+  const actionGateRef = useRef({ inventory: 0, compose: 0 });
+  const failureCountRef = useRef({ inventory: 0, compose: 0 });
+  const nextAllowedRef = useRef({ inventory: 0, compose: 0 });
+  const autoComposeRef = useRef(false);
 
   const loadArtifacts = useCallback(async (interventionId: string) => {
     const list = await listArtifacts(supabase, interventionId);
@@ -141,6 +149,7 @@ const PlannerPackDetail: React.FC = () => {
   }, []);
 
   const loadIntervention = useCallback(async () => {
+    if (schemaMismatch) return;
     if (!id) return;
     setIsLoading(true);
     setMembersLoading(true);
@@ -153,6 +162,7 @@ const PlannerPackDetail: React.FC = () => {
     } catch (error) {
       console.error(error);
       if (error instanceof PcivSchemaMismatchError) {
+        setSchemaMismatch(true);
         notifyRef.current('Database schema mismatch detected. Please refresh the page or contact support.', 'error');
         // Don't retry on schema mismatch - fail fast
         return;
@@ -162,7 +172,7 @@ const PlannerPackDetail: React.FC = () => {
       setMembersLoading(false);
       setIsLoading(false);
     }
-  }, [id, loadArtifacts]);
+  }, [id, loadArtifacts, schemaMismatch]);
 
   useEffect(() => {
     loadIntervention();
@@ -216,6 +226,8 @@ const PlannerPackDetail: React.FC = () => {
     const ensurePack = async () => {
       if (!id || !intervention) return;
       if (artifacts.memo) return;
+      if (autoComposeRef.current) return;
+      autoComposeRef.current = true;
       const derivedGeometry = geojsonText.trim() ? buildGeometryFromState() : null;
       const geometryToUse = derivedGeometry ?? (DEFAULT_GEOMETRY as PlannerGeometry);
 
@@ -264,10 +276,12 @@ const PlannerPackDetail: React.FC = () => {
 
   const handleComputeMetrics = async () => {
     setGeojsonError(null);
+    setMetricsNote(null);
     try {
       const parsedResult = safeParseGeojson(geojsonText);
       if (!parsedResult.value) {
         setGeojsonError(parsedResult.error);
+        setMetricsNote(parsedResult.error ?? 'Invalid geometry provided.');
         return;
       }
       const parsed = parsedResult.value;
@@ -285,6 +299,9 @@ const PlannerPackDetail: React.FC = () => {
         const area = computePolygonArea(ring);
         const length = computeLineLength(ring);
         setMetrics({ areaM2: area, lengthM: length });
+        if (!area || !length) {
+          setMetricsNote('Unable to compute area/length from the provided polygon.');
+        }
         await setGeometry(supabase, id as string, {
           kind,
           corridorWidthM: undefined,
@@ -300,6 +317,9 @@ const PlannerPackDetail: React.FC = () => {
         const length = computeLineLength(geometry.coordinates);
         const area = length * corridorWidthM;
         setMetrics({ areaM2: area, lengthM: length });
+        if (!length || !area) {
+          setMetricsNote('Unable to compute corridor metrics from the provided line.');
+        }
         await setGeometry(supabase, id as string, {
           kind,
           corridorWidthM,
@@ -310,7 +330,9 @@ const PlannerPackDetail: React.FC = () => {
       }
       showNotification('Geometry saved with computed metrics.', 'success');
     } catch (error) {
-      setGeojsonError((error as Error).message);
+      const message = (error as Error).message;
+      setGeojsonError(message);
+      setMetricsNote(message);
     }
   };
 
@@ -346,6 +368,9 @@ const PlannerPackDetail: React.FC = () => {
 
   const handleRunInventory = async () => {
     if (!id) return;
+    const now = Date.now();
+    if (now - actionGateRef.current.inventory < 500 || now < nextAllowedRef.current.inventory) return;
+    actionGateRef.current.inventory = now;
     setInventoryError(null);
     if (sources.length === 0) {
       setInventoryError('Upload a tree inventory CSV first.');
@@ -372,20 +397,28 @@ const PlannerPackDetail: React.FC = () => {
         setInventoryStatus('failed');
         setSources((prev) => prev.map((item) => (item.id === source.id ? { ...item, parseStatus: 'failed' } : item)));
         setInventoryError('Inventory ingest failed to parse any rows.');
+        failureCountRef.current.inventory += 1;
+        nextAllowedRef.current.inventory = Date.now() + Math.min(4000, 500 * 2 ** failureCountRef.current.inventory);
         return;
       }
       setInventoryStatus('succeeded');
+      failureCountRef.current.inventory = 0;
       setSources((prev) => prev.map((item) => (item.id === source.id ? { ...item, parseStatus: 'parsed' } : item)));
       await loadArtifacts(id);
     } catch (error) {
       console.error(error);
       setInventoryStatus('failed');
       setInventoryError((error as Error).message || 'Inventory ingest failed.');
+      failureCountRef.current.inventory += 1;
+      nextAllowedRef.current.inventory = Date.now() + Math.min(4000, 500 * 2 ** failureCountRef.current.inventory);
     }
   };
 
   const handleCompose = async () => {
     if (!id || !intervention) return;
+    const now = Date.now();
+    if (now - actionGateRef.current.compose < 500 || now < nextAllowedRef.current.compose) return;
+    actionGateRef.current.compose = now;
     setComposeError(null);
     setComposeStatus('running');
 
@@ -414,19 +447,29 @@ const PlannerPackDetail: React.FC = () => {
         })
       );
       setComposeStatus('succeeded');
+      failureCountRef.current.compose = 0;
       await loadArtifacts(id);
     } catch (error) {
       console.error(error);
       setComposeStatus('failed');
       setComposeError((error as Error).message || 'Planner Pack generation failed.');
+      failureCountRef.current.compose += 1;
+      nextAllowedRef.current.compose = Date.now() + Math.min(4000, 500 * 2 ** failureCountRef.current.compose);
     }
   };
 
   const handleExport = (artifact: PlannerArtifact) => {
     const fileName = `${intervention?.name ?? 'planner-pack'}-${artifact.type}-v${artifact.version}.html`;
+    const escapeHtml = (value: string) =>
+      value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     const html = artifact.renderedHtml
-      ? artifact.renderedHtml
-      : `<pre>${JSON.stringify(artifact.payload, null, 2)}</pre>`;
+      ? sanitizeHtml(artifact.renderedHtml)
+      : `<pre>${escapeHtml(JSON.stringify(artifact.payload, null, 2))}</pre>`;
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -437,6 +480,142 @@ const PlannerPackDetail: React.FC = () => {
   };
 
   const statusLabel = intervention?.status?.replace('_', ' ') ?? 'draft';
+
+  const assumptions = useMemo<AssumptionItem[]>(() => {
+    const payload =
+      (artifacts.memo?.payload as any) ??
+      (artifacts.options?.payload as any) ??
+      (artifacts.procurement?.payload as any) ??
+      (artifacts.maintenance?.payload as any) ??
+      null;
+    const list = (payload?.assumptionsDetailed ?? []) as any[];
+    return list.map((item, index) => {
+      const confidence = (item.confidence ?? 'Medium') as AssumptionItem['confidence'];
+      const owner = (item.owner ?? 'WeFlora') as AssumptionItem['owner'];
+      return {
+        id: item.id ?? `assumption-${index}`,
+        claim: item.claim ?? item.statement ?? 'Assumption',
+        basis: item.basis ?? 'proxy',
+        howToValidate: item.howToValidate ?? item.how_to_validate ?? 'Review evidence sources.',
+        confidence,
+        owner
+      };
+    });
+  }, [artifacts]);
+
+  const riskSummary = useMemo(() => {
+    const outstanding = assumptions.length;
+    const highRisk = assumptions.filter((item) => item.confidence === 'Low').length;
+    return { outstanding, highRisk };
+  }, [assumptions]);
+
+  const preflightState = useMemo(() => {
+    const geojsonParse = geojsonText.trim() ? safeParseGeojson(geojsonText) : { value: null, error: 'Missing geometry' };
+    const geometryValid = Boolean(geojsonParse.value);
+    const metricsValid = Boolean(metrics.lengthM && metrics.areaM2);
+    const inventoryReady =
+      Boolean((artifacts.check_report?.payload as any)?.inventorySummary) ||
+      sources.some((source) => source.parseStatus === 'parsed');
+    const memoEvidence = (artifacts.memo?.payload as any)?.evidence ?? [];
+    const zoningEvidence = memoEvidence.find((item: any) => item.kind === 'regulatory');
+    const zoningEvidenceReady = Boolean(zoningEvidence?.sourceId);
+
+    return {
+      geometryValid,
+      metricsValid,
+      inventoryReady,
+      zoningEvidenceReady,
+      geometryError: geojsonParse.error
+    };
+  }, [artifacts.check_report, artifacts.memo, geojsonText, metrics.areaM2, metrics.lengthM, sources]);
+
+  const confidenceLabel = useMemo(() => {
+    let score = 100;
+    if (!preflightState.geometryValid) score -= 20;
+    if (!preflightState.metricsValid) score -= 20;
+    if (!preflightState.inventoryReady) score -= 20;
+    if (!preflightState.zoningEvidenceReady) score -= 10;
+    score -= Math.min(30, riskSummary.highRisk * 10);
+    if (score >= 75) return 'High';
+    if (score >= 45) return 'Medium';
+    return 'Low';
+  }, [preflightState, riskSummary.highRisk]);
+
+  const recordStatus = useMemo(() => {
+    const hasCoreArtifacts = Boolean(
+      artifacts.memo &&
+        artifacts.options &&
+        artifacts.procurement &&
+        artifacts.maintenance &&
+        artifacts.email_draft
+    );
+    if (hasCoreArtifacts && preflightState.geometryValid && preflightState.metricsValid) {
+      return 'submission-ready';
+    }
+    if (!preflightState.geometryValid || !preflightState.metricsValid) {
+      return 'needs validation';
+    }
+    return statusLabel;
+  }, [artifacts, preflightState.geometryValid, preflightState.metricsValid, statusLabel]);
+
+  const lastUpdatedLabel = useMemo(() => {
+    const dates = Object.values(artifacts)
+      .filter((artifact): artifact is PlannerArtifact => Boolean(artifact))
+      .map((artifact) => artifact.updatedAt ?? artifact.createdAt)
+      .filter(Boolean)
+      .map((iso) => new Date(iso).getTime());
+    const fallback = intervention?.updatedAt ? new Date(intervention.updatedAt).getTime() : null;
+    const max = Math.max(...dates, fallback ?? 0);
+    if (!max || Number.isNaN(max)) return '—';
+    return new Date(max).toLocaleString();
+  }, [artifacts, intervention?.updatedAt]);
+
+  const preflightItems = useMemo(
+    () => [
+      {
+        label: 'Geometry valid',
+        status: preflightState.geometryValid ? 'ok' : 'warn',
+        detail: preflightState.geometryValid ? 'Geometry parsed successfully.' : preflightState.geometryError ?? 'Provide valid GeoJSON.'
+      },
+      {
+        label: 'Metrics computed',
+        status: preflightState.metricsValid ? 'ok' : 'warn',
+        detail: preflightState.metricsValid ? 'Length and area ready.' : 'Compute metrics to confirm quantities.'
+      },
+      {
+        label: 'Inventory attached',
+        status: preflightState.inventoryReady ? 'ok' : 'warn',
+        detail: preflightState.inventoryReady ? 'Inventory attached or parsed.' : 'Upload and ingest inventory.'
+      },
+      {
+        label: 'Zoning evidence',
+        status: preflightState.zoningEvidenceReady ? 'ok' : 'warn',
+        detail: preflightState.zoningEvidenceReady
+          ? 'Zoning evidence attached.'
+          : 'Proxy allowed. Attach official zoning data when available.'
+      }
+    ],
+    [
+      preflightState.geometryValid,
+      preflightState.geometryError,
+      preflightState.inventoryReady,
+      preflightState.metricsValid,
+      preflightState.zoningEvidenceReady
+    ]
+  );
+
+  const isSubmissionReady = recordStatus === 'submission-ready';
+  const primaryLabel = isSubmissionReady ? 'Export + Email draft' : 'Generate / Update Planner Pack';
+  const secondaryLabel = 'Run Inventory Ingest';
+
+  const handlePrimaryAction = () => {
+    if (isSubmissionReady && artifacts.email_draft) {
+      handleExport(artifacts.email_draft);
+      notifyRef.current('Email draft exported.', 'success');
+      return;
+    }
+    handleCompose();
+  };
 
   const handleRoleChange = async (userId: string, role: 'owner' | 'editor' | 'viewer') => {
     try {
@@ -473,6 +652,12 @@ const PlannerPackDetail: React.FC = () => {
     }
   };
 
+  if (schemaMismatch) {
+    return (
+      <div className="p-6 text-sm text-red-600">Planner Pack cannot load due to a schema mismatch. Refresh once the database is updated.</div>
+    );
+  }
+
   if (isLoading || !intervention) {
     return (
       <div className="p-6 text-sm text-slate-500">Loading Planner Pack…</div>
@@ -480,53 +665,72 @@ const PlannerPackDetail: React.FC = () => {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50">
-      <div className="p-6 space-y-6">
-        <header className="border border-slate-200 rounded-xl p-4 bg-white">
-          <div className="flex items-center justify-between">
+    <div className="h-full bg-slate-50">
+      <div className="h-full flex flex-col">
+        <header className="border-b border-slate-200 bg-white px-6 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold text-slate-900">{intervention.name}</h1>
               <p className="text-xs text-slate-500">
                 Prepared by WeFlora on behalf of {intervention.municipality ?? 'Municipality'}
               </p>
             </div>
-            <div className="text-xs font-semibold text-weflora-dark bg-weflora-mint/20 px-3 py-1 rounded-full">
-              Status: {statusLabel} · Confidence: High
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="px-2 py-1 rounded-full border border-slate-200 text-slate-600">Status: {recordStatus}</span>
+              <span className="px-2 py-1 rounded-full border border-slate-200 text-slate-600">
+                Confidence: {confidenceLabel}
+              </span>
+              <span className="px-2 py-1 rounded-full border border-slate-200 text-slate-600">
+                {riskSummary.outstanding} assumptions · {riskSummary.highRisk} high-risk
+              </span>
             </div>
           </div>
         </header>
 
-        <div className="grid grid-cols-12 gap-4">
-          <aside className="col-span-12 xl:col-span-3 space-y-6">
-            <GeometryStep
-              kind={kind}
-              geojsonText={geojsonText}
-              corridorWidthM={corridorWidthM}
-              metrics={metrics}
-              error={geojsonError}
-              onKindChange={setKind}
-              onGeojsonChange={setGeojsonText}
-              onCorridorWidthChange={setCorridorWidthM}
-              onCompute={handleComputeMetrics}
-            />
-            <SourcesPanel sources={sources} isUploading={isUploading} onUpload={handleUpload} />
-          </aside>
+        <div className="flex-1 min-h-0 px-6 py-4">
+          <div className="h-full grid grid-cols-12 gap-4">
+            <aside className="col-span-12 xl:col-span-3 space-y-6 overflow-y-auto pr-1">
+              <GeometryStep
+                kind={kind}
+                geojsonText={geojsonText}
+                corridorWidthM={corridorWidthM}
+                metrics={metrics}
+                metricsNote={metricsNote}
+                error={geojsonError}
+                onKindChange={setKind}
+                onGeojsonChange={setGeojsonText}
+                onCorridorWidthChange={setCorridorWidthM}
+                onCompute={handleComputeMetrics}
+                municipality={intervention.municipality}
+                title={intervention.name}
+              />
+              <SourcesPanel sources={sources} isUploading={isUploading} onUpload={handleUpload} />
+            </aside>
 
-          <section className="col-span-12 xl:col-span-6">
-            <ArtifactsPanel artifacts={artifacts} onExport={handleExport} />
-          </section>
+            <section className="col-span-12 xl:col-span-6 min-h-0 overflow-y-auto pr-1">
+              <LivingRecordPanel
+                artifacts={artifacts}
+                assumptions={assumptions}
+                recordStatus={recordStatus}
+                confidenceLabel={confidenceLabel}
+                lastUpdatedLabel={lastUpdatedLabel}
+                onExport={handleExport}
+              />
+            </section>
 
-          <aside className="col-span-12 xl:col-span-3">
-            <RunsPanel
-              inventoryStatus={inventoryStatus}
-              composeStatus={composeStatus}
-              inventoryError={inventoryError}
-              composeError={composeError}
-              logs={logs}
-              onRunInventory={handleRunInventory}
-              onCompose={handleCompose}
-            />
-            <div className="mt-6">
+            <aside className="col-span-12 xl:col-span-3 space-y-6 overflow-y-auto pr-1">
+              <RunsPanel
+                inventoryStatus={inventoryStatus}
+                composeStatus={composeStatus}
+                inventoryError={inventoryError}
+                composeError={composeError}
+                logs={logs}
+                preflightItems={preflightItems}
+                primaryLabel={primaryLabel}
+                secondaryLabel={secondaryLabel}
+                onPrimaryAction={handlePrimaryAction}
+                onSecondaryAction={handleRunInventory}
+              />
               <ScopeAccessPanel
                 scopeId={intervention.scopeId}
                 members={members}
@@ -536,8 +740,8 @@ const PlannerPackDetail: React.FC = () => {
                 onCopyInvite={handleCopyInvite}
                 isLoading={membersLoading}
               />
-            </div>
-          </aside>
+            </aside>
+          </div>
         </div>
       </div>
     </div>
