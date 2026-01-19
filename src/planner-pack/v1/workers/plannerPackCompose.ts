@@ -364,51 +364,6 @@ export const buildPlannerPackArtifacts = (args: {
     ]
   };
 
-  const speciesMixPayload = {
-    title: 'Species mix (10-20-30)',
-    assumptions,
-    assumptionsDetailed,
-    evidence: buildEvidence({
-      sourceIds: args.sourceIds,
-      hasInventory: Boolean(args.inventorySummary),
-      geometryProvided
-    }),
-    mode: args.inventorySummary ? 'inventory' : 'baseline',
-    baselineNote: args.inventorySummary
-      ? 'Inventory distribution analyzed against 10-20-30 heuristic.'
-      : 'Baseline heuristic mix (no inventory).',
-    distribution: args.inventorySummary
-      ? {
-          species: args.inventorySummary.speciesDistribution?.top ?? [],
-          genus: args.inventorySummary.genusDistribution?.top ?? [],
-          family: args.inventorySummary.familyDistribution?.top ?? []
-        }
-      : null,
-    violations: args.inventorySummary?.tenTwentyThirtyViolations ?? [],
-    recommendation: args.inventorySummary
-      ? 'Reduce dominant species/genus/family to meet 10-20-30 targets.'
-      : 'Use diversified template mix across species, genus, and family.'
-  };
-
-  const maintenancePayload = {
-    title: 'Maintenance & Lifecycle Plan',
-    preparedBy: `Prepared by WeFlora on behalf of ${args.municipality ?? 'Municipality'}`,
-    assumptions,
-    assumptionsDetailed,
-    evidence: buildEvidence({
-      sourceIds: args.sourceIds,
-      hasInventory: Boolean(args.inventorySummary),
-      geometryProvided
-    }),
-    schedule: [
-      { phase: 'Year 0–1 Establishment', tasks: ['Weekly watering', 'Monthly health inspection'] },
-      { phase: 'Year 2–5 Growth', tasks: ['Seasonal pruning', 'Annual safety inspection'] },
-      { phase: 'Year 5+ Steady State', tasks: ['Annual pruning', 'Replacement planning'] }
-    ],
-    mowingGuidance: ['Native verge: 6–8 cuts/year', 'Rain-adaptive: 4–6 cuts/year', 'Low-maintenance: 2–4 cuts/year'],
-    opexBands: ['€12–€18 per m² annually (establishment)', '€6–€10 per m² annually (steady state)']
-  };
-
   return {
     memoPayload,
     optionsPayload,
