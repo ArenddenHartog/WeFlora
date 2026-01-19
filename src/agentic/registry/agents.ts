@@ -646,6 +646,8 @@ export const AGENTS_V1: AgentProfile[] = [
   }
 ];
 
+export const agentProfiles: AgentProfile[] = AGENTS_V1;
+
 // Optional: convenient map
 export const AGENTS_BY_ID_V1: Record<string, AgentProfile> = Object.fromEntries(
   AGENTS_V1.map((a) => [a.agent_id, a])
