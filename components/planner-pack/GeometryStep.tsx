@@ -228,6 +228,8 @@ const GeometryStep: React.FC<GeometryStepProps> = ({
           />
         </Suspense>
       </div>
+
+      <MapPreview geojsonText={geojsonText} kind={kind} corridorWidthM={corridorWidthM} />
     </section>
   );
 };
