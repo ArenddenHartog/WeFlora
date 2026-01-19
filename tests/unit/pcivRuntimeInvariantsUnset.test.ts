@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { invariantPCIVValueColumnsMatchKind } from '../../src/decision-program/pciv/v1/runtimeInvariants';
+import { invariantPCIVValueColumnsMatchKind } from '../../src/decision-program/pciv/v1/runtimeInvariants.ts';
 
 describe('PCIV Runtime Invariants - Unset Values', () => {
   const baseParams = {

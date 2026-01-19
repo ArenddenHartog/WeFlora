@@ -1,0 +1,57 @@
+{
+  "agent_id": "document.compliance_memo",
+  "agent_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "samples": [
+    {
+      "schema_version": "1.0.0",
+      "id": "e65b4ad4-3f61-4f1b-b31f-9a3c36c2a7a7",
+      "run_id": "2c2dcf7e-0d78-4bff-80d9-6d0f4df9a1cf",
+      "scope_id": "scope-demo-015",
+      "agent_id": "document.compliance_memo",
+      "agent_version": "1.0.0",
+      "status": "ok",
+      "inputs": {
+        "policy_findings": "Findings set A",
+        "audience": "City council"
+      },
+      "output": {
+        "mode": "ok",
+        "payload": {
+          "summary": "Draft memo outline ready for compliance review.",
+          "memo_outline": ["Executive summary", "Evidence", "Recommendations"]
+        },
+        "confidence": { "level": "medium", "score": 0.6 },
+        "evidence": [],
+        "assumptions": []
+      },
+      "created_at": "2026-01-19T10:55:00Z",
+      "started_at": "2026-01-19T10:54:40Z",
+      "finished_at": "2026-01-19T10:55:00Z"
+    },
+    {
+      "schema_version": "1.0.0",
+      "id": "0e4606f8-2c4a-4c6e-9b8a-50ea8921b610",
+      "run_id": "2c2dcf7e-0d78-4bff-80d9-6d0f4df9a1cf",
+      "scope_id": "scope-demo-015",
+      "agent_id": "document.compliance_memo",
+      "agent_version": "1.0.0",
+      "status": "insufficient_data",
+      "inputs": {
+        "policy_findings": "",
+        "audience": ""
+      },
+      "output": {
+        "mode": "insufficient_data",
+        "confidence": { "level": "unknown" },
+        "insufficient_data": {
+          "missing": ["Policy findings"],
+          "recommended_next": ["Provide policy findings to draft a memo outline."]
+        }
+      },
+      "created_at": "2026-01-19T10:56:30Z",
+      "started_at": "2026-01-19T10:56:00Z",
+      "finished_at": "2026-01-19T10:56:30Z"
+    }
+  ]
+}

@@ -14,6 +14,11 @@ import PlannerPackRoute from './routes/PlannerPackRoute';
 import ContextIntakeRoute from './routes/ContextIntakeRoute';
 import { planningRoutePaths } from './routes/planningRoutePaths';
 import { plannerPackRoutePaths } from './routes/plannerPackRoutePaths';
+import { agenticRoutePaths } from '../src/agentic/routes';
+import SkillsIndex from './agentic/SkillsIndex';
+import SkillDetail from './agentic/SkillDetail';
+import RunsIndex from './agentic/RunsIndex';
+import RunDetail from './agentic/RunDetail';
 import GlobalLayout from './GlobalLayout';
 import BaseModal from './BaseModal';
 import { DatabaseIcon, FolderIcon, PlusIcon, CheckIcon, SparklesIcon, RefreshIcon } from './icons';
@@ -638,6 +643,20 @@ const MainContent: React.FC<MainContentProps> = ({
                     {planningRoutePaths.contextIntake.map((path) => (
                       <Route key={path} path={path} element={<ContextIntakeRoute />} />
                     ))}
+                                        {agenticRoutePaths.skills.map((path) => (
+                                            <Route
+                                                key={path}
+                                                path={path}
+                                                element={path.includes(':agentId') ? <SkillDetail /> : <SkillsIndex />}
+                                            />
+                                        ))}
+                                        {agenticRoutePaths.runs.map((path) => (
+                                            <Route
+                                                key={path}
+                                                path={path}
+                                                element={path.includes(':runId') ? <RunDetail /> : <RunsIndex />}
+                                            />
+                                        ))}
                                         {plannerPackRoutePaths.list.map((path) => (
                                             <Route key={path} path={path} element={<PlannerPackRoute />} />
                                         ))}

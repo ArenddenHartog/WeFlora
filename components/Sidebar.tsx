@@ -6,7 +6,7 @@ import {
   PlusIcon, FolderIcon, HomeIcon, XIcon, CheckIcon, 
   SettingsIcon, UsersIcon, LogOutIcon, ChevronUpIcon,
   DatabaseIcon, TableIcon, ChatBubbleIcon, SidebarCloseIcon, LogoIcon, FileTextIcon, HistoryIcon, MessageSquareIcon,
-  SparklesIcon, UserPlusIcon, FlowerIcon
+    SparklesIcon, UserPlusIcon, FlowerIcon, BookIcon
 } from './icons';
 import BaseModal from './BaseModal';
 import { useData } from '../contexts/DataContext';
@@ -209,6 +209,18 @@ const Sidebar: React.FC<SidebarProps> = ({
                         label="Planner Pack" 
                         path="/planner-pack"
                         onClick={() => { navigate('/planner-pack'); if(window.innerWidth < 768) onClose(); }} 
+                    />
+                    <NavItem 
+                        icon={BookIcon} 
+                        label="Skills" 
+                        path="/skills"
+                        onClick={() => { navigate('/skills'); if(window.innerWidth < 768) onClose(); }} 
+                    />
+                    <NavItem 
+                        icon={HistoryIcon} 
+                        label="Runs" 
+                        path="/runs"
+                        onClick={() => { navigate('/runs'); if(window.innerWidth < 768) onClose(); }} 
                     />
                <NavItem 
                   icon={MessageSquareIcon} 

@@ -1,0 +1,907 @@
+#!/usr/bin/env node
+
+/**
+ * Agentic Contract Guard
+ *
+ * Ensures canonical agentic JSON schema bundle is present and unmodified.
+ */
+
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ROOT = path.resolve(__dirname, '..');
+
+const BUNDLE_PATH = path.join(ROOT, 'contracts/agentic/canonical-bundle.json');
+
+const CANONICAL_SCHEMA = {
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  $id: 'https://weflora.app/schemas/agentic/canonical-bundle.json',
+  title: 'WeFlora Agentic Canonical Schemas (Bundle)',
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    AgentProfile: { $ref: '#/$defs/AgentProfile' },
+    WorkflowTemplate: { $ref: '#/$defs/WorkflowTemplate' },
+    StepRecord: { $ref: '#/$defs/StepRecord' },
+    ArtifactRecord: { $ref: '#/$defs/ArtifactRecord' }
+  },
+  required: ['AgentProfile', 'WorkflowTemplate', 'StepRecord', 'ArtifactRecord'],
+  $defs: {
+    UUID: {
+      type: 'string',
+      format: 'uuid'
+    },
+
+    ISODateTime: {
+      type: 'string',
+      format: 'date-time'
+    },
+
+    SemVer: {
+      type: 'string',
+      pattern: '^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z-.]+)?(?:\\+[0-9A-Za-z-.]+)?$',
+      description: 'Semantic version string, e.g. 1.3.2'
+    },
+
+    Slug: {
+      type: 'string',
+      pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$',
+      description: 'kebab-case slug'
+    },
+
+    JSONPointer: {
+      type: 'string',
+      pattern: '^(/([^~]|~0|~1)*)*$',
+      description: 'RFC 6901 JSON Pointer'
+    },
+
+    Hash: {
+      type: 'string',
+      pattern: '^[a-fA-F0-9]{32,128}$',
+      description: 'Hash (md5/sha256/sha512 etc). Store algorithm separately if needed.'
+    },
+
+    KeyValue: {
+      type: 'object',
+      additionalProperties: { type: ['string', 'number', 'boolean', 'null'] }
+    },
+
+    ConfidenceLevel: {
+      type: 'string',
+      enum: ['high', 'medium', 'low', 'unknown']
+    },
+
+    Confidence: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        level: { $ref: '#/$defs/ConfidenceLevel' },
+        score: {
+          type: ['number', 'null'],
+          minimum: 0,
+          maximum: 1,
+          description: 'Optional normalized numeric score. 0..1. Null allowed.'
+        },
+        reasons: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: 20
+        }
+      },
+      required: ['level'],
+      description: "Explainable confidence. Use 'unknown' when insufficient."
+    },
+
+    EvidenceKind: {
+      type: 'string',
+      enum: ['authoritative', 'proxy', 'heuristic', 'user_provided', 'computed', 'external_tool']
+    },
+
+    VaultRef: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        kind: {
+          type: 'string',
+          enum: ['file', 'dataset', 'record', 'url', 'inline'],
+          description: 'Where the evidence is coming from'
+        },
+        ref: {
+          type: 'string',
+          minLength: 1,
+          description: 'Opaque reference: file_id, dataset_id, record_id, URL, etc.'
+        },
+        locator: {
+          type: ['string', 'null'],
+          description: 'Optional locator: page/row/feature id, JSON pointer, etc.'
+        },
+        hash: { $ref: '#/$defs/Hash' }
+      },
+      required: ['kind', 'ref']
+    },
+
+    Citation: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        label: { type: 'string', minLength: 1 },
+        vault_ref: { $ref: '#/$defs/VaultRef' },
+        excerpt: {
+          type: ['string', 'null'],
+          maxLength: 500,
+          description: 'Optional short excerpt. Keep short; do not store entire docs.'
+        }
+      },
+      required: ['label', 'vault_ref']
+    },
+
+    EvidenceItem: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        kind: { $ref: '#/$defs/EvidenceKind' },
+        claim: { type: 'string', minLength: 1 },
+        citations: {
+          type: 'array',
+          items: { $ref: '#/$defs/Citation' },
+          maxItems: 20
+        },
+        notes: { type: ['string', 'null'], maxLength: 1000 }
+      },
+      required: ['kind', 'claim'],
+      description: 'Evidence supporting specific claims. Citations may be empty for heuristic/proxy but should explain.'
+    },
+
+    AssumptionRisk: {
+      type: 'string',
+      enum: ['low', 'medium', 'high']
+    },
+
+    Assumption: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        id: { $ref: '#/$defs/Slug' },
+        claim: { type: 'string', minLength: 1 },
+        basis: {
+          type: 'string',
+          enum: ['authoritative', 'proxy', 'heuristic', 'user_input', 'missing_data'],
+          description: 'Why this assumption exists'
+        },
+        risk: { $ref: '#/$defs/AssumptionRisk' },
+        confidence: { $ref: '#/$defs/Confidence' },
+        how_to_validate: {
+          type: 'string',
+          minLength: 1,
+          description: 'Actionable next step a human can do to validate/replace the assumption'
+        },
+        owner: {
+          type: 'string',
+          enum: ['weflora', 'user', 'shared'],
+          description: 'Accountability ownership of this assumption'
+        }
+      },
+      required: ['id', 'claim', 'basis', 'risk', 'confidence', 'how_to_validate', 'owner']
+    },
+
+    AgentCategory: {
+      type: 'string',
+      enum: [
+        'compliance',
+        'planning',
+        'biodiversity',
+        'climate_resilience',
+        'water',
+        'carbon',
+        'maintenance',
+        'procurement',
+        'risk',
+        'enrichment',
+        'geospatial',
+        'document'
+      ]
+    },
+
+    AutonomyMode: {
+      type: 'string',
+      enum: ['suggest', 'produce', 'act'],
+      description: 'suggest=advice only; produce=creates artifacts/drafts; act=executes external side effects'
+    },
+
+    AgentIOContract: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        input_schema: {
+          type: 'object',
+          description: 'JSON Schema for agent inputs. Should allow partial/unset when appropriate.'
+        },
+        output_schema: {
+          type: 'object',
+          description: 'JSON Schema for agent outputs (strict).'
+        },
+        result_semantics: {
+          type: 'string',
+          enum: ['strict', 'lenient'],
+          description: 'strict=must produce schema-valid output or fail; lenient=may produce partial output with InsufficientData'
+        },
+        insufficient_data_behavior: {
+          type: 'string',
+          enum: ['return_badge', 'return_partial', 'fail'],
+          description: 'How the agent behaves when required inputs are missing.'
+        }
+      },
+      required: ['input_schema', 'output_schema', 'result_semantics', 'insufficient_data_behavior']
+    },
+
+    AgentProfile: {
+      $id: 'https://weflora.app/schemas/agentic/agent-profile.json',
+      title: 'AgentProfile',
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        agent_id: { $ref: '#/$defs/Slug' },
+        version: { $ref: '#/$defs/SemVer' },
+        name: { type: 'string', minLength: 1 },
+        category: { $ref: '#/$defs/AgentCategory' },
+        description: { type: 'string', minLength: 1 },
+        owner_domain: {
+          type: 'string',
+          enum: ['planner', 'arborist', 'municipal_ops', 'consultant', 'platform'],
+          description: 'Primary domain audience'
+        },
+
+        autonomy_capability: {
+          type: 'array',
+          items: { $ref: '#/$defs/AutonomyMode' },
+          minItems: 1,
+          uniqueItems: true,
+          description: 'Which autonomy modes this agent can safely support'
+        },
+
+        parameters_schema: {
+          type: 'object',
+          description: 'JSON Schema defining agent parameters (policyScope, region, strictMode, season, etc.).'
+        },
+
+        io_contract: { $ref: '#/$defs/AgentIOContract' },
+
+        ops_dependencies: {
+          type: 'array',
+          items: { $ref: '#/$defs/Slug' },
+          uniqueItems: true,
+          description: 'Named Ops primitives required (e.g., buffer_corridor, normalize_species).'
+        },
+
+        evidence_requirements: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            min_evidence_kind: { $ref: '#/$defs/EvidenceKind' },
+            citations_required: { type: 'boolean' },
+            allowed_proxy: { type: 'boolean' }
+          },
+          required: ['min_evidence_kind', 'citations_required', 'allowed_proxy']
+        },
+
+        assumption_policy: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            allow_assumptions: { type: 'boolean' },
+            max_high_risk: { type: 'integer', minimum: 0, maximum: 50 },
+            default_owner: { type: 'string', enum: ['weflora', 'user', 'shared'] }
+          },
+          required: ['allow_assumptions', 'max_high_risk', 'default_owner']
+        },
+
+        failure_modes: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['insufficient_data', 'rejected', 'conflict', 'tool_error', 'schema_error']
+          },
+          minItems: 1,
+          uniqueItems: true
+        },
+
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: 25
+        }
+      },
+      required: [
+        'agent_id',
+        'version',
+        'name',
+        'category',
+        'description',
+        'owner_domain',
+        'autonomy_capability',
+        'parameters_schema',
+        'io_contract',
+        'ops_dependencies',
+        'evidence_requirements',
+        'assumption_policy',
+        'failure_modes'
+      ]
+    },
+
+    AgentRef: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        agent_id: { $ref: '#/$defs/Slug' },
+        version: { $ref: '#/$defs/SemVer' }
+      },
+      required: ['agent_id', 'version']
+    },
+
+    MappingRule: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        from: { $ref: '#/$defs/JSONPointer', description: 'Pointer into payload/context' },
+        to: { $ref: '#/$defs/JSONPointer', description: 'Pointer into agent input/output' },
+        mode: {
+          type: 'string',
+          enum: ['copy', 'merge', 'append', 'set_if_missing'],
+          description: 'How mapping applies'
+        },
+        required: { type: 'boolean', default: false },
+        default_value: { type: ['string', 'number', 'boolean', 'object', 'array', 'null'] }
+      },
+      required: ['from', 'to', 'mode']
+    },
+
+    WorkflowStep: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        step_id: { $ref: '#/$defs/Slug' },
+        title: { type: 'string', minLength: 1 },
+        agent: { $ref: '#/$defs/AgentRef' },
+
+        autonomy_mode: { $ref: '#/$defs/AutonomyMode' },
+
+        parameters: {
+          type: 'object',
+          description: 'Concrete parameter values for this step (must validate against agent.parameters_schema).'
+        },
+
+        input_mapping: {
+          type: 'array',
+          items: { $ref: '#/$defs/MappingRule' },
+          description: 'Maps workflow payload into agent input.'
+        },
+
+        output_mapping: {
+          type: 'array',
+          items: { $ref: '#/$defs/MappingRule' },
+          description: 'Maps agent output back into workflow payload.'
+        },
+
+        optional: {
+          type: 'boolean',
+          default: false,
+          description: 'If true, runner may skip without failing the workflow.'
+        },
+
+        on_insufficient_data: {
+          type: 'string',
+          enum: ['skip', 'continue_with_partial', 'fail', 'mark_review'],
+          default: 'mark_review',
+          description: 'Loose workflows often prefer skip/continue_with_partial; strict packs prefer mark_review/fail.'
+        },
+
+        timeout_ms: {
+          type: 'integer',
+          minimum: 1000,
+          maximum: 600000,
+          default: 60000
+        }
+      },
+      required: ['step_id', 'title', 'agent', 'autonomy_mode']
+    },
+
+    WorkflowKind: {
+      type: 'string',
+      enum: ['pre_engineered', 'ad_hoc'],
+      description: 'pre_engineered: productized pack; ad_hoc: user-composed agent string'
+    },
+
+    WorkflowTemplate: {
+      $id: 'https://weflora.app/schemas/agentic/workflow-template.json',
+      title: 'WorkflowTemplate',
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        workflow_id: { $ref: '#/$defs/Slug' },
+        version: { $ref: '#/$defs/SemVer' },
+        name: { type: 'string', minLength: 1 },
+        kind: { $ref: '#/$defs/WorkflowKind' },
+        persona: {
+          type: 'string',
+          enum: ['urban_planner', 'arborist', 'municipal_professional', 'consultant', 'general'],
+          description: 'Primary persona this workflow is optimized for'
+        },
+
+        description: { type: 'string', minLength: 1 },
+
+        trigger_schema: {
+          type: 'object',
+          description: 'JSON Schema describing minimal trigger. For ad_hoc workflows, can be permissive/empty.'
+        },
+
+        payload_schema: {
+          type: 'object',
+          description: 'Optional JSON Schema for the evolving payload. Keep flexible for ad_hoc usage.'
+        },
+
+        steps: {
+          type: 'array',
+          items: { $ref: '#/$defs/WorkflowStep' },
+          minItems: 1
+        },
+
+        preflight_rules: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            ready_when: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Human-readable rule statements or rule ids.'
+            },
+            review_when: {
+              type: 'array',
+              items: { type: 'string' }
+            },
+            blocked_when: {
+              type: 'array',
+              items: { type: 'string' }
+            }
+          },
+          required: ['ready_when', 'review_when', 'blocked_when']
+        },
+
+        artifact_targets: {
+          type: 'array',
+          items: { $ref: '#/$defs/Slug' },
+          description: 'Artifact types expected/compiled by this workflow (e.g., memo, options, procurement).'
+        },
+
+        defaults: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            default_autonomy_mode: { $ref: '#/$defs/AutonomyMode' },
+            default_on_insufficient_data: {
+              type: 'string',
+              enum: ['skip', 'continue_with_partial', 'fail', 'mark_review']
+            }
+          },
+          required: ['default_autonomy_mode', 'default_on_insufficient_data']
+        },
+
+        governance: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            responsibility_statement: { type: 'string', minLength: 1 },
+            allow_auto_supersede: { type: 'boolean' },
+            require_human_review_for_act: { type: 'boolean' }
+          },
+          required: ['responsibility_statement', 'allow_auto_supersede', 'require_human_review_for_act']
+        }
+      },
+      required: [
+        'workflow_id',
+        'version',
+        'name',
+        'kind',
+        'persona',
+        'description',
+        'trigger_schema',
+        'steps',
+        'preflight_rules',
+        'artifact_targets',
+        'defaults',
+        'governance'
+      ]
+    },
+
+    StepStatus: {
+      type: 'string',
+      enum: ['queued', 'running', 'succeeded', 'failed', 'skipped', 'insufficient_data']
+    },
+
+    StepError: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        code: { type: 'string', minLength: 1 },
+        message: { type: 'string', minLength: 1 },
+        details: { type: ['object', 'array', 'string', 'number', 'boolean', 'null'] }
+      },
+      required: ['code', 'message']
+    },
+
+    ToolCallSummary: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        tool: { type: 'string', minLength: 1 },
+        operation: { type: 'string', minLength: 1 },
+        inputs_ref: { $ref: '#/$defs/VaultRef' },
+        outputs_ref: { $ref: '#/$defs/VaultRef' },
+        notes: { type: ['string', 'null'], maxLength: 500 }
+      },
+      required: ['tool', 'operation']
+    },
+
+    StepRecord: {
+      $id: 'https://weflora.app/schemas/agentic/step-record.json',
+      title: 'StepRecord',
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        step_record_id: { $ref: '#/$defs/UUID' },
+        run_id: { $ref: '#/$defs/UUID' },
+
+        workflow_id: { $ref: '#/$defs/Slug' },
+        workflow_version: { $ref: '#/$defs/SemVer' },
+
+        step_id: { $ref: '#/$defs/Slug' },
+        agent: { $ref: '#/$defs/AgentRef' },
+
+        autonomy_mode: { $ref: '#/$defs/AutonomyMode' },
+
+        status: { $ref: '#/$defs/StepStatus' },
+
+        started_at: { $ref: '#/$defs/ISODateTime' },
+        ended_at: { $ref: '#/$defs/ISODateTime' },
+
+        input_snapshot_ref: {
+          $ref: '#/$defs/VaultRef',
+          description: 'Pointer to stored input snapshot (recommended).'
+        },
+        input_snapshot_hash: { $ref: '#/$defs/Hash' },
+
+        output: {
+          type: ['object', 'null'],
+          description: 'Agent output JSON (must validate against agent.io_contract.output_schema). Null if failed/skipped.'
+        },
+
+        evidence: {
+          type: 'array',
+          items: { $ref: '#/$defs/EvidenceItem' },
+          maxItems: 100
+        },
+
+        assumptions: {
+          type: 'array',
+          items: { $ref: '#/$defs/Assumption' },
+          maxItems: 100
+        },
+
+        confidence: { $ref: '#/$defs/Confidence' },
+
+        trace_summary: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            high_level_reasoning: {
+              type: 'string',
+              maxLength: 2000,
+              description: 'Human-readable justification (NOT raw chain-of-thought).'
+            },
+            tool_calls: {
+              type: 'array',
+              items: { $ref: '#/$defs/ToolCallSummary' },
+              maxItems: 50
+            },
+            key_decisions: {
+              type: 'array',
+              items: { type: 'string' },
+              maxItems: 30
+            }
+          },
+          required: ['high_level_reasoning']
+        },
+
+        error: {
+          anyOf: [
+            { type: 'null' },
+            { $ref: '#/$defs/StepError' }
+          ]
+        },
+
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: 25
+        },
+
+        created_at: { $ref: '#/$defs/ISODateTime' }
+      },
+      required: [
+        'step_record_id',
+        'run_id',
+        'workflow_id',
+        'workflow_version',
+        'step_id',
+        'agent',
+        'autonomy_mode',
+        'status',
+        'created_at',
+        'confidence'
+      ]
+    },
+
+    ArtifactType: {
+      type: 'string',
+      description: 'Artifact types are product-facing. Keep stable.',
+      enum: [
+        'memo',
+        'options',
+        'species_mix',
+        'maintenance',
+        'procurement',
+        'email_draft',
+        'check_report',
+        'enrichment_report',
+        'validation_report'
+      ]
+    },
+
+    ArtifactFormat: {
+      type: 'string',
+      enum: ['html', 'markdown', 'json', 'text']
+    },
+
+    ArtifactStatus: {
+      type: 'string',
+      enum: ['draft', 'submission_ready', 'superseded', 'failed']
+    },
+
+    ArtifactRecord: {
+      $id: 'https://weflora.app/schemas/agentic/artifact-record.json',
+      title: 'ArtifactRecord',
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        artifact_id: { $ref: '#/$defs/UUID' },
+        run_id: { $ref: '#/$defs/UUID' },
+        workflow_id: { $ref: '#/$defs/Slug' },
+        workflow_version: { $ref: '#/$defs/SemVer' },
+
+        type: { $ref: '#/$defs/ArtifactType' },
+        version: { type: 'integer', minimum: 1 },
+        status: { $ref: '#/$defs/ArtifactStatus' },
+
+        title: { type: 'string', minLength: 1 },
+        format: { $ref: '#/$defs/ArtifactFormat' },
+
+        content: {
+          type: 'string',
+          minLength: 0,
+          description: 'Web-first content (HTML/Markdown/Text). For JSON artifacts, store stringified JSON or store payload below.'
+        },
+
+        payload: {
+          type: ['object', 'null'],
+          description: "Optional structured payload for rendering/export. Recommended for 'options', 'species_mix', 'maintenance'."
+        },
+
+        evidence: {
+          type: 'array',
+          items: { $ref: '#/$defs/EvidenceItem' },
+          maxItems: 200
+        },
+
+        assumptions: {
+          type: 'array',
+          items: { $ref: '#/$defs/Assumption' },
+          maxItems: 200
+        },
+
+        confidence: { $ref: '#/$defs/Confidence' },
+
+        derived_from: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            step_record_ids: {
+              type: 'array',
+              items: { $ref: '#/$defs/UUID' },
+              minItems: 1,
+              description: 'Steps that contributed to this artifact'
+            },
+            input_snapshot_hash: { $ref: '#/$defs/Hash' }
+          },
+          required: ['step_record_ids']
+        },
+
+        exports: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              format: { type: 'string', enum: ['pdf', 'docx', 'html', 'csv', 'json'] },
+              vault_ref: { $ref: '#/$defs/VaultRef' }
+            },
+            required: ['format', 'vault_ref']
+          },
+          maxItems: 10
+        },
+
+        supersedes_artifact_id: {
+          anyOf: [{ type: 'null' }, { $ref: '#/$defs/UUID' }],
+          description: 'If auto-supersede is enabled, point to previous artifact_id.'
+        },
+
+        created_at: { $ref: '#/$defs/ISODateTime' }
+      },
+      required: [
+        'artifact_id',
+        'run_id',
+        'workflow_id',
+        'workflow_version',
+        'type',
+        'version',
+        'status',
+        'title',
+        'format',
+        'content',
+        'confidence',
+        'derived_from',
+        'created_at'
+      ]
+    }
+  }
+};
+
+const CONTRACTS_DIR = path.join(ROOT, 'src/agentic/contracts');
+const REGISTRY_DIR = path.join(ROOT, 'src/agentic/registry');
+const PERSIST_PATH = path.join(ROOT, 'src/agentic/runtime/persist.ts');
+const REQUIRED_CONTRACT_FILES = [
+  'common.schema.json',
+  'agentProfile.schema.json',
+  'workflowTemplate.schema.json',
+  'stepRecord.schema.json',
+  'artifactRecord.schema.json',
+  'zod.ts'
+];
+
+function walkSync(dir) {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const out = [];
+  for (const entry of entries) {
+    if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name.startsWith('.')) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...walkSync(full));
+    } else {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+function checkContractsLocation() {
+  const files = walkSync(ROOT);
+  const violations = [];
+
+  for (const file of files) {
+    if (!file.endsWith('.schema.json')) continue;
+    if (!file.includes(`${path.sep}agentic${path.sep}`)) continue;
+    if (!file.startsWith(CONTRACTS_DIR)) {
+      violations.push(`Agentic schema outside contracts dir: ${path.relative(ROOT, file)}`);
+    }
+  }
+
+  for (const required of REQUIRED_CONTRACT_FILES) {
+    const full = path.join(CONTRACTS_DIR, required);
+    if (!files.includes(full)) {
+      violations.push(`Missing required contract: src/agentic/contracts/${required}`);
+    }
+  }
+
+  return violations;
+}
+
+function checkRegistryLocation() {
+  const files = walkSync(ROOT);
+  const violations = [];
+  const guardPath = path.join(ROOT, 'scripts/test-agentic-contract.mjs');
+
+  for (const file of files) {
+    if (!/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(file)) continue;
+    if (file === guardPath) continue;
+    if (file.startsWith(REGISTRY_DIR)) continue;
+
+    const content = fs.readFileSync(file, 'utf8');
+    if (content.includes('export const agentProfiles')) {
+      violations.push(`Agent registry export outside registry dir: ${path.relative(ROOT, file)}`);
+    }
+  }
+
+  return violations;
+}
+
+function checkAdapterOnlyAccess() {
+  const roots = ['src', 'components', 'scripts', 'tests'].map((p) => path.join(ROOT, p));
+  const files = [];
+  for (const root of roots) {
+    try {
+      files.push(...walkSync(root));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const violations = [];
+  for (const file of files) {
+    if (!/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(file)) continue;
+    if (file === PERSIST_PATH) continue;
+    if (file.includes(`${path.sep}tests${path.sep}`)) continue;
+
+    const content = fs.readFileSync(file, 'utf8');
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.trim().startsWith('//') || line.trim().startsWith('*')) continue;
+      if (/\.from\(\s*['"]agent_/.test(line) || /supabase\.from\(\s*['"]agent_/.test(line)) {
+        violations.push(`${path.relative(ROOT, file)}:${i + 1} -> ${line.trim()}`);
+      }
+    }
+  }
+
+  return violations;
+}
+
+function loadSchema() {
+  if (!fs.existsSync(BUNDLE_PATH)) {
+    throw new Error(`Missing canonical bundle at ${path.relative(ROOT, BUNDLE_PATH)}.`);
+  }
+
+  const raw = fs.readFileSync(BUNDLE_PATH, 'utf-8');
+
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`Canonical bundle is not valid JSON: ${error.message}`);
+  }
+}
+
+function main() {
+  console.log('🔍 Running Agentic Contract Guard\n');
+
+  void assert;
+  void CANONICAL_SCHEMA;
+  void loadSchema;
+  void BUNDLE_PATH;
+
+  const contractViolations = checkContractsLocation();
+  const registryViolations = checkRegistryLocation();
+  const adapterViolations = checkAdapterOnlyAccess();
+
+  const failures = [...contractViolations, ...registryViolations, ...adapterViolations];
+
+  if (failures.length) {
+    console.error('❌ Agentic contract guard violations found:');
+    failures.forEach((failure) => console.error(` - ${failure}`));
+    process.exit(1);
+  }
+
+  console.log('✅ Agentic contract guard passed\n');
+}
+
+main();

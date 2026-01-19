@@ -19,6 +19,7 @@
     "test:pciv": "node --experimental-strip-types scripts/test-pciv.ts",
     "test:pciv-ui": "node --experimental-strip-types scripts/test-pciv-ui.ts",
     "test:pciv-stabilization:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
+    "test": "node --test --experimental-strip-types tests/unit/*.test.ts",
     "test:pciv:db": "node --test tests/integration/pcivSupabaseContract.test.ts",
     "test:pciv:rls": "node --test tests/integration/pcivSupabaseRls.test.ts",
     "test:pciv:membership": "node --test tests/integration/pcivSupabaseMembershipRls.test.ts",
@@ -29,8 +30,9 @@
     "test:pciv-contract": "node scripts/test-pciv-contract.mjs",
     "test:planning-contract": "node scripts/test-planning-contract.mjs",
     "test:planner-pack-contract": "node scripts/test-planner-pack-contract.mjs",
+    "test:agentic-contract": "node scripts/test-agentic-contract.mjs",
     "test:planning:unit": "node --test tests/unit/planningPcivPersistence.test.ts",
-    "check": "npm run lint && npm run guard:temp-ids && npm run guard:toast-icons && npm run test:pciv-contract && npm run test:planning-contract && npm run test:planner-pack-contract && npm run build"
+    "check": "npm run lint && npm run guard:temp-ids && npm run guard:toast-icons && npm run test:pciv-contract && npm run test:planning-contract && npm run test:planner-pack-contract && npm run test:agentic-contract && npm run build"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",

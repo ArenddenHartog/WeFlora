@@ -1,0 +1,57 @@
+{
+  "agent_id": "maintenance.pruning_plan",
+  "agent_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "samples": [
+    {
+      "schema_version": "1.0.0",
+      "id": "1d1650c8-1f0d-4f4f-8d0e-1b5d9e84b8fd",
+      "run_id": "a6a1e1b5-08d3-4f51-90fd-b9c2b7bb9c2b",
+      "scope_id": "scope-demo-010",
+      "agent_id": "maintenance.pruning_plan",
+      "agent_version": "1.0.0",
+      "status": "ok",
+      "inputs": {
+        "species_list": "Maple, Elm",
+        "maintenance_window": "Spring 2026"
+      },
+      "output": {
+        "mode": "ok",
+        "payload": {
+          "summary": "Prioritize young maples in early spring and elms mid-season.",
+          "schedule": ["Week 2: Maples", "Week 5: Elms"]
+        },
+        "confidence": { "level": "medium", "score": 0.57 },
+        "evidence": [],
+        "assumptions": []
+      },
+      "created_at": "2026-01-19T10:40:00Z",
+      "started_at": "2026-01-19T10:39:40Z",
+      "finished_at": "2026-01-19T10:40:00Z"
+    },
+    {
+      "schema_version": "1.0.0",
+      "id": "2f7ac038-736f-49f1-9fc0-8af5f3f5b2d7",
+      "run_id": "a6a1e1b5-08d3-4f51-90fd-b9c2b7bb9c2b",
+      "scope_id": "scope-demo-010",
+      "agent_id": "maintenance.pruning_plan",
+      "agent_version": "1.0.0",
+      "status": "insufficient_data",
+      "inputs": {
+        "species_list": "",
+        "maintenance_window": ""
+      },
+      "output": {
+        "mode": "insufficient_data",
+        "confidence": { "level": "unknown" },
+        "insufficient_data": {
+          "missing": ["Species list"],
+          "recommended_next": ["Provide a species list and window to create a pruning plan."]
+        }
+      },
+      "created_at": "2026-01-19T10:41:30Z",
+      "started_at": "2026-01-19T10:41:00Z",
+      "finished_at": "2026-01-19T10:41:30Z"
+    }
+  ]
+}

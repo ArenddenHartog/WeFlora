@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://weflora.app/schemas/agentic/artifactRecord.schema.json",
+  "title": "ArtifactRecord",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "./common.schema.json#/$defs/SemVer" },
+    "id": { "$ref": "./common.schema.json#/$defs/UUID" },
+    "run_id": { "$ref": "./common.schema.json#/$defs/UUID" },
+    "scope_id": { "type": "string", "minLength": 1 },
+    "type": { "type": "string", "minLength": 1 },
+    "title": { "type": ["string", "null"] },
+    "version": { "type": "integer", "minimum": 1 },
+    "status": { "type": "string", "enum": ["draft", "final", "superseded"] },
+    "supersedes": { "type": ["string", "null"], "format": "uuid" },
+    "derived_from_steps": {
+      "type": "array",
+      "items": { "$ref": "./common.schema.json#/$defs/UUID" },
+      "default": []
+    },
+    "content": { "$ref": "./common.schema.json#/$defs/ArtifactContent" },
+    "evidence": { "type": "array", "items": { "$ref": "./common.schema.json#/$defs/EvidenceItem" }, "default": [] },
+    "assumptions": { "type": "array", "items": { "$ref": "./common.schema.json#/$defs/Assumption" }, "default": [] },
+    "created_at": { "$ref": "./common.schema.json#/$defs/ISODateTime" }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "run_id",
+    "scope_id",
+    "type",
+    "version",
+    "status",
+    "derived_from_steps",
+    "content",
+    "evidence",
+    "assumptions",
+    "created_at"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://weflora.app/schemas/agentic/agentProfile.schema.json",
+  "title": "AgentProfile",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "./common.schema.json#/$defs/SemVer" },
+    "spec_version": { "$ref": "./common.schema.json#/$defs/SemVer" },
+    "agent_id": { "$ref": "./common.schema.json#/$defs/AgentId" },
+    "name": { "type": "string", "minLength": 1 },
+    "category": {
+      "type": "string",
+      "enum": [
+        "compliance",
+        "planning",
+        "biodiversity",
+        "climate_resilience",
+        "water",
+        "carbon",
+        "maintenance",
+        "procurement",
+        "risk",
+        "enrichment",
+        "geospatial",
+        "document"
+      ]
+    },
+    "description": { "type": "string", "minLength": 1 },
+    "inputs": { "type": "array", "items": { "type": "object" }, "default": [] },
+    "output_modes": { "type": "array", "items": { "$ref": "./common.schema.json#/$defs/OutputMode" }, "default": ["ok", "insufficient_data", "rejected"] },
+    "output_schema": { "type": "object" },
+    "tags": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "tooling": { "type": ["object", "null"] },
+    "governance": { "type": ["object", "null"] }
+  },
+  "required": [
+    "schema_version",
+    "spec_version",
+    "agent_id",
+    "name",
+    "category",
+    "description",
+    "inputs",
+    "output_modes",
+    "output_schema"
+  ]
+}
