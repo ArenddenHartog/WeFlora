@@ -73,12 +73,14 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, agentNameByI
 
             <div className="mt-5 space-y-5">
               <section>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">What happened</p>
                 <p className="mt-2 text-sm text-slate-900">{summary}</p>
                 {rationale ? <p className="mt-2 text-sm text-slate-600">{rationale}</p> : null}
               </section>
 
               {event.kind === 'step.output' && event.data.output?.mode === 'insufficient_data' && event.data.output?.insufficient_data ? (
                 <section className="space-y-3">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Missing inputs</p>
                   <div>
                     <ul className="mt-2 list-disc pl-5 text-sm text-slate-700">
                       {event.data.output.insufficient_data.missing.map((item) => (
@@ -100,10 +102,17 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, agentNameByI
                       <p className="mt-2 text-sm text-slate-600">Provide the missing inputs to continue.</p>
                     )}
                   </div>
+                  <button
+                    type="button"
+                    className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Ask follow-up
+                  </button>
                 </section>
               ) : null}
 
               <section>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Inputs</p>
                 {inputPointers.length === 0 ? (
                   <p className="mt-2 text-sm text-slate-500">No inputs captured for this step.</p>
                 ) : (
@@ -118,6 +127,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, agentNameByI
               </section>
 
               <section>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Outputs</p>
                 {outputPointers.length === 0 ? (
                   <p className="mt-2 text-sm text-slate-500">No outputs recorded for this step.</p>
                 ) : (
@@ -132,6 +142,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, agentNameByI
               </section>
 
               <section>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Evidence</p>
                 {evidence.length === 0 ? (
                   <p className="mt-2 text-sm text-slate-500">No evidence captured for this step.</p>
                 ) : (
@@ -167,6 +178,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, agentNameByI
               </section>
 
               <section>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Assumptions</p>
                 {assumptions.length === 0 ? (
                   <p className="mt-2 text-sm text-slate-500">No assumptions recorded.</p>
                 ) : (
@@ -182,6 +194,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, agentNameByI
               </section>
 
               <section>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Artifacts & actions</p>
                 {artifactPayload ? (
                   <div className="mt-2 text-sm text-slate-600">
                     {artifactPayload.title ?? artifactPayload.type}

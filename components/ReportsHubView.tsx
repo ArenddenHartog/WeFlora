@@ -5,6 +5,7 @@ import {
     SearchIcon, MenuIcon, PlusIcon, FileTextIcon, FolderIcon, TagIcon, XIcon,
     MagicWandIcon, LightningBoltIcon
 } from './icons';
+import AppPage from './AppPage';
 import BaseModal from './BaseModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 
@@ -45,67 +46,15 @@ const ReportsHubView: React.FC<ReportsHubViewProps> = ({
             report.tags?.forEach(tag => tags.add(tag));
         });
         return Array.from(tags).sort();
-    }, [displayReports]);
-
-    const filteredReports = displayReports.filter(report => {
-        const matchesSearch = report.title.toLowerCase().includes(search.toLowerCase()) || 
-                              report.tags?.some(tag => tag.toLowerCase().includes(search.toLowerCase()));
-        const matchesTag = selectedTag ? report.tags?.includes(selectedTag) : true;
-        return matchesSearch && matchesTag;
-    });
-
-    const filteredTemplates = templates.filter(template => 
-        template.title.toLowerCase().includes(search.toLowerCase()) ||
-        template.description.toLowerCase().includes(search.toLowerCase()) ||
-        template.tags?.some(tag => tag.toLowerCase().includes(search.toLowerCase()))
-    );
-
-    const handleDelete = (e: React.MouseEvent, id: string) => {
-        e.stopPropagation();
-        setPendingDeleteReportId(id);
-    };
-
-    const handleCreateTemplate = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (newTemplateTitle && onCreateTemplate) {
-            const newTemplate: ReportTemplate = {
-                id: `rt-${Date.now()}`,
-                title: newTemplateTitle,
-                description: newTemplateDesc,
-                content: newTemplateContent,
-                tags: newTemplateTags.split(',').map(t => t.trim()).filter(Boolean),
-                usageCount: 0,
-                lastUsed: 'Never',
-                isSystem: false
-            };
-            onCreateTemplate(newTemplate);
-            setIsCreateTemplateModalOpen(false);
-            setNewTemplateTitle('');
-            setNewTemplateDesc('');
-            setNewTemplateTags('');
-            setNewTemplateContent('');
-        }
-    };
-
-    return (
-        <div className="bg-white p-4 md:p-8" data-layout-root>
-            <header className="mb-8">
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                        <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
-                            <MenuIcon className="h-6 w-6" />
-                        </button>
-                        {/* Updated to Teal Theme */}
-                        <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
-                            <FileTextIcon className="h-6 w-6" />
-                        </div>
-                        <h1 className="text-2xl font-bold text-slate-800">Reports Hub</h1>
-                    </div>
+            <AppPage
+                title="Reports"
+                subtitle="Drafts and reusable report templates."
+                actions={
                     <div className="flex gap-2">
                         {onCreateTemplate && (
                             <button 
                                 onClick={() => setIsCreateTemplateModalOpen(true)}
-                                className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium border border-slate-200 hover:border-slate-300 transition-colors shadow-sm"
+                                className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-semibold text-xs border border-slate-200 hover:border-slate-300"
                             >
                                 <PlusIcon className="h-4 w-4" />
                                 <span className="hidden sm:inline">Draft Template</span>
@@ -113,6 +62,58 @@ const ReportsHubView: React.FC<ReportsHubViewProps> = ({
                         )}
                         <button 
                             onClick={onCreateReport}
+                            className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-semibold text-xs"
+                        >
+                            <PlusIcon className="h-4 w-4" />
+                            <span className="hidden sm:inline">Draft Report</span>
+                        </button>
+                    </div>
+                }
+                toolbar={
+                    <div className="flex flex-col md:flex-row gap-6 items-center">
+                        <div className="flex items-center gap-3">
+                            <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
+                                <MenuIcon className="h-6 w-6" />
+                            </button>
+                            <div className="h-9 w-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-700">
+                                <FileTextIcon className="h-5 w-5" />
+                            </div>
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 hide-scrollbar flex-1 border-b border-slate-100 w-full">
+                            <button
+                                onClick={() => setActiveTab('myreports')}
+                                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+                                    activeTab === 'myreports' 
+                                    ? 'border-slate-900 text-slate-900' 
+                                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                                }`}
+                            >
+                                My Reports
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('templates')}
+                                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+                                    activeTab === 'templates' 
+                                    ? 'border-slate-900 text-slate-900' 
+                                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                                }`}
+                            >
+                                Templates
+                            </button>
+                        </div>
+                        <div className="relative w-full md:w-80">
+                            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Search reports..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-weflora-teal focus:border-weflora-teal outline-none text-slate-900"
+                            />
+                        </div>
+                    </div>
+                }
+            >
                             className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium shadow-sm transition-colors"
                         >
                             <PlusIcon className="h-4 w-4" />
@@ -373,7 +374,7 @@ const ReportsHubView: React.FC<ReportsHubViewProps> = ({
                     setPendingDeleteReportId(null);
                 }}
             />
-        </div>
+        </AppPage>
     );
 };
 

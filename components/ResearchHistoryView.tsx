@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import AppPage from './AppPage';
 import { useChat } from '../contexts/ChatContext';
 import { useUI } from '../contexts/UIContext';
 import { 
@@ -67,30 +68,40 @@ const ResearchHistoryView: React.FC<ResearchHistoryViewProps> = ({ onOpenMenu })
     };
 
     return (
-        <div className="bg-white p-4 md:p-8" data-layout-root>
-            <header className="mb-8">
-                <div className="flex items-center gap-4 mb-6">
-                    <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
-                        <MenuIcon className="h-6 w-6" />
-                    </button>
-                    <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
-                        <MessageSquareIcon className="h-6 w-6" />
+        <AppPage
+            title="Sessions"
+            subtitle="Research threads and planning runs."
+            actions={
+                <Link
+                    to="/chat"
+                    className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                >
+                    New Session
+                </Link>
+            }
+            toolbar={
+                <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex items-center gap-3">
+                        <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
+                            <MenuIcon className="h-6 w-6" />
+                        </button>
+                        <div className="h-9 w-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-700">
+                            <MessageSquareIcon className="h-5 w-5" />
+                        </div>
                     </div>
-                    <h1 className="text-2xl font-bold text-slate-800">Sessions History</h1>
+                    <div className="relative w-full max-w-md">
+                        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Search threads..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none text-slate-900"
+                        />
+                    </div>
                 </div>
-
-                <div className="relative w-full max-w-md">
-                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Search threads..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none text-slate-900"
-                    />
-                </div>
-            </header>
-
+            }
+        >
             <div className="space-y-6 max-w-4xl">
                 {planningRuns.length > 0 && (
                     <div>
@@ -203,7 +214,7 @@ const ResearchHistoryView: React.FC<ResearchHistoryViewProps> = ({ onOpenMenu })
                     setPendingDeleteThreadId(null);
                 }}
             />
-        </div>
+        </AppPage>
     );
 };
 

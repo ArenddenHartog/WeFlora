@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import AppPage from './AppPage';
 import type { PinnedProject, Member } from '../types';
 import { SearchIcon, PlusIcon, FolderIcon, FilterIcon, SortAscendingIcon, XIcon, ChevronDownIcon, MenuIcon, ArchiveIcon } from './icons';
 import BaseModal from './BaseModal';
@@ -121,70 +122,72 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
         });
 
     return (
-        <div className="bg-white p-4 md:p-8 relative" data-layout-root>
-            <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 relative z-10">
-                <div className="flex items-center gap-4">
-                    <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
-                        <MenuIcon className="h-6 w-6" />
-                    </button>
-                    <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
-                        <FolderIcon className="h-6 w-6" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-slate-800">Projects Hub</h1>
-                </div>
+        <AppPage
+            title="Projects"
+            subtitle="Organize active work across teams and sites."
+            actions={
                 <button 
                     onClick={() => setIsModalOpen(true)}
-                    className="flex items-center justify-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium transition-colors shadow-sm"
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-semibold text-xs"
                 >
-                    <PlusIcon className="h-5 w-5" />
+                    <PlusIcon className="h-4 w-4" />
                     New Project
                 </button>
-            </header>
-
-            <div className="flex flex-col md:flex-row gap-4 mb-8 relative z-20">
-                <div className="relative flex-grow">
-                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Search projects..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-weflora-teal focus:border-weflora-teal text-slate-900"
-                    />
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                    <div className="relative group">
-                        <button className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:border-weflora-teal hover:text-weflora-teal transition-colors">
-                            <div className="flex items-center gap-2">
-                                <FilterIcon className="h-4 w-4" />
-                                <span>Filter: {filterStatus}</span>
-                            </div>
+            }
+            toolbar={
+                <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex items-center gap-3">
+                        <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
+                            <MenuIcon className="h-6 w-6" />
                         </button>
-                        <div className="absolute right-0 mt-1 w-full sm:w-32 bg-white border border-slate-200 rounded-lg shadow-lg hidden group-hover:block z-50">
-                            {['All', 'Active', 'Archived'].map(status => (
-                                <button 
-                                    key={status}
-                                    onClick={() => setFilterStatus(status as any)}
-                                    className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 first:rounded-t-lg last:rounded-b-lg"
-                                >
-                                    {status}
-                                </button>
-                            ))}
+                        <div className="h-9 w-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-700">
+                            <FolderIcon className="h-5 w-5" />
                         </div>
                     </div>
-                    <button 
-                        onClick={() => setSortOrder(sortOrder === 'name' ? 'date' : 'name')}
-                        className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:border-weflora-teal hover:text-weflora-teal transition-colors"
-                    >
-                         <div className="flex items-center gap-2">
-                            <SortAscendingIcon className="h-4 w-4" />
-                            <span>Sort: {sortOrder === 'name' ? 'Name' : 'Date'}</span>
+                    <div className="relative flex-grow">
+                        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Search projects..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-slate-900"
+                        />
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="relative group">
+                            <button className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:border-slate-300 transition-colors">
+                                <div className="flex items-center gap-2">
+                                    <FilterIcon className="h-4 w-4" />
+                                    <span>Filter: {filterStatus}</span>
+                                </div>
+                            </button>
+                            <div className="absolute right-0 mt-1 w-full sm:w-32 bg-white border border-slate-200 rounded-lg shadow-lg hidden group-hover:block z-50">
+                                {['All', 'Active', 'Archived'].map(status => (
+                                    <button 
+                                        key={status}
+                                        onClick={() => setFilterStatus(status as any)}
+                                        className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 first:rounded-t-lg last:rounded-b-lg"
+                                    >
+                                        {status}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    </button>
+                        <button 
+                            onClick={() => setSortOrder(sortOrder === 'name' ? 'date' : 'name')}
+                            className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:border-slate-300 transition-colors"
+                        >
+                             <div className="flex items-center gap-2">
+                                <SortAscendingIcon className="h-4 w-4" />
+                                <span>Sort: {sortOrder === 'name' ? 'Name' : 'Date'}</span>
+                            </div>
+                        </button>
+                    </div>
                 </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8 relative z-0">
+            }
+        >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8">
                 {filteredProjects.map(project => {
                     const isExpanded = expandedProjects.has(project.id);
                     return (
@@ -366,7 +369,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
                     setPendingDeleteProjectId(null);
                 }}
             />
-        </div>
+        </AppPage>
     );
 };
 

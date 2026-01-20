@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import AppPage from '../AppPage';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import type { ExecutionState } from '../../src/decision-program/types';
 import PlanningRunnerView from './PlanningRunnerView';
@@ -102,80 +103,78 @@ const PlanningView: React.FC = () => {
             file.file.type.includes('json') ||
             file.name.endsWith('.txt') ||
             file.name.endsWith('.csv') ||
-            file.name.endsWith('.json'))
-            ? await file.file.text()
-            : undefined;
-        return {
-          id: file.id,
-          title: file.name,
-          fileId: file.id,
-          file: file.file,
-          content
-        };
-      })
-    );
-    return selectedDocs;
-  }, [files, planningProjectId]);
-  const [planningState, setPlanningState] = useState<ExecutionState | null>(null);
-  const [isStarting, setIsStarting] = useState(false);
-  const [pcivContextView, setPcivContextView] = useState<PcivContextViewV1 | null>(null);
-  const [inputChangeNotice, setInputChangeNotice] = useState<{
-    changedInputs: string[];
-    impactedSteps: string[];
-    impactedStepIds: string[];
-  } | null>(null);
-
-  const withActionCards = useCallback((state: ExecutionState) => ({
-    ...state,
-    actionCards: buildActionCards(state)
-  }), []);
-
-  const startPlanningRun = useCallback(async (targetProjectId?: string | null, contextView?: PcivContextViewV1 | null) => {
-    setIsStarting(true);
-    const activeProjectId = targetProjectId ?? planningProjectId;
-    const selectedDocs = await buildSelectedDocs(activeProjectId);
-    const baseContext = {
-      ...defaultPlanningContext,
-      selectedDocs,
-      scopeId: planningScopeId
-    };
-    const baseState = planRun(program, baseContext);
-    const hydrated = contextView
-      ? applyContextViewToPlanningState(baseState, contextView, { debug: FEATURES.pcivDebug })
-      : baseState;
-    const planned = withActionCards(hydrated);
-    setPlanningState(planned);
-    setInputChangeNotice(null);
-    if (contextView) {
-      setPcivContextView(contextView);
-    }
-    navigate(`/planning/${planned.runId}`);
-    const stepped = await runAgentStep(planned, program, agentRegistry);
-    setPlanningState(withActionCards(stepped));
-    setIsStarting(false);
-  }, [agentRegistry, buildSelectedDocs, defaultPlanningContext, planningScopeId, program, withActionCards, navigate, planningProjectId]);
-
-  useEffect(() => {
-    if (routeProjectId) {
-      setResolvedProjectId(null);
-      return;
-    }
-    let isCancelled = false;
-    resolvePlanningProject()
-      .then((result) => {
-        if (isCancelled) return;
-        if (result?.projectId) {
-          setResolvedProjectId(result.projectId);
-        }
-      })
-      .catch(() => {
-        if (isCancelled) return;
-        setResolvedProjectId(null);
-      });
-    return () => {
-      isCancelled = true;
-    };
-  }, [routeProjectId]);
+            return (
+              <AppPage
+                title="Planning"
+                actions={
+                  <button
+                    type="button"
+                    onClick={() => openContextIntake('import', { autoStart: false })}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                  >
+                    {hasPcivCommit ? 'Update Context' : 'Context intake'}
+                  </button>
+                }
+                toolbar={
+                  <div className="flex items-center gap-3">
+                    {showBackButton && (
+                      <button
+                        onClick={() => (backTarget ? navigate(backTarget) : navigate(-1))}
+                        className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-xs font-semibold"
+                        title="Back"
+                      >
+                        <ChevronRightIcon className="h-4 w-4 rotate-180" />
+                        Back
+                      </button>
+                    )}
+                    <div className="h-9 w-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-700">
+                      <FlowerIcon className="h-5 w-5" />
+                    </div>
+                  </div>
+                }
+              >
+                <main className="flex items-center justify-center px-6 py-10">
+                  <div className="w-full max-w-xl space-y-8">
+                    <div className="space-y-4">
+                      {pcivSummary && (
+                        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                          Context committed · {pcivSummary.sourcesCount} sources ·{' '}
+                          {pcivSummary.fieldsFilledCount}/{pcivSummary.fieldsTotal} fields
+                          mapped
+                        </div>
+                      )}
+                      <button
+                        onClick={handleStartFlow}
+                        disabled={isStarting}
+                        className="w-full px-5 py-3 bg-weflora-teal text-white rounded-xl font-semibold text-sm shadow-sm hover:bg-weflora-dark transition-colors disabled:opacity-70"
+                      >
+                        {isStarting
+                          ? 'Starting Planning...'
+                          : startLabel}
+                      </button>
+                      {hasPcivCommit && (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openContextIntake('import', { autoStart: false })}
+                            className="flex-1 min-w-[160px] px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                          >
+                            {hasPcivCommit ? 'Update Context' : 'Context intake'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openContextIntake('validate', { focus: 'missingRequired', autoStart: true })}
+                            className="flex-1 min-w-[160px] px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                          >
+                            Validate missing inputs
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </main>
+              </AppPage>
+            );
 
   useEffect(() => {
     if (!planningRunId) return;

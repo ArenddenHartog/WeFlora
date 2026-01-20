@@ -6,6 +6,7 @@ import type {
     ContextItem, Chat
 } from '../types';
 import HomeView from './HomeView';
+import AppPage from './AppPage';
 import ProjectsView from './ProjectsView';
 import ChatView from './ChatView';
 import KnowledgeBaseView from './KnowledgeBaseView';
@@ -14,7 +15,7 @@ import ResearchHistoryView from './ResearchHistoryView';
 import WorksheetWizard from './WorksheetWizard';
 import ReportWizard from './ReportWizard';
 import BaseModal from './BaseModal';
-import { FolderIcon } from './icons';
+import { FolderIcon, MenuIcon } from './icons';
 import { useData } from '../contexts/DataContext';
 import { useProject } from '../contexts/ProjectContext';
 import { useChat } from '../contexts/ChatContext';
@@ -204,7 +205,32 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
                 />
             );
         case 'chat':
-            if (selectedChat) return <div className="flex flex-col bg-white"><ChatView chat={selectedChat} messages={messages} onBack={() => onNavigate('home')} onSendMessage={sendMessage} isGenerating={isGenerating} onOpenMenu={onOpenMenu} onRegenerateMessage={() => {}} onContinueInReport={(msg) => onOpenDestinationModal('report', msg)} onContinueInWorksheet={(msg) => onOpenDestinationModal('worksheet', msg)} /></div>;
+            if (selectedChat) return (
+                <AppPage
+                    title={selectedChat.title || 'Chat'}
+                    actions={null}
+                    toolbar={
+                        <div className="flex items-center gap-3">
+                            <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
+                                <MenuIcon className="h-6 w-6" />
+                            </button>
+                        </div>
+                    }
+                >
+                    <ChatView
+                        chat={selectedChat}
+                        messages={messages}
+                        onBack={() => onNavigate('home')}
+                        onSendMessage={sendMessage}
+                        isGenerating={isGenerating}
+                        onOpenMenu={onOpenMenu}
+                        onRegenerateMessage={() => {}}
+                        onContinueInReport={(msg) => onOpenDestinationModal('report', msg)}
+                        onContinueInWorksheet={(msg) => onOpenDestinationModal('worksheet', msg)}
+                        showHeader={false}
+                    />
+                </AppPage>
+            );
             return <div className="p-10 text-center text-slate-400">Chat not found</div>;
         case 'knowledge_base':
             return (

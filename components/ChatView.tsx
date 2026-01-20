@@ -44,12 +44,14 @@ interface ChatViewProps {
     onContinueInWorksheet?: (message: ChatMessage) => void;
     contextProjectId?: string; // New prop for scoping
     draftKey?: string;
+    showHeader?: boolean;
 }
 
 const ChatView: React.FC<ChatViewProps> = ({ 
     chat, messages, onBack, onSendMessage, isGenerating, 
     onRegenerateMessage, onOpenMenu, variant = 'full',
-    onContinueInReport, onContinueInWorksheet, contextProjectId, draftKey
+    onContinueInReport, onContinueInWorksheet, contextProjectId, draftKey,
+    showHeader = true
 }) => {
     const navigate = useNavigate();
     const { upsertPlanningRun } = useChat();
@@ -387,9 +389,10 @@ const ChatView: React.FC<ChatViewProps> = ({
     }, [decisionState.runId, decisionState.status]);
 
     return (
-        <div className="flex bg-white relative" data-layout-root>
+        <div className="flex bg-white relative">
             <div className="flex-1 flex flex-col min-w-0">
-                <header className="flex-none h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-white z-20">
+                {showHeader && (
+                  <header className="flex-none h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-white z-20">
                     <div className="flex items-center gap-3">
                         {variant === 'full' && (
                             <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
@@ -431,7 +434,8 @@ const ChatView: React.FC<ChatViewProps> = ({
                             </button>
                         )}
                     </div>
-                </header>
+                                    </header>
+                                )}
 
                 {viewMode === 'chat' ? (
                     <>

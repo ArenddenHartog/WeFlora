@@ -1,20 +1,30 @@
 import React, { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import AppPage from '../AppPage';
+import { useUI } from '../../contexts/UIContext';
+import { useProject } from '../../contexts/ProjectContext';
+import DataIntakePanel from './DataIntakePanel';
 import { agentProfilesContract } from '../../src/agentic/registry/agents.ts';
+import { demoRuns } from '../../src/agentic/fixtures/demoRuns.ts';
 
 const SkillDetail: React.FC = () => {
   const { agentId } = useParams();
   const profile = agentProfilesContract.find((item) => item.id === agentId);
   const [copied, setCopied] = useState(false);
+  const [runSignal, setRunSignal] = useState(0);
+  const { showNotification } = useUI();
+  const { files } = useProject();
+  const availableFiles = Object.values(files ?? {}).flat();
+  const availableSessions = demoRuns.map((run) => ({ id: run.id, title: run.title }));
 
   if (!profile) {
     return (
-      <div className="px-8 py-6 bg-white" data-layout-root>
+      <AppPage title="Skill not found" actions={null}>
         <p className="text-sm text-slate-500">Skill not found.</p>
         <Link to="/skills" className="mt-4 inline-block text-sm text-weflora-teal underline">
           Back to Skills
         </Link>
-      </div>
+      </AppPage>
     );
   }
 
@@ -30,19 +40,25 @@ const SkillDetail: React.FC = () => {
   };
 
   return (
-    <div className="px-8 py-6 bg-white" data-layout-root>
-      <div className="mb-6">
+    <AppPage
+      title={profile.title}
+      subtitle={profile.description}
+      actions={
+        <button
+          type="button"
+          onClick={() => setRunSignal((prev) => prev + 1)}
+          className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+        >
+          Run Skill
+        </button>
+      }
+      toolbar={
         <Link to="/skills" className="text-xs text-slate-500 hover:text-slate-700">
           ← Back to Skills
         </Link>
-        <h1 className="mt-3 text-2xl font-semibold text-slate-900">{profile.title}</h1>
-      </div>
-
+      }
+    >
       <div className="border-t border-slate-200 divide-y divide-slate-200">
-        <section className="py-6">
-          <p className="text-sm text-slate-600">{profile.description}</p>
-        </section>
-
         <section className="py-6">
           <div className="mt-3 space-y-3 text-sm text-slate-600">
             {profile.inputs.length === 0 ? (
@@ -64,6 +80,22 @@ const SkillDetail: React.FC = () => {
               ))
             )}
           </div>
+        </section>
+
+        <section className="py-6">
+          <DataIntakePanel
+            inputs={profile.inputs}
+            availableFiles={availableFiles}
+            availableSessions={availableSessions}
+            runSignal={runSignal}
+            onRun={({ valid, missing }) => {
+              if (!valid) {
+                showNotification(`Missing required inputs: ${missing.join(', ')}`, 'error');
+                return;
+              }
+              showNotification('Skill run queued.', 'success');
+            }}
+          />
         </section>
 
         <section className="py-6">
@@ -102,7 +134,7 @@ const SkillDetail: React.FC = () => {
           )}
         </section>
       </div>
-    </div>
+    </AppPage>
   );
 };
 

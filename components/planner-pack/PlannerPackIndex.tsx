@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import AppPage from '../AppPage';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { getPlanningScopeId } from '../../src/lib/planningScope';
@@ -153,23 +154,23 @@ const PlannerPackIndex: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6" data-layout-root>
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold text-slate-900">Planner Pack</h1>
-        <p className="text-sm text-slate-500">Submission-ready intervention packs prepared by WeFlora.</p>
-      </header>
-
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-slate-500">
-          {isLoading ? 'Loading interventions…' : `${interventions.length} intervention${interventions.length === 1 ? '' : 's'}`}
-        </div>
+    <AppPage
+      title="Planner Pack"
+      subtitle="Submission-ready intervention packs prepared by WeFlora."
+      actions={
         <button
           onClick={() => setFormOpen(true)}
-          className="px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-weflora-dark"
+          className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold shadow-sm hover:bg-slate-800"
         >
           New Intervention
         </button>
-      </div>
+      }
+      toolbar={
+        <div className="text-sm text-slate-500">
+          {isLoading ? 'Loading interventions…' : `${interventions.length} intervention${interventions.length === 1 ? '' : 's'}`}
+        </div>
+      }
+    >
 
       {formOpen && (
         <form onSubmit={handleCreate} className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
@@ -246,7 +247,7 @@ const PlannerPackIndex: React.FC = () => {
           </button>
         ))}
       </div>
-    </div>
+    </AppPage>
   );
 };
 

@@ -3,10 +3,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const layoutFiles = [
+  'components/AppPage.tsx',
   'components/HomeView.tsx',
   'components/ProjectsView.tsx',
   'components/ResearchHistoryView.tsx',
-  'components/ChatView.tsx',
   'components/KnowledgeBaseView.tsx',
   'components/PromptTemplatesView.tsx',
   'components/LibraryView.tsx',
@@ -38,9 +38,10 @@ for (const relativePath of layoutFiles) {
 
   const src = fs.readFileSync(filePath, 'utf8');
   const matches = Array.from(src.matchAll(/<[^>]*data-layout-root[^>]*>/g));
+  const usesAppPage = /<AppPage[\s>]/.test(src);
 
-  if (matches.length === 0) {
-    errors.push(`[layout-guard] Missing data-layout-root in ${relativePath}`);
+  if (matches.length === 0 && !usesAppPage) {
+    errors.push(`[layout-guard] Missing AppPage usage or data-layout-root in ${relativePath}`);
     continue;
   }
 

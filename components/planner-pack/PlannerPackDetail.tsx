@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AppPage from '../AppPage';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { useUI } from '../../contexts/UIContext';
@@ -665,30 +666,25 @@ const PlannerPackDetail: React.FC = () => {
   }
 
   return (
-    <div className="bg-slate-50" data-layout-root>
-      <div className="flex flex-col">
-        <header className="border-b border-slate-200 bg-white px-6 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-bold text-slate-900">{intervention.name}</h1>
-              <p className="text-xs text-slate-500">
-                Prepared by WeFlora on behalf of {intervention.municipality ?? 'Municipality'}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="px-2 py-1 rounded-full border border-slate-200 text-slate-600">Status: {recordStatus}</span>
-              <span className="px-2 py-1 rounded-full border border-slate-200 text-slate-600">
-                Confidence: {confidenceLabel}
-              </span>
-              <span className="px-2 py-1 rounded-full border border-slate-200 text-slate-600">
-                {riskSummary.outstanding} assumptions · {riskSummary.highRisk} high-risk
-              </span>
-            </div>
-          </div>
-        </header>
+    <AppPage
+      title={intervention.name}
+      subtitle={`Prepared by WeFlora on behalf of ${intervention.municipality ?? 'Municipality'}.`}
+      actions={null}
+    >
+      <div className="border-b border-slate-200 pb-4">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="px-2 py-1 rounded-full border border-slate-200 text-slate-600">Status: {recordStatus}</span>
+          <span className="px-2 py-1 rounded-full border border-slate-200 text-slate-600">
+            Confidence: {confidenceLabel}
+          </span>
+          <span className="px-2 py-1 rounded-full border border-slate-200 text-slate-600">
+            {riskSummary.outstanding} assumptions · {riskSummary.highRisk} high-risk
+          </span>
+        </div>
+      </div>
 
-        <div className="px-6 py-4">
-          <div className="grid grid-cols-12 gap-4">
+      <div className="px-6 py-4">
+        <div className="grid grid-cols-12 gap-4">
             <aside className="col-span-12 xl:col-span-3 space-y-6 pr-1">
               <GeometryStep
                 kind={kind}
@@ -740,10 +736,9 @@ const PlannerPackDetail: React.FC = () => {
                 isLoading={membersLoading}
               />
             </aside>
-          </div>
         </div>
       </div>
-    </div>
+    </AppPage>
   );
 };
 

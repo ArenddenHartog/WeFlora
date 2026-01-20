@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import AppPage from '../AppPage';
 import { demoRuns } from '../../src/agentic/fixtures/demoRuns.ts';
 import { agentProfiles } from '../../src/agentic/registry/agents.ts';
 import LivingRecordRenderer from './RunTimeline';
@@ -31,25 +32,35 @@ const RunDetail: React.FC = () => {
 
   if (!run) {
     return (
-      <div className="px-8 py-6 bg-white" data-layout-root>
-        <p className="text-sm text-slate-500">Run not found.</p>
+      <AppPage title="Session not found" actions={null}>
+        <p className="text-sm text-slate-500">Session not found.</p>
         <Link to="/sessions" className="mt-4 inline-block text-sm text-weflora-teal underline">
           Back to Sessions
         </Link>
-      </div>
+      </AppPage>
     );
   }
 
   return (
-    <div className="px-8 py-6 space-y-6 bg-white" data-layout-root>
-      <div>
+    <AppPage
+      title={run.title}
+      actions={
+        <Link
+          to="/flows"
+          className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+        >
+          Re-run Session
+        </Link>
+      }
+      toolbar={
         <Link to="/sessions" className="text-xs text-slate-500 hover:text-slate-700">
           ← Back to Sessions
         </Link>
-      </div>
+      }
+    >
       <RunHeader title={run.title} scopeId={run.scopeId} status={run.status} />
       <LivingRecordRenderer events={run.events} agentNameById={agentNameById} />
-    </div>
+    </AppPage>
   );
 };
 

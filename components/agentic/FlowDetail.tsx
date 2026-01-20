@@ -1,32 +1,54 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import AppPage from '../AppPage';
+import { useUI } from '../../contexts/UIContext';
+import { useProject } from '../../contexts/ProjectContext';
+import DataIntakePanel from './DataIntakePanel';
 import { flowTemplatesById } from '../../src/agentic/registry/flows.ts';
+import { demoRuns } from '../../src/agentic/fixtures/demoRuns.ts';
 
 const FlowDetail: React.FC = () => {
   const { flowId } = useParams();
   const flow = flowId ? flowTemplatesById[flowId] : undefined;
+  const [runSignal, setRunSignal] = useState(0);
+  const { showNotification } = useUI();
+  const { files } = useProject();
+  const availableFiles = useMemo(() => Object.values(files ?? {}).flat(), [files]);
+  const availableSessions = useMemo(
+    () => demoRuns.map((run) => ({ id: run.id, title: run.title })),
+    []
+  );
 
   if (!flow) {
     return (
-      <div className="px-8 py-6 bg-white" data-layout-root>
+      <AppPage title="Flow not found" actions={null}>
         <p className="text-sm text-slate-500">Flow not found.</p>
         <Link to="/flows" className="mt-4 inline-block text-sm text-weflora-teal underline">
           Back to Flows
         </Link>
-      </div>
+      </AppPage>
     );
   }
 
   return (
-    <div className="px-8 py-6 bg-white" data-layout-root>
-      <div className="mb-6">
+    <AppPage
+      title={flow.title}
+      subtitle={flow.description}
+      actions={
+        <button
+          type="button"
+          onClick={() => setRunSignal((prev) => prev + 1)}
+          className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+        >
+          Run Flow
+        </button>
+      }
+      toolbar={
         <Link to="/flows" className="text-xs text-slate-500 hover:text-slate-700">
           ← Back to Flows
         </Link>
-        <h1 className="mt-3 text-2xl font-semibold text-slate-900">{flow.title}</h1>
-        <p className="text-sm text-slate-500">{flow.description}</p>
-      </div>
-
+      }
+    >
       <div className="border-t border-slate-200 divide-y divide-slate-200">
         <section className="py-6">
           <h3 className="text-sm font-semibold text-slate-700">Inputs</h3>
@@ -42,6 +64,22 @@ const FlowDetail: React.FC = () => {
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="py-6">
+          <DataIntakePanel
+            inputs={flow.inputs}
+            availableFiles={availableFiles}
+            availableSessions={availableSessions}
+            runSignal={runSignal}
+            onRun={({ valid, missing }) => {
+              if (!valid) {
+                showNotification(`Missing required inputs: ${missing.join(', ')}`, 'error');
+                return;
+              }
+              showNotification('Flow run queued.', 'success');
+            }}
+          />
         </section>
 
         <section className="py-6">
@@ -61,7 +99,7 @@ const FlowDetail: React.FC = () => {
           </div>
         </section>
       </div>
-    </div>
+    </AppPage>
   );
 };
 
