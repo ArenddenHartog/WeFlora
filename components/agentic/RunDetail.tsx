@@ -48,7 +48,7 @@ const RunDetail: React.FC = () => {
         </Link>
       </div>
       <RunHeader title={run.title} scopeId={run.scopeId} status={run.status} />
-      <LivingRecordRenderer steps={run.steps} artifacts={run.artifacts} agentNameById={agentNameById} />
+      <LivingRecordRenderer events={run.events} agentNameById={agentNameById} />
     </div>
   );
 };

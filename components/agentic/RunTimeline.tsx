@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
-import type { ArtifactRecord, StepRecord } from '../../src/agentic/contracts/zod.ts';
+import type { EventRecord } from '../../src/decision-program/contracts/types.ts';
 
 interface RunTimelineProps {
-  steps: StepRecord[];
-  artifacts: ArtifactRecord[];
+  events: EventRecord[];
   agentNameById: Record<string, string>;
 }
 
@@ -25,72 +24,75 @@ const formatPointerValue = (value: unknown) => {
 const toPointerEntries = (prefix: string, obj: Record<string, unknown>) =>
   Object.entries(obj).map(([key, value]) => ({ pointer: `${prefix}/${key}`, value }));
 
-const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ steps, artifacts, agentNameById }) => {
-  const sortedSteps = useMemo(
-    () => [...steps].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
-    [steps]
-  );
+const sortEvents = (events: EventRecord[]) =>
+  [...events].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, agentNameById }) => {
+  const orderedEvents = useMemo(() => sortEvents(events), [events]);
 
   return (
     <div className="relative">
       <div className="absolute left-2 top-0 h-full w-px bg-slate-200" />
       <div className="space-y-10 pl-8">
-      {sortedSteps.map((step) => {
-        const evidence = step.output.evidence ?? [];
-        const assumptions = step.output.assumptions ?? [];
-        const payload = step.output.payload as Record<string, unknown> | null | undefined;
-        const summary = (payload?.summary as string | undefined) ?? 'No summary available.';
-        const rationale = (payload?.rationale as string | undefined) ?? '';
-        const inputs = step.inputs ?? {};
-        const inputPointers = toPointerEntries('/inputs', inputs);
-        const outputPointers = toPointerEntries('/outputs', payload ?? {});
+      {orderedEvents.map((event) => {
+        const agentLabel = event.agent_id ? agentNameById[event.agent_id] ?? event.agent_id : 'System';
+        const status = event.kind === 'step.output' ? event.data.output?.mode ?? 'ok' : 'ok';
+        const evidence = event.kind === 'step.output' ? event.data.output?.evidence ?? [] : [];
+        const assumptions = event.kind === 'step.output' ? event.data.output?.assumptions ?? [] : [];
+        const payload = event.kind === 'step.output' ? (event.data.output?.payload as Record<string, unknown> | undefined) : undefined;
+        const summary = event.kind === 'step.output'
+          ? (payload?.summary as string | undefined) ?? 'No summary available.'
+          : event.kind === 'step.input_snapshot'
+            ? 'Inputs captured for this step.'
+            : event.kind === 'artifact.created'
+              ? 'Artifact recorded.'
+              : 'Event recorded.';
+        const rationale = event.kind === 'step.output' ? (payload?.rationale as string | undefined) ?? '' : '';
+        const inputs = event.kind === 'step.input_snapshot' ? (event.data.inputs as Record<string, unknown>) : {};
+        const outputPointers = event.kind === 'step.output' ? toPointerEntries('/outputs', payload ?? {}) : [];
+        const inputPointers = event.kind === 'step.input_snapshot' ? toPointerEntries('/inputs', inputs) : [];
+        const artifactPayload = event.kind === 'artifact.created' ? event.data.artifact : null;
 
         return (
-          <article key={step.id} className="relative pb-10">
+          <article key={event.id} className="relative pb-10">
             <div className="absolute left-[-28px] top-2 h-3 w-3 rounded-full border border-weflora-teal bg-white" />
 
             <header className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs text-slate-400">{new Date(step.created_at).toLocaleString()}</p>
-                <p className="mt-2 text-base font-semibold text-slate-900">
-                  {agentNameById[step.agent_id] ?? step.agent_id}
-                </p>
+                <p className="text-xs text-slate-400">{new Date(event.created_at).toLocaleString()}</p>
+                <p className="mt-2 text-base font-semibold text-slate-900">{agentLabel}</p>
               </div>
               <span
                 className={`inline-flex items-center rounded-full border border-slate-200 px-2 py-0.5 text-xs ${
-                  statusClasses[step.status] ?? 'text-slate-600'
+                  statusClasses[String(status)] ?? 'text-slate-600'
                 }`}
               >
-                {step.status}
+                {String(status)}
               </span>
             </header>
 
             <div className="mt-5 space-y-5">
               <section>
-                <h4 className="text-sm font-semibold text-slate-700">What happened</h4>
                 <p className="mt-2 text-sm text-slate-900">{summary}</p>
                 {rationale ? <p className="mt-2 text-sm text-slate-600">{rationale}</p> : null}
               </section>
 
-              {step.output.mode === 'insufficient_data' && step.output.insufficient_data ? (
+              {event.kind === 'step.output' && event.data.output?.mode === 'insufficient_data' && event.data.output?.insufficient_data ? (
                 <section className="space-y-3">
                   <div>
-                    <h4 className="text-sm font-semibold text-slate-700">Missing</h4>
                     <ul className="mt-2 list-disc pl-5 text-sm text-slate-700">
-                      {step.output.insufficient_data.missing.map((item) => (
+                      {event.data.output.insufficient_data.missing.map((item) => (
                         <li key={item}>{item}</li>
                       ))}
                     </ul>
                   </div>
                   <div>
-                    <h4 className="text-sm font-semibold text-slate-700">Why this matters</h4>
                     <p className="mt-2 text-sm text-slate-600">These inputs are required to complete this step.</p>
                   </div>
                   <div>
-                    <h4 className="text-sm font-semibold text-slate-700">Recommended next</h4>
-                    {step.output.insufficient_data.recommended_next?.length ? (
+                    {event.data.output.insufficient_data.recommended_next?.length ? (
                       <ul className="mt-2 list-disc pl-5 text-sm text-slate-700">
-                        {step.output.insufficient_data.recommended_next.map((item) => (
+                        {event.data.output.insufficient_data.recommended_next.map((item) => (
                           <li key={item}>{item}</li>
                         ))}
                       </ul>
@@ -102,7 +104,6 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ steps, artifacts, ag
               ) : null}
 
               <section>
-                <h4 className="text-sm font-semibold text-slate-700">Inputs</h4>
                 {inputPointers.length === 0 ? (
                   <p className="mt-2 text-sm text-slate-500">No inputs captured for this step.</p>
                 ) : (
@@ -117,7 +118,6 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ steps, artifacts, ag
               </section>
 
               <section>
-                <h4 className="text-sm font-semibold text-slate-700">Outputs</h4>
                 {outputPointers.length === 0 ? (
                   <p className="mt-2 text-sm text-slate-500">No outputs recorded for this step.</p>
                 ) : (
@@ -132,7 +132,6 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ steps, artifacts, ag
               </section>
 
               <section>
-                <h4 className="text-sm font-semibold text-slate-700">Evidence</h4>
                 {evidence.length === 0 ? (
                   <p className="mt-2 text-sm text-slate-500">No evidence captured for this step.</p>
                 ) : (
@@ -168,7 +167,6 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ steps, artifacts, ag
               </section>
 
               <section>
-                <h4 className="text-sm font-semibold text-slate-700">Assumptions</h4>
                 {assumptions.length === 0 ? (
                   <p className="mt-2 text-sm text-slate-500">No assumptions recorded.</p>
                 ) : (
@@ -184,15 +182,12 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ steps, artifacts, ag
               </section>
 
               <section>
-                <h4 className="text-sm font-semibold text-slate-700">Artifacts / Actions</h4>
-                {artifacts.length === 0 ? (
-                  <p className="mt-2 text-sm text-slate-500">No artifacts or actions emitted.</p>
+                {artifactPayload ? (
+                  <div className="mt-2 text-sm text-slate-600">
+                    {artifactPayload.title ?? artifactPayload.type}
+                  </div>
                 ) : (
-                  <ul className="mt-2 space-y-1 text-sm text-slate-600">
-                    {artifacts.map((artifact) => (
-                      <li key={artifact.id}>{artifact.title ?? artifact.type}</li>
-                    ))}
-                  </ul>
+                  <p className="mt-2 text-sm text-slate-500">No artifacts or actions emitted.</p>
                 )}
               </section>
             </div>

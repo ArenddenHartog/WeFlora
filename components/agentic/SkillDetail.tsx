@@ -40,12 +40,10 @@ const SkillDetail: React.FC = () => {
 
       <div className="border-t border-slate-200 divide-y divide-slate-200">
         <section className="py-6">
-          <h3 className="text-sm font-semibold text-slate-700">Purpose</h3>
-          <p className="mt-2 text-sm text-slate-600">{profile.description}</p>
+          <p className="text-sm text-slate-600">{profile.description}</p>
         </section>
 
         <section className="py-6">
-          <h3 className="text-sm font-semibold text-slate-700">Inputs</h3>
           <div className="mt-3 space-y-3 text-sm text-slate-600">
             {profile.inputs.length === 0 ? (
               <p>No declared inputs.</p>
@@ -70,7 +68,6 @@ const SkillDetail: React.FC = () => {
 
         <section className="py-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-700">Output schema</h3>
             <button
               type="button"
               onClick={handleCopySchema}
@@ -85,7 +82,6 @@ const SkillDetail: React.FC = () => {
         </section>
 
         <section className="py-6">
-          <h3 className="text-sm font-semibold text-slate-700">Output examples</h3>
           {profile.fixtures ? (
             <div className="mt-3 space-y-4 text-xs text-slate-600">
               {(['ok', 'insufficient_data', 'rejected'] as const).map((mode) => {

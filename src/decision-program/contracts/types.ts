@@ -349,6 +349,9 @@ export interface BaseEventRecord {
   /** Who/what produced the event. */
   actor: 'system' | 'user' | 'agent' | 'ops' | 'connector';
 
+  /** Tone classification for rendering. */
+  tone: 'fact' | 'conversational';
+
   /** Optional link to the skill/agent that generated it. */
   agent_id?: string; // AgentProfile.id
   agent_spec_version?: SemVer;

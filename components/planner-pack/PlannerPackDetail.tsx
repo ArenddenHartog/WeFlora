@@ -689,7 +689,7 @@ const PlannerPackDetail: React.FC = () => {
 
         <div className="flex-1 min-h-0 px-6 py-4">
           <div className="h-full grid grid-cols-12 gap-4">
-            <aside className="col-span-12 xl:col-span-3 space-y-6 overflow-y-auto pr-1">
+            <aside className="col-span-12 xl:col-span-3 space-y-6 pr-1">
               <GeometryStep
                 kind={kind}
                 geojsonText={geojsonText}
@@ -717,7 +717,7 @@ const PlannerPackDetail: React.FC = () => {
               />
             </section>
 
-            <aside className="col-span-12 xl:col-span-3 space-y-6 overflow-y-auto pr-1">
+            <aside className="col-span-12 xl:col-span-3 space-y-6 pr-1">
               <RunsPanel
                 inventoryStatus={inventoryStatus}
                 composeStatus={composeStatus}
