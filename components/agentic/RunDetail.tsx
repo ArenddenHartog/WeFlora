@@ -31,7 +31,7 @@ const RunDetail: React.FC = () => {
 
   if (!run) {
     return (
-      <div className="min-h-screen px-8 py-6">
+      <div className="px-8 py-6 bg-white" data-layout-root>
         <p className="text-sm text-slate-500">Run not found.</p>
         <Link to="/sessions" className="mt-4 inline-block text-sm text-weflora-teal underline">
           Back to Sessions
@@ -41,7 +41,7 @@ const RunDetail: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen px-8 py-6 space-y-6">
+    <div className="px-8 py-6 space-y-6 bg-white" data-layout-root>
       <div>
         <Link to="/sessions" className="text-xs text-slate-500 hover:text-slate-700">
           ← Back to Sessions

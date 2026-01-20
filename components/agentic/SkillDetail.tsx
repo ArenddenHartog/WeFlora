@@ -9,7 +9,7 @@ const SkillDetail: React.FC = () => {
 
   if (!profile) {
     return (
-      <div className="min-h-screen px-8 py-6">
+      <div className="px-8 py-6 bg-white" data-layout-root>
         <p className="text-sm text-slate-500">Skill not found.</p>
         <Link to="/skills" className="mt-4 inline-block text-sm text-weflora-teal underline">
           Back to Skills
@@ -30,7 +30,7 @@ const SkillDetail: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen px-8 py-6">
+    <div className="px-8 py-6 bg-white" data-layout-root>
       <div className="mb-6">
         <Link to="/skills" className="text-xs text-slate-500 hover:text-slate-700">
           ← Back to Skills

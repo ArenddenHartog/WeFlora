@@ -4,7 +4,7 @@ import { agentProfilesContract } from '../../src/agentic/registry/agents.ts';
 
 const SkillsIndex: React.FC = () => {
   return (
-    <div className="min-h-screen px-8 py-6">
+    <div className="px-8 py-6 bg-white" data-layout-root>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">Skills</h1>
         <p className="text-sm text-slate-500">Browse agent profiles and their evidence-ready output contracts.</p>

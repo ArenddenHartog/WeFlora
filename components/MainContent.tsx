@@ -21,7 +21,8 @@ import RunsIndex from './agentic/RunsIndex';
 import FlowsIndex from './agentic/FlowsIndex';
 import FlowDetail from './agentic/FlowDetail';
 import RunDetail from './agentic/RunDetail';
-import GlobalLayout from './GlobalLayout';
+import AppLayout from './AppLayout';
+import CanvasLayout from './CanvasLayout';
 import BaseModal from './BaseModal';
 import { DatabaseIcon, FolderIcon, PlusIcon, CheckIcon, SparklesIcon, RefreshIcon } from './icons';
 import { aiService, hasMarkdownPipeTable, parseMarkdownPipeTableAsMatrix } from '../services/aiService';
@@ -633,8 +634,8 @@ const MainContent: React.FC<MainContentProps> = ({
     return (
         <>
             <Routes>
-                {/* Global Routes wrapped in Global Layout */}
-                <Route element={<GlobalLayout />}>
+                {/* Global Routes wrapped in App Layout */}
+                <Route element={<AppLayout />}>
                     <Route path="/" element={<GlobalWorkspace view="home" {...sharedProps} />} />
                     <Route path="/projects" element={<GlobalWorkspace view="projects" {...sharedProps} />} />
                     <Route path="/research-history" element={<GlobalWorkspace view="research_history" {...sharedProps} />} />
@@ -676,14 +677,14 @@ const MainContent: React.FC<MainContentProps> = ({
                     <Route path="/prompts" element={<GlobalWorkspace view="prompts" {...sharedProps} />} />
                 </Route>
                 
-                {/* Standalone Editors (Have their own headers) */}
-                <Route path="/worksheets/*" element={<WorksheetsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
-                <Route path="/worksheets/:matrixId" element={<WorksheetsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
-                <Route path="/reports/*" element={<ReportsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
-                <Route path="/reports/:reportId" element={<ReportsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
-                
-                {/* Project Workspace */}
-                <Route path="/project/:projectId/*" element={<ProjectWorkspace />} />
+                {/* Canvas Editors (own scroll/zoom/pan) */}
+                <Route element={<CanvasLayout />}>
+                    <Route path="/worksheets/*" element={<WorksheetsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
+                    <Route path="/worksheets/:matrixId" element={<WorksheetsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
+                    <Route path="/reports/*" element={<ReportsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
+                    <Route path="/reports/:reportId" element={<ReportsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
+                    <Route path="/project/:projectId/*" element={<ProjectWorkspace />} />
+                </Route>
                 
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

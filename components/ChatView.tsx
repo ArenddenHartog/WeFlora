@@ -387,7 +387,7 @@ const ChatView: React.FC<ChatViewProps> = ({
     }, [decisionState.runId, decisionState.status]);
 
     return (
-        <div className="flex h-full bg-white relative overflow-hidden">
+        <div className="flex bg-white relative" data-layout-root>
             <div className="flex-1 flex flex-col min-w-0">
                 <header className="flex-none h-14 border-b border-slate-200 flex items-center justify-between px-4 bg-white z-20">
                     <div className="flex items-center gap-3">

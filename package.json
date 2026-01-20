@@ -11,6 +11,7 @@
     "lint:fix": "eslint . --fix",
     "guard:temp-ids": "bash scripts/guard-temp-ids.sh",
     "guard:toast-icons": "bash scripts/guard-toast-icons.sh",
+    "guard:layout": "node scripts/guard-layouts.mjs",
     "test:skill-prompts": "node --experimental-strip-types scripts/test-skill-prompts.ts",
     "test:floragpt": "node --experimental-strip-types scripts/test-floragpt.ts && node --experimental-strip-types scripts/test-message-persistence.ts && node --experimental-strip-types scripts/test-citations-enforcement.ts",
     "test:floragpt-worksheet": "node --experimental-strip-types scripts/test-floragpt-worksheet.ts",
@@ -32,7 +33,7 @@
     "test:planner-pack-contract": "node scripts/test-planner-pack-contract.mjs",
     "test:agentic-contract": "node scripts/test-agentic-contract.mjs",
     "test:planning:unit": "node --test tests/unit/planningPcivPersistence.test.ts",
-    "check": "npm run lint && npm run guard:temp-ids && npm run guard:toast-icons && npm run test:pciv-contract && npm run test:planning-contract && npm run test:planner-pack-contract && npm run test:agentic-contract && npm run build"
+    "check": "npm run lint && npm run guard:temp-ids && npm run guard:toast-icons && npm run guard:layout && npm run test:pciv-contract && npm run test:planning-contract && npm run test:planner-pack-contract && npm run test:agentic-contract && npm run build"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",

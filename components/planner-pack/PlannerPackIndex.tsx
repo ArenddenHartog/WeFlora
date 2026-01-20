@@ -153,7 +153,7 @@ const PlannerPackIndex: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="p-6 max-w-6xl mx-auto space-y-6" data-layout-root>
       <header className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold text-slate-900">Planner Pack</h1>
         <p className="text-sm text-slate-500">Submission-ready intervention packs prepared by WeFlora.</p>

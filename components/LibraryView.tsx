@@ -36,7 +36,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTempl
     };
 
     return (
-        <div className="h-full overflow-y-auto bg-white p-4 md:p-8">
+        <div className="bg-white p-4 md:p-8" data-layout-root>
             <header className="mb-8">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-4">

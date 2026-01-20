@@ -56,7 +56,7 @@ const PromptTemplatesView: React.FC<PromptTemplatesViewProps> = ({ items, onOpen
     };
 
     return (
-        <div className="h-full overflow-y-auto bg-white p-4 md:p-8">
+        <div className="bg-white p-4 md:p-8" data-layout-root>
             <header className="mb-8">
                 <div className="flex items-center gap-4 mb-6">
                     <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">

@@ -204,7 +204,7 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
                 />
             );
         case 'chat':
-            if (selectedChat) return <div className="h-full flex flex-col bg-white"><ChatView chat={selectedChat} messages={messages} onBack={() => onNavigate('home')} onSendMessage={sendMessage} isGenerating={isGenerating} onOpenMenu={onOpenMenu} onRegenerateMessage={() => {}} onContinueInReport={(msg) => onOpenDestinationModal('report', msg)} onContinueInWorksheet={(msg) => onOpenDestinationModal('worksheet', msg)} /></div>;
+            if (selectedChat) return <div className="flex flex-col bg-white"><ChatView chat={selectedChat} messages={messages} onBack={() => onNavigate('home')} onSendMessage={sendMessage} isGenerating={isGenerating} onOpenMenu={onOpenMenu} onRegenerateMessage={() => {}} onContinueInReport={(msg) => onOpenDestinationModal('report', msg)} onContinueInWorksheet={(msg) => onOpenDestinationModal('worksheet', msg)} /></div>;
             return <div className="p-10 text-center text-slate-400">Chat not found</div>;
         case 'knowledge_base':
             return (

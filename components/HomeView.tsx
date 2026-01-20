@@ -54,14 +54,14 @@ const HomeView: React.FC<HomeViewProps> = ({
     // Only show dashboard if no thread is active AND we are not currently creating one (generating)
     if (!activeThreadId && !isGenerating) {
         return (
-            <div className="h-full flex flex-col bg-white">
+            <div className="flex flex-col bg-white" data-layout-root>
                 {/* Mobile Menu Trigger for Zero State */}
                 <div className="md:hidden flex items-center p-4 pb-0">
                     <button onClick={onOpenMenu} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                         <MenuIcon className="h-6 w-6" />
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center">
+                <div className="p-4 md:p-8 flex flex-col items-center">
                     <header className="mb-8 md:mb-10 text-center relative w-full max-w-3xl mt-4 md:mt-8">
                         <div className="flex flex-col items-center gap-4 mb-6">
                             <div className="h-16 w-16 bg-weflora-mint/20 rounded-2xl flex items-center justify-center text-weflora-teal shadow-sm">
@@ -124,7 +124,7 @@ const HomeView: React.FC<HomeViewProps> = ({
 
     // --- ACTIVE THREAD STATE: RESEARCH INTERFACE ---
     return (
-        <div className="h-full flex flex-col bg-white relative">
+        <div className="flex flex-col bg-white relative" data-layout-root>
             {/* Thread Context Header */}
             <header className="flex-none h-14 border-b border-slate-100 flex items-center justify-between px-4 bg-white/80 backdrop-blur-md z-30">
                 <div className="flex items-center gap-4">
@@ -174,7 +174,7 @@ const HomeView: React.FC<HomeViewProps> = ({
             </header>
 
             {/* Chat Stream - flex-1 scrollable */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-0 scroll-smooth">
+            <div className="p-4 md:p-0 scroll-smooth">
                 <div className="max-w-3xl mx-auto w-full pt-6 px-4 md:px-0 pb-4">
                     {/* Only show "Start Research" if NOT generating and NO messages */}
                     {messages.length === 0 && !isGenerating && (

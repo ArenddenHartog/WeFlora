@@ -654,19 +654,19 @@ const PlannerPackDetail: React.FC = () => {
 
   if (schemaMismatch) {
     return (
-      <div className="p-6 text-sm text-red-600">Planner Pack cannot load due to a schema mismatch. Refresh once the database is updated.</div>
+      <div className="p-6 text-sm text-red-600" data-layout-root>Planner Pack cannot load due to a schema mismatch. Refresh once the database is updated.</div>
     );
   }
 
   if (isLoading || !intervention) {
     return (
-      <div className="p-6 text-sm text-slate-500">Loading Planner Pack…</div>
+      <div className="p-6 text-sm text-slate-500" data-layout-root>Loading Planner Pack…</div>
     );
   }
 
   return (
-    <div className="h-full bg-slate-50">
-      <div className="h-full flex flex-col">
+    <div className="bg-slate-50" data-layout-root>
+      <div className="flex flex-col">
         <header className="border-b border-slate-200 bg-white px-6 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -687,8 +687,8 @@ const PlannerPackDetail: React.FC = () => {
           </div>
         </header>
 
-        <div className="flex-1 min-h-0 px-6 py-4">
-          <div className="h-full grid grid-cols-12 gap-4">
+        <div className="px-6 py-4">
+          <div className="grid grid-cols-12 gap-4">
             <aside className="col-span-12 xl:col-span-3 space-y-6 pr-1">
               <GeometryStep
                 kind={kind}

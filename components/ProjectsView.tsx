@@ -121,7 +121,7 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onSelectProject, 
         });
 
     return (
-        <div className="h-full overflow-y-auto bg-white p-4 md:p-8 relative">
+        <div className="bg-white p-4 md:p-8 relative" data-layout-root>
             <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 relative z-10">
                 <div className="flex items-center gap-4">
                     <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">

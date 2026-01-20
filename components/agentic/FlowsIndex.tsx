@@ -4,7 +4,7 @@ import { flowTemplates } from '../../src/agentic/registry/flows.ts';
 
 const FlowsIndex: React.FC = () => {
   return (
-    <div className="min-h-screen px-8 py-6">
+    <div className="px-8 py-6 bg-white" data-layout-root>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">Flows</h1>
         <p className="text-sm text-slate-500">Pre-built agent sequences that create submission-ready outputs.</p>

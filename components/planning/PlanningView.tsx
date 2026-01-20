@@ -692,7 +692,7 @@ const PlanningView: React.FC = () => {
 
   if (planningState) {
     return (
-      <div className="flex h-full flex-col bg-slate-50">
+      <div className="flex flex-col bg-slate-50" data-layout-root>
         <header className="flex-none h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30">
           <div className="flex items-center gap-3">
             {showBackButton && (
@@ -762,7 +762,7 @@ const PlanningView: React.FC = () => {
   }
 
   return (
-    <div className="flex h-full flex-col bg-slate-50">
+    <div className="flex flex-col bg-slate-50" data-layout-root>
       <header className="flex-none h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30">
         <div className="flex items-center gap-3">
           {showBackButton && (
