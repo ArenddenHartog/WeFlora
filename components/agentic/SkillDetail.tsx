@@ -5,6 +5,7 @@ import { agentProfilesContract } from '../../src/agentic/registry/agents.ts';
 const SkillDetail: React.FC = () => {
   const { agentId } = useParams();
   const profile = agentProfilesContract.find((item) => item.id === agentId);
+  const [copied, setCopied] = useState(false);
 
   if (!profile) {
     return (
@@ -17,7 +18,6 @@ const SkillDetail: React.FC = () => {
     );
   }
 
-  const [copied, setCopied] = useState(false);
   const payloadSchemaText = JSON.stringify(profile.output.payload_schema, null, 2);
   const handleCopySchema = async () => {
     try {
