@@ -158,7 +158,7 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
                         onBack={sessionOpenOrigin === 'sessions' ? () => {
                             setSessionOpenOrigin(null);
                             setActiveThreadId(null);
-                            navigate('/sessions');
+                            navigate('/research-history');
                         } : undefined}
                     />
                     {isCreateWorksheetOpen && (

@@ -3,10 +3,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { User, PinnedProject, RecentItem, ViewMode, Workspace, Thread } from '../types';
 import {
-  PlusIcon, FolderIcon, HomeIcon, XIcon, CheckIcon, 
-  SettingsIcon, UsersIcon, LogOutIcon, ChevronUpIcon,
-  DatabaseIcon, TableIcon, ChatBubbleIcon, SidebarCloseIcon, LogoIcon, FileTextIcon, HistoryIcon, MessageSquareIcon,
-    SparklesIcon, UserPlusIcon, FlowerIcon, BookIcon
+    PlusIcon, FolderIcon, HomeIcon, XIcon, CheckIcon, 
+    SettingsIcon, UsersIcon, LogOutIcon, ChevronUpIcon,
+    DatabaseIcon, TableIcon, SidebarCloseIcon, LogoIcon, FileTextIcon, HistoryIcon,
+        SparklesIcon, UserPlusIcon, BookIcon
 } from './icons';
 import BaseModal from './BaseModal';
 import { useData } from '../contexts/DataContext';
@@ -42,7 +42,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     
     const { activeThreadId, setActiveThreadId } = useChat();
     const { signOut } = useAuth();
-    const { showNotification, sessionOpenOrigin, setSessionOpenOrigin } = useUI();
+    const { showNotification } = useUI();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -105,13 +105,9 @@ const Sidebar: React.FC<SidebarProps> = ({
       // Normalize project domain routes so sidebar selection reflects the active domain.
       // - /projects (hub) and /project/:id/* (workspace) both count as "Projects"
       if (path === '/projects') return location.pathname.startsWith('/projects') || location.pathname.startsWith('/project/');
-      if (path === '/planning') return location.pathname.startsWith('/planning') || location.pathname.endsWith('/planning');
-      // Keep "Sessions" active while viewing a session opened from /sessions (even though the detail UI lives on /).
-      if (path === '/sessions') return location.pathname.startsWith('/sessions') || (sessionOpenOrigin === 'sessions' && Boolean(activeThreadId) && location.pathname === '/');
+      if (path === '/sessions') return location.pathname.startsWith('/sessions');
       return location.pathname.startsWith(path);
   }
-
-  const isSessionsThread = sessionOpenOrigin === "sessions" && !!activeThreadId;
 
   const NavItem = ({ 
       icon: Icon, 
@@ -192,42 +188,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                   path="/"
                   onClick={() => { 
                       setActiveThreadId(null);
-                      setSessionOpenOrigin(null);
                       navigate('/'); 
                       if(window.innerWidth < 768) onClose(); 
                   }} 
-                  activeOverride={!isSessionsThread && isActive('/')}
-               />
-               <NavItem 
-                  icon={FlowerIcon} 
-                  label="Planning" 
-                  path="/planning"
-                  onClick={() => { navigate('/planning'); if(window.innerWidth < 768) onClose(); }} 
-               />
-                    <NavItem 
-                        icon={SparklesIcon} 
-                        label="Planner Pack" 
-                        path="/planner-pack"
-                        onClick={() => { navigate('/planner-pack'); if(window.innerWidth < 768) onClose(); }} 
-                    />
-                    <NavItem 
-                        icon={BookIcon} 
-                        label="Skills" 
-                        path="/skills"
-                        onClick={() => { navigate('/skills'); if(window.innerWidth < 768) onClose(); }} 
-                    />
-                    <NavItem 
-                        icon={HistoryIcon} 
-                        label="Runs" 
-                        path="/runs"
-                        onClick={() => { navigate('/runs'); if(window.innerWidth < 768) onClose(); }} 
-                    />
-               <NavItem 
-                  icon={MessageSquareIcon} 
-                  label="Sessions" 
-                  path="/sessions"
-                  onClick={() => { navigate('/sessions'); if(window.innerWidth < 768) onClose(); }} 
-                  activeOverride={isSessionsThread || isActive('/sessions')}
                />
                <NavItem 
                   icon={FolderIcon} 
@@ -235,6 +198,24 @@ const Sidebar: React.FC<SidebarProps> = ({
                   path="/projects"
                   onClick={() => { navigate('/projects'); if(window.innerWidth < 768) onClose(); }} 
                />
+            <NavItem 
+                icon={BookIcon} 
+                label="Skills" 
+                path="/skills"
+                onClick={() => { navigate('/skills'); if(window.innerWidth < 768) onClose(); }} 
+            />
+            <NavItem 
+                icon={SparklesIcon} 
+                label="Flows" 
+                path="/flows"
+                onClick={() => { navigate('/flows'); if(window.innerWidth < 768) onClose(); }} 
+            />
+            <NavItem 
+                icon={HistoryIcon} 
+                label="Sessions" 
+                path="/sessions"
+                onClick={() => { navigate('/sessions'); if(window.innerWidth < 768) onClose(); }} 
+            />
                <NavItem 
                   icon={TableIcon} 
                   label="Worksheets" 
@@ -252,12 +233,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                     label="Files" 
                     path="/files"
                     onClick={() => { navigate('/files'); if(window.innerWidth < 768) onClose(); }} 
-               />
-               <NavItem 
-                    icon={ChatBubbleIcon} 
-                    label="Prompts" 
-                    path="/prompts"
-                    onClick={() => { navigate('/prompts'); if(window.innerWidth < 768) onClose(); }} 
                />
           </nav>
           

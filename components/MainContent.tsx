@@ -18,6 +18,8 @@ import { agenticRoutePaths } from '../src/agentic/routes';
 import SkillsIndex from './agentic/SkillsIndex';
 import SkillDetail from './agentic/SkillDetail';
 import RunsIndex from './agentic/RunsIndex';
+import FlowsIndex from './agentic/FlowsIndex';
+import FlowDetail from './agentic/FlowDetail';
 import RunDetail from './agentic/RunDetail';
 import GlobalLayout from './GlobalLayout';
 import BaseModal from './BaseModal';
@@ -635,7 +637,7 @@ const MainContent: React.FC<MainContentProps> = ({
                 <Route element={<GlobalLayout />}>
                     <Route path="/" element={<GlobalWorkspace view="home" {...sharedProps} />} />
                     <Route path="/projects" element={<GlobalWorkspace view="projects" {...sharedProps} />} />
-                    <Route path="/sessions" element={<GlobalWorkspace view="research_history" {...sharedProps} />} />
+                    <Route path="/research-history" element={<GlobalWorkspace view="research_history" {...sharedProps} />} />
                     <Route path="/chat" element={<GlobalWorkspace view="chat" {...sharedProps} />} />
                     {planningRoutePaths.planning.map((path) => (
                       <Route key={path} path={path} element={<PlanningRoute />} />
@@ -650,7 +652,14 @@ const MainContent: React.FC<MainContentProps> = ({
                                                 element={path.includes(':agentId') ? <SkillDetail /> : <SkillsIndex />}
                                             />
                                         ))}
-                                        {agenticRoutePaths.runs.map((path) => (
+                                        {agenticRoutePaths.flows.map((path) => (
+                                            <Route
+                                                key={path}
+                                                path={path}
+                                                element={path.includes(':flowId') ? <FlowDetail /> : <FlowsIndex />}
+                                            />
+                                        ))}
+                                        {agenticRoutePaths.sessions.map((path) => (
                                             <Route
                                                 key={path}
                                                 path={path}

@@ -707,14 +707,13 @@ const PlannerPackDetail: React.FC = () => {
               <SourcesPanel sources={sources} isUploading={isUploading} onUpload={handleUpload} />
             </aside>
 
-            <section className="col-span-12 xl:col-span-6 min-h-0 overflow-y-auto pr-1">
+            <section className="col-span-12 xl:col-span-6 min-h-0 pr-1">
               <LivingRecordPanel
                 artifacts={artifacts}
                 assumptions={assumptions}
                 recordStatus={recordStatus}
                 confidenceLabel={confidenceLabel}
                 lastUpdatedLabel={lastUpdatedLabel}
-                onExport={handleExport}
               />
             </section>
 

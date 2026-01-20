@@ -136,7 +136,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                         <button 
                             onClick={onBack}
                             className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium -ml-1 pr-3 border-r border-slate-200 h-6 mr-1"
-                            title="Back to Sessions"
+                            title="Back to Research"
                         >
                             <ChevronRightIcon className="h-4 w-4 rotate-180" />
                             <span className="hidden sm:inline">Back</span>

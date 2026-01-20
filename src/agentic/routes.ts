@@ -1,4 +1,5 @@
 export const agenticRoutePaths = {
   skills: ['/skills', '/skills/:agentId'],
-  runs: ['/runs', '/runs/:runId']
+  flows: ['/flows', '/flows/:flowId'],
+  sessions: ['/sessions', '/sessions/:runId']
 };

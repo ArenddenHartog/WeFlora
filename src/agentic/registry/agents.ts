@@ -19,6 +19,7 @@ import type {
   OutputMode,
   OutputSpec
 } from '../../decision-program/contracts/types.ts';
+import { agentOutputFixtureMap } from '../fixtures/agentOutputs/index.ts';
 
 // ---------------------------
 // Shared JSON Schema fragments
@@ -750,6 +751,122 @@ const toContractOutput = (profile: AgentProfileLegacy): OutputSpec => {
   };
 };
 
+const toConfidenceLevel = (value?: string): 'low' | 'medium' | 'high' => {
+  switch (value) {
+    case 'high':
+      return 'high';
+    case 'medium':
+      return 'medium';
+    default:
+      return 'low';
+  }
+};
+
+const toAssumptionBasis = (value?: string) => {
+  switch (value) {
+    case 'user_input':
+      return 'planner_provided' as const;
+    case 'proxy':
+      return 'proxy' as const;
+    case 'heuristic':
+      return 'heuristic' as const;
+    default:
+      return 'unknown' as const;
+  }
+};
+
+const toEvidenceKind = (value?: string) => {
+  switch (value) {
+    case 'authoritative':
+      return 'policy' as const;
+    case 'external_tool':
+      return 'dataset' as const;
+    case 'user_provided':
+      return 'file' as const;
+    default:
+      return 'note' as const;
+  }
+};
+
+const toFixtureSet = (profile: AgentProfileLegacy) => {
+  const fixture = agentOutputFixtureMap[profile.agent_id];
+  if (!fixture?.samples?.length) return undefined;
+
+  const findSample = (mode: string) => fixture.samples.find((sample: any) => sample.output?.mode === mode);
+  const okSample = findSample('ok') ?? fixture.samples[0];
+  const insufficientSample = findSample('insufficient_data');
+  const rejectedSample = findSample('rejected');
+
+  const toOutputEnvelope = (sample?: any) => {
+    if (!sample?.output) return undefined;
+    const output = sample.output;
+    const payload = output.payload ?? {};
+    const summary = payload.summary ?? payload.rationale ?? 'No summary available.';
+    const evidence = (output.evidence ?? []).map((item: any, index: number) => {
+      const firstCitation = item.citations?.[0];
+      return {
+        id: `${sample.id}-evidence-${index}`,
+        kind: toEvidenceKind(item.kind),
+        title: item.claim ?? 'Evidence item',
+        uri: firstCitation?.vault_ref?.ref,
+        excerpt: firstCitation?.excerpt,
+        created_at: sample.created_at
+      };
+    });
+    const assumptions = (output.assumptions ?? []).map((item: any) => ({
+      id: item.id,
+      claim: item.claim,
+      basis: toAssumptionBasis(item.basis),
+      confidence: toConfidenceLevel(item.confidence?.level),
+      how_to_validate: item.how_to_validate,
+      owner: item.owner === 'user' ? 'user' : item.owner === 'shared' ? 'external' : 'weflora'
+    }));
+
+    return {
+      mode: output.mode as OutputMode,
+      confidence: toConfidenceLevel(output.confidence?.level),
+      summary,
+      payload,
+      evidence,
+      assumptions,
+      writes: [],
+      missing: output.insufficient_data?.missing?.map((field: string) => ({
+        field,
+        reason: 'Required input missing',
+        expected: output.insufficient_data?.recommended_next?.[0]
+      }))
+    };
+  };
+
+  return {
+    minimal_ok_input: okSample?.inputs ?? {},
+    example_outputs: {
+      ok: toOutputEnvelope(okSample) ?? {
+        mode: 'ok' as OutputMode,
+        confidence: 'low',
+        summary: 'No example available.',
+        payload: {},
+        evidence: [],
+        assumptions: [],
+        writes: []
+      },
+      insufficient_data:
+        toOutputEnvelope(insufficientSample) ??
+        {
+          mode: 'insufficient_data' as OutputMode,
+          confidence: 'low',
+          summary: 'Missing required inputs.',
+          payload: {},
+          evidence: [],
+          assumptions: [],
+          writes: [],
+          missing: []
+        },
+      rejected: toOutputEnvelope(rejectedSample)
+    }
+  };
+};
+
 const toContractProfile = (profile: AgentProfileLegacy): AgentProfileContract => ({
   id: profile.agent_id,
   title: profile.name,
@@ -770,7 +887,8 @@ const toContractProfile = (profile: AgentProfileLegacy): AgentProfileContract =>
       label: input.label
     })
   ),
-  output: toContractOutput(profile)
+  output: toContractOutput(profile),
+  fixtures: toFixtureSet(profile)
 });
 
 export const agentProfilesContract: AgentProfileContract[] = AGENTS_V1.map(toContractProfile);

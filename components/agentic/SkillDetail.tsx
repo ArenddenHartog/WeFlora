@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { agentProfilesContract } from '../../src/agentic/registry/agents.ts';
 
@@ -17,6 +17,18 @@ const SkillDetail: React.FC = () => {
     );
   }
 
+  const [copied, setCopied] = useState(false);
+  const payloadSchemaText = JSON.stringify(profile.output.payload_schema, null, 2);
+  const handleCopySchema = async () => {
+    try {
+      await navigator.clipboard.writeText(payloadSchemaText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  };
+
   return (
     <div className="min-h-screen px-8 py-6">
       <div className="mb-6">
@@ -24,18 +36,12 @@ const SkillDetail: React.FC = () => {
           ← Back to Skills
         </Link>
         <h1 className="mt-3 text-2xl font-semibold text-slate-900">{profile.title}</h1>
-        <p className="text-sm text-slate-500">{profile.description}</p>
       </div>
 
       <div className="border-t border-slate-200 divide-y divide-slate-200">
         <section className="py-6">
-          <h3 className="text-sm font-semibold text-slate-700">Profile</h3>
-          <div className="mt-3 grid gap-2 text-sm text-slate-600">
-            <div><span className="font-semibold">Agent ID:</span> {profile.id}</div>
-            <div><span className="font-semibold">Category:</span> {profile.category}</div>
-            <div><span className="font-semibold">Spec version:</span> {profile.spec_version}</div>
-            <div><span className="font-semibold">Schema version:</span> {profile.schema_version}</div>
-          </div>
+          <h3 className="text-sm font-semibold text-slate-700">Purpose</h3>
+          <p className="mt-2 text-sm text-slate-600">{profile.description}</p>
         </section>
 
         <section className="py-6">
@@ -52,10 +58,9 @@ const SkillDetail: React.FC = () => {
                   </div>
                   {input.description ? <p className="mt-1 text-xs text-slate-500">{input.description}</p> : null}
                   <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
+                    <span>Type: {Array.isArray(input.schema.type) ? input.schema.type.join(', ') : input.schema.type}</span>
                     <span>Source: {input.source}</span>
                     {input.pointer ? <span>Pointer: {input.pointer}</span> : null}
-                    {input.schema.type ? <span>Type: {Array.isArray(input.schema.type) ? input.schema.type.join(', ') : input.schema.type}</span> : null}
-                    {input.ui?.control ? <span>Control: {input.ui.control}</span> : null}
                   </div>
                 </div>
               ))
@@ -64,42 +69,40 @@ const SkillDetail: React.FC = () => {
         </section>
 
         <section className="py-6">
-          <h3 className="text-sm font-semibold text-slate-700">Output Modes</h3>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {profile.output.modes.map((mode) => (
-              <span key={mode} className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">
-                {mode}
-              </span>
-            ))}
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-700">Output schema</h3>
+            <button
+              type="button"
+              onClick={handleCopySchema}
+              className="text-xs text-weflora-teal hover:text-weflora-dark"
+            >
+              {copied ? 'Copied' : 'Copy JSON'}
+            </button>
           </div>
-        </section>
-
-        <section className="py-6">
-          <h3 className="text-sm font-semibold text-slate-700">Output Schema (payload)</h3>
           <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-50 p-4 text-xs text-slate-600">
-            {JSON.stringify(profile.output.payload_schema, null, 2)}
+            {payloadSchemaText}
           </pre>
         </section>
 
         <section className="py-6">
-          <h3 className="text-sm font-semibold text-slate-700">Fixtures</h3>
+          <h3 className="text-sm font-semibold text-slate-700">Output examples</h3>
           {profile.fixtures ? (
             <div className="mt-3 space-y-4 text-xs text-slate-600">
-              <div>
-                <p className="font-semibold text-slate-700">Minimal OK Input</p>
-                <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-slate-50 p-4">
-                  {JSON.stringify(profile.fixtures.minimal_ok_input, null, 2)}
-                </pre>
-              </div>
-              <div>
-                <p className="font-semibold text-slate-700">Example Outputs</p>
-                <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-slate-50 p-4">
-                  {JSON.stringify(profile.fixtures.example_outputs, null, 2)}
-                </pre>
-              </div>
+              {(['ok', 'insufficient_data', 'rejected'] as const).map((mode) => {
+                const example = profile.fixtures?.example_outputs?.[mode];
+                if (!example) return null;
+                return (
+                  <div key={mode}>
+                    <p className="font-semibold text-slate-700">{mode}</p>
+                    <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-slate-50 p-4">
+                      {JSON.stringify(example, null, 2)}
+                    </pre>
+                  </div>
+                );
+              })}
             </div>
           ) : (
-            <p className="mt-2 text-sm text-slate-500">No fixtures declared yet.</p>
+            <p className="mt-2 text-sm text-slate-500">No examples available.</p>
           )}
         </section>
       </div>
