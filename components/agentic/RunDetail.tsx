@@ -17,7 +17,7 @@ const RunDetail: React.FC = () => {
 
   if (!run) {
     return (
-      <div className="h-full min-h-0 overflow-y-auto px-8 py-6">
+      <div className="min-h-screen px-8 py-6">
         <p className="text-sm text-slate-500">Run not found.</p>
         <Link to="/runs" className="mt-4 inline-block text-sm text-weflora-teal underline">
           Back to Runs
@@ -27,17 +27,15 @@ const RunDetail: React.FC = () => {
   }
 
   return (
-    <div className="h-full min-h-0 overflow-hidden px-8 py-6 flex flex-col">
-      <div className="mb-6">
+    <div className="min-h-screen px-8 py-6 space-y-6">
+      <div>
         <Link to="/runs" className="text-xs text-slate-500 hover:text-slate-700">
           ← Back to Runs
         </Link>
         <h1 className="mt-3 text-2xl font-semibold text-slate-900">{run.title}</h1>
         <p className="text-sm text-slate-500">Scope: {run.scopeId}</p>
       </div>
-      <div className="flex-1 min-h-0">
-        <RunTimeline steps={run.steps} artifacts={run.artifacts} agentNameById={agentNameById} />
-      </div>
+      <RunTimeline steps={run.steps} artifacts={run.artifacts} agentNameById={agentNameById} />
     </div>
   );
 };

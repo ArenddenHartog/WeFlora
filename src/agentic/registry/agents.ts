@@ -10,7 +10,15 @@
 //
 // If your type name/path differs, adjust the import accordingly.
 
-import type { AgentProfile } from '../contracts/zod.ts';
+import type { AgentProfile as AgentProfileLegacy } from '../contracts/zod.ts';
+import type {
+  AgentCategory,
+  AgentProfile as AgentProfileContract,
+  InputFieldSpec,
+  JsonSchema,
+  OutputMode,
+  OutputSpec
+} from '../../decision-program/contracts/types.ts';
 
 // ---------------------------
 // Shared JSON Schema fragments
@@ -184,7 +192,7 @@ const JsonConstraintsPayload = () => ({
 // ---------------------------
 // Agent Profiles 1–15
 // ---------------------------
-export const AGENTS_V1: AgentProfile[] = [
+export const AGENTS_V1: AgentProfileLegacy[] = [
   // 1) Compliance (Policy-grounded)
   {
     agent_id: 'compliance.policy_grounded',
@@ -646,9 +654,128 @@ export const AGENTS_V1: AgentProfile[] = [
   }
 ];
 
-export const agentProfiles: AgentProfile[] = AGENTS_V1;
+export const agentProfiles: AgentProfileLegacy[] = AGENTS_V1;
+
+const labelFromKey = (key: string) =>
+  key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^\w/, (char) => char.toUpperCase());
+
+const controlForType = (type: string) => {
+  switch (type) {
+    case 'select':
+      return 'select' as const;
+    case 'boolean':
+      return 'checkbox' as const;
+    case 'number':
+      return 'number' as const;
+    case 'object':
+      return 'json' as const;
+    case 'string':
+    default:
+      return 'text' as const;
+  }
+};
+
+const schemaForInput = (input: { type: string; options?: string[] }): JsonSchema => {
+  const baseType = input.type === 'select' ? 'string' : input.type;
+  const schema: JsonSchema = { type: baseType };
+  if (input.options?.length) {
+    schema.enum = input.options;
+  }
+  return schema;
+};
+
+const toInputSpec = (input: {
+  key: string;
+  type: string;
+  required: boolean;
+  description?: string;
+  options?: string[];
+  label?: string;
+}): InputFieldSpec => {
+  const options = input.options?.map((value) => ({ label: value, value }));
+  return {
+    key: input.key,
+    label: input.label ?? labelFromKey(input.key),
+    description: input.description,
+    required: Boolean(input.required),
+    source: 'value',
+    schema: schemaForInput(input),
+    ui: {
+      control: controlForType(input.type),
+      options
+    }
+  };
+};
+
+const renderAsForPayload = (payloadSchema: JsonSchema): OutputSpec['ui'] => {
+  const keys = Object.keys(payloadSchema.properties ?? {});
+  if (keys.includes('badge')) return { render_as: 'badge' };
+  if (keys.includes('score')) return { render_as: 'score' };
+  if (keys.includes('amount')) return { render_as: 'currency' };
+  if (keys.includes('text')) return { render_as: 'text' };
+  if (keys.includes('value')) return { render_as: 'enum' };
+  return { render_as: 'json' };
+};
+
+const toContractCategory = (category: AgentProfileLegacy['category']): AgentCategory => {
+  switch (category) {
+    case 'carbon':
+      return 'operations';
+    case 'procurement':
+      return 'operations';
+    case 'enrichment':
+      return 'biodiversity';
+    case 'document':
+      return 'documentation';
+    case 'geospatial':
+      return 'site';
+    default:
+      return category;
+  }
+};
+
+const toContractOutput = (profile: AgentProfileLegacy): OutputSpec => {
+  const payloadSchema =
+    (profile.output_schema as { properties?: Record<string, JsonSchema> })?.properties?.payload ??
+    (profile.output_schema as JsonSchema);
+  return {
+    payload_schema: payloadSchema,
+    modes: profile.output_modes as OutputMode[],
+    ui: renderAsForPayload(payloadSchema)
+  };
+};
+
+const toContractProfile = (profile: AgentProfileLegacy): AgentProfileContract => ({
+  id: profile.agent_id,
+  title: profile.name,
+  description: profile.description,
+  category: toContractCategory(profile.category),
+  tags: profile.tags ?? [],
+  spec_version: profile.spec_version as AgentProfileContract['spec_version'],
+  schema_version: profile.schema_version as AgentProfileContract['schema_version'],
+  reads: [],
+  writes: [],
+  inputs: profile.inputs.map((input: any) =>
+    toInputSpec({
+      key: input.key,
+      type: input.type,
+      required: input.required,
+      description: input.description,
+      options: input.options,
+      label: input.label
+    })
+  ),
+  output: toContractOutput(profile)
+});
+
+export const agentProfilesContract: AgentProfileContract[] = AGENTS_V1.map(toContractProfile);
 
 // Optional: convenient map
-export const AGENTS_BY_ID_V1: Record<string, AgentProfile> = Object.fromEntries(
+export const AGENTS_BY_ID_V1: Record<string, AgentProfileLegacy> = Object.fromEntries(
   AGENTS_V1.map((a) => [a.agent_id, a])
 );
