@@ -47,7 +47,7 @@ const RunDetail: React.FC = () => {
   }
 
   return (
-    <div className="bg-white px-4 py-6 md:px-8">
+    <div className="bg-white px-4 py-6 md:px-8" data-layout-root>
       <div className="mb-8 flex flex-wrap items-start justify-between gap-6">
         <div className="flex items-start gap-4">
           <div className="h-10 w-10 rounded-xl bg-weflora-mint/15 text-weflora-teal flex items-center justify-center">
