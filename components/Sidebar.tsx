@@ -205,12 +205,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => { navigate('/skills'); if(window.innerWidth < 768) onClose(); }} 
             />
             <NavItem 
-                icon={SparklesIcon} 
-                label="Flows" 
-                path="/flows"
-                onClick={() => { navigate('/flows'); if(window.innerWidth < 768) onClose(); }} 
-            />
-            <NavItem 
                 icon={HistoryIcon} 
                 label="Sessions" 
                 path="/sessions"

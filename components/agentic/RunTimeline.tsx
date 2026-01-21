@@ -1,90 +1,102 @@
 import React, { useMemo } from 'react';
-import type { EventRecord } from '../../src/decision-program/contracts/types.ts';
+import type { EventRecord, StepCompletedEvent, StepStartedEvent } from '../../src/agentic/contracts/ledger';
+import type { VaultPointer } from '../../src/agentic/contracts/vault';
 
 interface RunTimelineProps {
   events: EventRecord[];
-  agentNameById: Record<string, string>;
 }
 
 const statusClasses: Record<string, string> = {
-  ok: 'text-emerald-700',
-  insufficient_data: 'text-amber-700',
-  rejected: 'text-rose-700',
-  error: 'text-rose-700',
-  running: 'text-slate-700'
+  ok: 'bg-weflora-mint/20 text-weflora-teal border border-weflora-mint/40',
+  insufficient_data: 'bg-amber-50 text-amber-700 border border-amber-200',
+  partial: 'bg-amber-50 text-amber-700 border border-amber-200',
+  rejected: 'bg-rose-50 text-rose-700 border border-rose-200',
+  error: 'bg-rose-50 text-rose-700 border border-rose-200',
+  running: 'bg-slate-50 text-slate-700 border border-slate-200'
 };
 
-const formatPointerValue = (value: unknown) => {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  if (value === null || value === undefined) return 'null';
-  return JSON.stringify(value);
-};
+const sortEvents = (events: EventRecord[]) => [...events].sort((a, b) => a.seq - b.seq);
 
-const toPointerEntries = (prefix: string, obj: Record<string, unknown>) =>
-  Object.entries(obj).map(([key, value]) => ({ pointer: `${prefix}/${key}`, value }));
+const asStepStarted = (event: EventRecord): event is StepStartedEvent => event.type === 'step.started';
+const asStepCompleted = (event: EventRecord): event is StepCompletedEvent => event.type === 'step.completed';
 
-const sortEvents = (events: EventRecord[]) =>
-  [...events].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
-const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, agentNameById }) => {
+const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events }) => {
   const orderedEvents = useMemo(() => sortEvents(events), [events]);
+  const stepStartById = useMemo(() => {
+    return orderedEvents.reduce<Record<string, StepStartedEvent>>((acc, event) => {
+      if (asStepStarted(event)) {
+        acc[event.payload.step_id] = event;
+      }
+      return acc;
+    }, {});
+  }, [orderedEvents]);
 
   return (
     <div className="relative">
       <div className="absolute left-2 top-0 h-full w-px bg-slate-200" />
       <div className="space-y-10 pl-8">
       {orderedEvents.map((event) => {
-        const agentLabel = event.agent_id ? agentNameById[event.agent_id] ?? event.agent_id : 'System';
-        const status = event.kind === 'step.output' ? event.data.output?.mode ?? 'ok' : 'ok';
-        const evidence = event.kind === 'step.output' ? event.data.output?.evidence ?? [] : [];
-        const assumptions = event.kind === 'step.output' ? event.data.output?.assumptions ?? [] : [];
-        const payload = event.kind === 'step.output' ? (event.data.output?.payload as Record<string, unknown> | undefined) : undefined;
-        const summary = event.kind === 'step.output'
-          ? (payload?.summary as string | undefined) ?? 'No summary available.'
-          : event.kind === 'step.input_snapshot'
-            ? 'Inputs captured for this step.'
-            : event.kind === 'artifact.created'
-              ? 'Artifact recorded.'
-              : 'Event recorded.';
-        const rationale = event.kind === 'step.output' ? (payload?.rationale as string | undefined) ?? '' : '';
-        const inputs = event.kind === 'step.input_snapshot' ? (event.data.inputs as Record<string, unknown>) : {};
-        const outputPointers = event.kind === 'step.output' ? toPointerEntries('/outputs', payload ?? {}) : [];
-        const inputPointers = event.kind === 'step.input_snapshot' ? toPointerEntries('/inputs', inputs) : [];
-        const artifactPayload = event.kind === 'artifact.created' ? event.data.artifact : null;
+        const status = asStepCompleted(event)
+          ? event.payload.status
+          : event.type === 'run.completed'
+            ? event.payload.status
+            : event.type === 'run.started'
+              ? 'running'
+              : 'ok';
+        const stepTitle = asStepCompleted(event)
+          ? stepStartById[event.payload.step_id]?.payload.title ?? event.payload.agent_id
+          : asStepStarted(event)
+            ? event.payload.title ?? event.payload.agent_id
+            : event.type === 'run.started'
+              ? event.payload.title
+              : event.type.replace('.', ' ');
+
+        const stepInputs: Record<string, VaultPointer> = asStepCompleted(event)
+          ? stepStartById[event.payload.step_id]?.payload.inputs ?? {}
+          : {};
+        const mutations = asStepCompleted(event) ? event.payload.mutations : [];
+        const evidence = asStepCompleted(event) ? event.payload.evidence ?? [] : [];
+        const assumptions = asStepCompleted(event) ? event.payload.assumptions ?? [] : [];
+        const actions = asStepCompleted(event) ? event.payload.actions ?? [] : [];
+        const outputs = asStepCompleted(event) && event.payload.output
+          ? [{ path: '/outputs/agent_output', pointer: event.payload.output.pointer }]
+          : [];
 
         return (
-          <article key={event.id} className="relative pb-10">
+          <article key={event.event_id} className="relative pb-10">
             <div className="absolute left-[-28px] top-2 h-3 w-3 rounded-full border border-weflora-teal bg-white" />
 
             <header className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs text-slate-400">{new Date(event.created_at).toLocaleString()}</p>
-                <p className="mt-2 text-base font-semibold text-slate-900">{agentLabel}</p>
+                <p className="text-xs text-slate-500">{new Date(event.at).toLocaleString()}</p>
+                <p className="mt-2 text-base font-semibold text-slate-900">{stepTitle}</p>
               </div>
-              <span
-                className={`inline-flex items-center rounded-full border border-slate-200 px-2 py-0.5 text-xs ${
-                  statusClasses[String(status)] ?? 'text-slate-600'
-                }`}
-              >
+              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${statusClasses[String(status)] ?? 'bg-slate-50 text-slate-700 border border-slate-200'}`}>
                 {String(status)}
               </span>
             </header>
 
             <div className="mt-5 space-y-5">
               <section>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">What happened</p>
-                <p className="mt-2 text-sm text-slate-900">{summary}</p>
-                {rationale ? <p className="mt-2 text-sm text-slate-600">{rationale}</p> : null}
+                <p className="text-xs text-slate-500">What happened</p>
+                <p className="mt-2 text-sm text-slate-700">
+                  {asStepCompleted(event)
+                    ? event.payload.summary
+                    : event.type === 'run.started'
+                      ? 'Run started with the selected inputs.'
+                      : event.type === 'run.completed'
+                        ? event.payload.summary ?? 'Run completed.'
+                        : 'Event recorded.'}
+                </p>
               </section>
 
-              {event.kind === 'step.output' && event.data.output?.mode === 'insufficient_data' && event.data.output?.insufficient_data ? (
+              {asStepCompleted(event) && event.payload.status === 'insufficient_data' && event.payload.insufficient_data ? (
                 <section className="space-y-3">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Missing inputs</p>
+                  <p className="text-xs text-slate-500">Missing inputs</p>
                   <div>
                     <ul className="mt-2 list-disc pl-5 text-sm text-slate-700">
-                      {event.data.output.insufficient_data.missing.map((item) => (
-                        <li key={item}>{item}</li>
+                      {event.payload.insufficient_data.missing.map((item) => (
+                        <li key={item.path}>{item.label}</li>
                       ))}
                     </ul>
                   </div>
@@ -92,10 +104,10 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, agentNameByI
                     <p className="mt-2 text-sm text-slate-600">These inputs are required to complete this step.</p>
                   </div>
                   <div>
-                    {event.data.output.insufficient_data.recommended_next?.length ? (
+                    {event.payload.insufficient_data.recommended_next?.length ? (
                       <ul className="mt-2 list-disc pl-5 text-sm text-slate-700">
-                        {event.data.output.insufficient_data.recommended_next.map((item) => (
-                          <li key={item}>{item}</li>
+                        {event.payload.insufficient_data.recommended_next.map((item) => (
+                          <li key={item.label}>{item.label}</li>
                         ))}
                       </ul>
                     ) : (
@@ -112,14 +124,14 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, agentNameByI
               ) : null}
 
               <section>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Inputs</p>
-                {inputPointers.length === 0 ? (
+                <p className="text-xs text-slate-500">Inputs</p>
+                {Object.keys(stepInputs).length === 0 ? (
                   <p className="mt-2 text-sm text-slate-500">No inputs captured for this step.</p>
                 ) : (
                   <ul className="mt-2 space-y-1 text-xs text-slate-700">
-                    {inputPointers.map((item) => (
-                      <li key={item.pointer} className="font-mono">
-                        {item.pointer} = {formatPointerValue(item.value)}
+                    {Object.entries(stepInputs).map(([path, pointer]) => (
+                      <li key={path} className="font-mono">
+                        {path} → {pointer.label ?? pointer.ref.vault_id}
                       </li>
                     ))}
                   </ul>
@@ -127,14 +139,14 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, agentNameByI
               </section>
 
               <section>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Outputs</p>
-                {outputPointers.length === 0 ? (
+                <p className="text-xs text-slate-500">Outputs</p>
+                {outputs.length === 0 ? (
                   <p className="mt-2 text-sm text-slate-500">No outputs recorded for this step.</p>
                 ) : (
                   <ul className="mt-2 space-y-1 text-xs text-slate-700">
-                    {outputPointers.map((item) => (
-                      <li key={item.pointer} className="font-mono">
-                        {item.pointer} = {formatPointerValue(item.value)}
+                    {outputs.map((item) => (
+                      <li key={item.path} className="font-mono">
+                        {item.path} → {item.pointer.label ?? item.pointer.ref.vault_id}
                       </li>
                     ))}
                   </ul>
@@ -142,35 +154,30 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, agentNameByI
               </section>
 
               <section>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Evidence</p>
+                <p className="text-xs text-slate-500">Mutations</p>
+                {mutations.length === 0 ? (
+                  <p className="mt-2 text-sm text-slate-500">No pointer mutations recorded.</p>
+                ) : (
+                  <ul className="mt-2 space-y-1 text-xs text-slate-700">
+                    {mutations.map((item, index) => (
+                      <li key={`${item.path}-${index}`} className="font-mono">
+                        {item.op} {item.path}
+                        {item.value ? ` → ${item.value.label ?? item.value.ref.vault_id}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              <section>
+                <p className="text-xs text-slate-500">Evidence</p>
                 {evidence.length === 0 ? (
                   <p className="mt-2 text-sm text-slate-500">No evidence captured for this step.</p>
                 ) : (
                   <ul className="mt-3 space-y-2 text-sm text-slate-600">
                     {evidence.map((item, index) => (
-                      <li key={`${item.claim}-${index}`}>
-                        <p className="text-sm text-slate-800">{item.claim}</p>
-                        {item.citations?.length ? (
-                          <div className="mt-2 flex flex-col gap-1 text-xs text-slate-500">
-                            {item.citations.map((citation, idx) =>
-                              citation.vault_ref.kind === 'url' ? (
-                                <a
-                                  key={`${citation.label}-${idx}`}
-                                  href={citation.vault_ref.ref}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-weflora-teal hover:text-weflora-dark underline"
-                                >
-                                  {citation.label}
-                                </a>
-                              ) : (
-                                <span key={`${citation.label}-${idx}`} className="text-slate-500">
-                                  {citation.label}
-                                </span>
-                              )
-                            )}
-                          </div>
-                        ) : null}
+                      <li key={`${item.label}-${index}`} className="text-sm text-slate-700">
+                        {item.label}
                       </li>
                     ))}
                   </ul>
@@ -178,15 +185,17 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, agentNameByI
               </section>
 
               <section>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Assumptions</p>
+                <p className="text-xs text-slate-500">Assumptions</p>
                 {assumptions.length === 0 ? (
                   <p className="mt-2 text-sm text-slate-500">No assumptions recorded.</p>
                 ) : (
                   <div className="mt-3 space-y-2 text-sm text-slate-600">
                     {assumptions.map((assumption) => (
-                      <div key={assumption.id}>
-                        <p className="text-sm text-slate-800">{assumption.claim}</p>
-                        <p className="text-xs text-slate-500 mt-1">Validate: {assumption.how_to_validate}</p>
+                      <div key={assumption.statement}>
+                        <p className="text-sm text-slate-800">{assumption.statement}</p>
+                        {assumption.validate_next ? (
+                          <p className="text-xs text-slate-500 mt-1">Validate: {assumption.validate_next}</p>
+                        ) : null}
                       </div>
                     ))}
                   </div>
@@ -194,13 +203,15 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, agentNameByI
               </section>
 
               <section>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Artifacts & actions</p>
-                {artifactPayload ? (
-                  <div className="mt-2 text-sm text-slate-600">
-                    {artifactPayload.title ?? artifactPayload.type}
-                  </div>
-                ) : (
+                <p className="text-xs text-slate-500">Artifacts & actions</p>
+                {actions.length === 0 ? (
                   <p className="mt-2 text-sm text-slate-500">No artifacts or actions emitted.</p>
+                ) : (
+                  <ul className="mt-2 space-y-2 text-sm text-slate-700">
+                    {actions.map((action) => (
+                      <li key={action.action_id}>{action.label}</li>
+                    ))}
+                  </ul>
                 )}
               </section>
             </div>

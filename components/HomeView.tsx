@@ -88,13 +88,13 @@ const HomeView: React.FC<HomeViewProps> = ({
                     <div className="w-full max-w-3xl flex flex-col items-center mb-12 relative z-10">
                         <div className="w-full max-w-2xl space-y-8">
                             <button
-                                onClick={() => navigate('/planning')}
+                                onClick={() => navigate('/sessions/new')}
                                 className="w-full bg-weflora-teal text-white rounded-2xl px-6 py-4 font-semibold text-sm shadow-md hover:bg-weflora-dark transition-colors relative flex items-center"
                             >
                                 <span className="absolute left-5 flex items-center text-white">
                                     <FlowerIcon className="h-5 w-5" />
                                 </span>
-                                <span className="w-full text-center">Start Automated Planning Flow</span>
+                                <span className="w-full text-center">Start Session</span>
                             </button>
                             <p className="text-lg text-slate-500 text-center">Or start a search or chat</p>
                             <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 p-1">

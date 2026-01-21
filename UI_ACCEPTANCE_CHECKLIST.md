@@ -4,51 +4,81 @@ Use this checklist for QA, PR review, and regression testing.
 
 ---
 
-## Page-Level Checks
-- Page background matches Worksheets
-- Only one scroll bar exists
-- No cards used as layout scaffolding
-- No tabs, previews, or accordions
-- No meta subtitles (phase/category/version)
+# UI Acceptance Checklist – WeFlora
+
+QA must tick **ALL** items before approval.
 
 ---
 
-## Navigation & IA
-- Planner Pack is not in left navigation
-- Flows exist as first-class concept
-- Runs list all executions
-- Clicking a Flow creates a Run
+## Layout & Scroll
+
+- [ ] Exactly one vertical scroll container
+- [ ] No nested `overflow-y-auto`
+- [ ] No `min-h-screen` in page components
+- [ ] Page uses PageShell → PageHeader → PageBody
 
 ---
 
-## Skills Pages
-- Skills list uses list/table layout
-- Skill detail scrolls correctly
-- Inputs show required vs optional
-- Output schema is visible and copyable
-- Output examples include insufficient_data
+## Typography
+
+- [ ] Page title uses correct H1 class
+- [ ] Subtitle uses correct style (or absent)
+- [ ] Section headers use correct H2 class
+- [ ] No decorative or redundant subtitles
+- [ ] Text hierarchy is clear without color hacks
 
 ---
 
-## Living Record / Runs
-- Timeline renders from EventRecords only
-- Events appear in chronological order
-- Each event shows:
-  - Timestamp
-  - Agent/action name
-  - Status
-  - Inputs used
-  - Outputs written
-  - Evidence
-  - Assumptions
-- No event content is hidden by default
-- Insufficient data events show missing inputs + next steps
+## Icons & Color
+
+- [ ] All icons are inside colored containers
+- [ ] Status badges use approved colors only
+- [ ] No raw/uncolored icons
+- [ ] No arbitrary colors introduced
 
 ---
 
-## Scroll & Layout
-- No nested scroll containers
-- No horizontal scroll except for code blocks
+## Living Ledger / Sessions
+
+- [ ] Timeline is vertical and chronological
+- [ ] No cards around steps
+- [ ] Each step shows:
+  - [ ] What happened
+  - [ ] Inputs
+  - [ ] Outputs
+  - [ ] Evidence
+  - [ ] Assumptions
+- [ ] Follow-up interaction only on insufficient_data
+- [ ] No conversational tone in factual steps
+
+---
+
+## Skills / Flows
+
+- [ ] Clear description of purpose
+- [ ] Clear list of inputs
+- [ ] Clear indication of outputs
+- [ ] Clear way to initiate/run
+- [ ] No dead-end pages
+
+---
+
+## General UX
+
+- [ ] Page explains itself without prior knowledge
+- [ ] No empty states without guidance
+- [ ] UI feels consistent with Worksheets typography
+- [ ] No unexplained visual differences between pages
+
+---
+
+## Final Gate
+
+- [ ] Feels like ONE system
+- [ ] Readable without scrolling confusion
+- [ ] Usable by a first-time user
+
+Approval requires **100% compliance**.
 - Map or large visuals do not create secondary scrollbars
 
 ---

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import type { 
     PinnedProject, Chat, ProjectFile, Matrix, Report, 
     ChatMessage, DiscoveredStructure, FloraGPTResponseEnvelope
@@ -21,6 +21,7 @@ import RunsIndex from './agentic/RunsIndex';
 import FlowsIndex from './agentic/FlowsIndex';
 import FlowDetail from './agentic/FlowDetail';
 import RunDetail from './agentic/RunDetail';
+import SessionWizardRoute from './sessions/SessionWizardRoute';
 import AppLayout from './AppLayout';
 import CanvasLayout from './CanvasLayout';
 import BaseModal from './BaseModal';
@@ -660,13 +661,23 @@ const MainContent: React.FC<MainContentProps> = ({
                                                 element={path.includes(':flowId') ? <FlowDetail /> : <FlowsIndex />}
                                             />
                                         ))}
-                                        {agenticRoutePaths.sessions.map((path) => (
-                                            <Route
-                                                key={path}
-                                                path={path}
-                                                element={path.includes(':runId') ? <RunDetail /> : <RunsIndex />}
-                                            />
-                                        ))}
+                                                                                <Route path="/sessions/new" element={<SessionWizardRoute />} />
+                                                                                {agenticRoutePaths.sessions
+                                                                                    .filter((path) => path !== '/sessions/new')
+                                                                                    .map((path) => (
+                                                                                        <Route
+                                                                                            key={path}
+                                                                                            path={path}
+                                                                                            element={path.includes(':runId') ? <RunDetail /> : <RunsIndex />}
+                                                                                        />
+                                                                                    ))}
+                                                                                {agenticRoutePaths.legacyRuns.map((path) => (
+                                                                                    <Route
+                                                                                        key={path}
+                                                                                        path={path}
+                                                                                        element={<LegacyRunRedirect />}
+                                                                                    />
+                                                                                ))}
                                         {plannerPackRoutePaths.list.map((path) => (
                                             <Route key={path} path={path} element={<PlannerPackRoute />} />
                                         ))}
@@ -903,6 +914,14 @@ const MainContent: React.FC<MainContentProps> = ({
             </BaseModal>
         </>
     );
+};
+
+const LegacyRunRedirect: React.FC = () => {
+    const { runId } = useParams();
+    if (runId) {
+        return <Navigate to={`/sessions/${runId}`} replace />;
+    }
+    return <Navigate to="/sessions" replace />;
 };
 
 export default MainContent;
