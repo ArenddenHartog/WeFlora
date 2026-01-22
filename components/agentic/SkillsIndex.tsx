@@ -16,7 +16,7 @@ const SkillsIndex: React.FC = () => {
   }, [search]);
 
   return (
-    <div className="h-full w-full overflow-y-auto bg-white p-4 md:p-8" data-layout-root>
+    <div className="w-full bg-white p-4 md:p-8" data-layout-root>
       <div className="flex flex-col gap-6">
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div className="flex items-start gap-4">

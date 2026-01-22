@@ -9,5 +9,5 @@ test('SkillsIndex uses worksheet-style container classes', () => {
   const html = renderToString(
     React.createElement(MemoryRouter, null, React.createElement(SkillsIndex))
   );
-  assert.ok(html.includes('h-full w-full overflow-y-auto bg-white p-4 md:p-8'));
+  assert.ok(html.includes('w-full bg-white p-4 md:p-8'));
 });
