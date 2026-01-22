@@ -1,7 +1,7 @@
 import React from 'react';
 import FilePicker from '../../FilePicker';
 import { FILE_VALIDATION, VaultObject, VaultLink } from '../../../services/fileService';
-import { FileSheetIcon, FilePdfIcon, FileCodeIcon, MapIcon } from '../../icons';
+import { FileSheetIcon, FilePdfIcon, FileCodeIcon } from '../../icons';
 
 export type VaultUploadItem = {
   vaultObject: VaultObject;
@@ -17,18 +17,6 @@ interface StepVaultProps {
   onToggleSaveToProject: (value: boolean) => void;
   onProjectChange: (value: string) => void;
   onUpload: (files: File[]) => void;
-  quickInputs: {
-    region: string;
-    municipality: string;
-    policyScope: string;
-  };
-  onQuickInputChange: (field: 'region' | 'municipality' | 'policyScope', value: string) => void;
-  geometry: {
-    mode: 'none' | 'corridor' | 'polygon';
-    corridorWidth: string;
-    polygonGeoJson: string;
-  };
-  onGeometryChange: (field: 'mode' | 'corridorWidth' | 'polygonGeoJson', value: string) => void;
 }
 
 const getFileIcon = (mimeType: string, filename: string) => {
@@ -45,19 +33,12 @@ const StepVault: React.FC<StepVaultProps> = ({
   projectOptions,
   onToggleSaveToProject,
   onProjectChange,
-  onUpload,
-  quickInputs,
-  onQuickInputChange,
-  geometry,
-  onGeometryChange
+  onUpload
 }) => {
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold text-slate-900">Upload inputs</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-500">
-          Upload species lists, site notes, policies, PDFs, spreadsheets — WeFlora will extract structure.
-        </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -79,7 +60,7 @@ const StepVault: React.FC<StepVaultProps> = ({
             onChange={(event) => onToggleSaveToProject(event.target.checked)}
             className="h-4 w-4 rounded border-slate-300 text-weflora-teal focus:ring-weflora-teal"
           />
-          Also add to a project
+          Also link to selected project
         </label>
         {saveToProject ? (
           <select
@@ -124,93 +105,6 @@ const StepVault: React.FC<StepVaultProps> = ({
             })}
           </div>
         )}
-      </div>
-
-      <div className="border-t border-slate-200 pt-6 space-y-4">
-        <h3 className="text-base font-semibold text-slate-900">Quick inputs</h3>
-        <div className="grid gap-4 md:grid-cols-3">
-          <input
-            type="text"
-            placeholder="Region"
-            value={quickInputs.region}
-            onChange={(event) => onQuickInputChange('region', event.target.value)}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
-          />
-          <input
-            type="text"
-            placeholder="Municipality"
-            value={quickInputs.municipality}
-            onChange={(event) => onQuickInputChange('municipality', event.target.value)}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
-          />
-          <input
-            type="text"
-            placeholder="Policy scope"
-            value={quickInputs.policyScope}
-            onChange={(event) => onQuickInputChange('policyScope', event.target.value)}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
-          />
-        </div>
-      </div>
-
-      <div className="border-t border-slate-200 pt-6 space-y-4">
-        <h3 className="text-base font-semibold text-slate-900">Add geometry</h3>
-        <div className="grid gap-3 text-sm text-slate-600">
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="geometry-mode"
-              value="none"
-              checked={geometry.mode === 'none'}
-              onChange={() => onGeometryChange('mode', 'none')}
-              className="h-4 w-4 text-weflora-teal"
-            />
-            None
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="geometry-mode"
-              value="corridor"
-              checked={geometry.mode === 'corridor'}
-              onChange={() => onGeometryChange('mode', 'corridor')}
-              className="h-4 w-4 text-weflora-teal"
-            />
-            Corridor line + buffer width
-          </label>
-          {geometry.mode === 'corridor' ? (
-            <div className="ml-6 flex items-center gap-3">
-              <MapIcon className="h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Width (meters)"
-                value={geometry.corridorWidth}
-                onChange={(event) => onGeometryChange('corridorWidth', event.target.value)}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
-              />
-            </div>
-          ) : null}
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="geometry-mode"
-              value="polygon"
-              checked={geometry.mode === 'polygon'}
-              onChange={() => onGeometryChange('mode', 'polygon')}
-              className="h-4 w-4 text-weflora-teal"
-            />
-            Polygon (paste GeoJSON)
-          </label>
-          {geometry.mode === 'polygon' ? (
-            <textarea
-              value={geometry.polygonGeoJson}
-              onChange={(event) => onGeometryChange('polygonGeoJson', event.target.value)}
-              placeholder="Paste GeoJSON here"
-              rows={4}
-              className="ml-6 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
-            />
-          ) : null}
-        </div>
       </div>
     </div>
   );

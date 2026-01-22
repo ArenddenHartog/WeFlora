@@ -6,7 +6,7 @@ import {
     PlusIcon, FolderIcon, HomeIcon, XIcon, CheckIcon, 
     SettingsIcon, UsersIcon, LogOutIcon, ChevronUpIcon,
     DatabaseIcon, TableIcon, SidebarCloseIcon, LogoIcon, FileTextIcon, HistoryIcon,
-        SparklesIcon, UserPlusIcon, BookIcon
+    SparklesIcon, UserPlusIcon, BookIcon, LightningBoltIcon
 } from './icons';
 import BaseModal from './BaseModal';
 import { useData } from '../contexts/DataContext';
@@ -203,6 +203,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                 label="Skills" 
                 path="/skills"
                 onClick={() => { navigate('/skills'); if(window.innerWidth < 768) onClose(); }} 
+            />
+            <NavItem 
+                icon={LightningBoltIcon} 
+                label="Flows" 
+                path="/flows"
+                onClick={() => { navigate('/flows'); if(window.innerWidth < 768) onClose(); }} 
             />
             <NavItem 
                 icon={HistoryIcon} 

@@ -11,6 +11,7 @@ create table if not exists public.vault_objects (
   mime_type text not null,
   size_bytes bigint not null,
   sha256 text null,
+  confidence numeric null,
   storage_bucket text not null,
   storage_path text not null,
   source_kind text not null default 'upload',

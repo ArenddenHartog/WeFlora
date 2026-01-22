@@ -5,7 +5,7 @@ import type {
     ViewMode, PinnedProject, Matrix, Report, 
     ContextItem, Chat
 } from '../types';
-import HomeView from './HomeView';
+import HomeRoute from './home/HomeRoute';
 import AppPage from './AppPage';
 import ProjectsView from './ProjectsView';
 import ChatView from './ChatView';
@@ -48,15 +48,15 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
         knowledgeItems, deleteKnowledgeItem, currentWorkspace, 
         promptTemplates, savePromptTemplate, reportTemplates, 
         worksheetTemplates, saveWorksheetTemplate, saveReportTemplate,
-        species, recentItems 
+        species
     } = useData();
     
     const { 
-        chats, threads, activeThreadId, isGenerating, messages,
-        sendMessage, setActiveThreadId
+        chats, isGenerating, messages,
+        sendMessage
     } = useChat();
 
-    const { selectedChatId, sessionOpenOrigin, setSessionOpenOrigin } = useUI();
+    const { selectedChatId } = useUI();
 
     // Derived Data
     const standaloneMatrices = useMemo(() => allMatrices.filter(m => !m.projectId), [allMatrices]);
@@ -139,29 +139,7 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
         case 'home':
             return (
                 <>
-                    <HomeView
-                        pinnedProjects={pinnedProjects}
-                        recentItems={recentItems}
-                        activeThreadId={activeThreadId}
-                        threads={threads}
-                        onSelectProject={onSelectProject}
-                        onSendQuery={(text, files, instructions, model, contextItems) => 
-                            sendMessage(text, files, instructions, model, contextItems, 'home')
-                        }
-                        onOpenMenu={onOpenMenu}
-                        onOpenCreateWorksheet={() => setIsCreateWorksheetOpen(true)}
-                        onOpenCreateProject={() => setIsCreateProjectOpen(true)}
-                        onCreateReport={() => setIsCreateReportOpen(true)}
-                        onPromoteToProject={() => {}}
-                        onCopyContentToReport={(msg) => onOpenDestinationModal('report', msg)}
-                        onCopyContentToWorksheet={(msg) => onOpenDestinationModal('worksheet', msg)}
-                        isGenerating={isGenerating}
-                        onBack={sessionOpenOrigin === 'sessions' ? () => {
-                            setSessionOpenOrigin(null);
-                            setActiveThreadId(null);
-                            navigate('/research-history');
-                        } : undefined}
-                    />
+                    <HomeRoute />
                     {isCreateWorksheetOpen && (
                         <WorksheetWizard 
                             onClose={() => setIsCreateWorksheetOpen(false)} 

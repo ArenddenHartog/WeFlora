@@ -43,8 +43,8 @@ const SessionWizard: React.FC<SessionWizardProps> = ({ intent }) => {
   const [showFlows, setShowFlows] = useState(false);
   const [runMode, setRunMode] = useState<'sequence' | 'parallel'>('sequence');
   const [allowPartial, setAllowPartial] = useState(true);
-  const [quickInputs, setQuickInputs] = useState({ region: '', municipality: '', policyScope: '' });
-  const [geometry, setGeometry] = useState({ mode: 'none' as const, corridorWidth: '', polygonGeoJson: '' });
+  const quickInputs = { region: '', municipality: '', policyScope: '' };
+  const geometry = { mode: 'none' as const, corridorWidth: '', polygonGeoJson: '' };
 
   const projectOptions = useMemo(() => {
     return projects.map((project) => ({ id: project.id, name: project.name }));
@@ -82,7 +82,8 @@ const SessionWizard: React.FC<SessionWizardProps> = ({ intent }) => {
       setVaultItems((prev) => [...prev, ...items]);
       showNotification('Upload complete.', 'success');
     } catch (error) {
-      showNotification(error instanceof Error ? error.message : 'Upload failed.', 'error');
+      console.error('[session-wizard] upload failed', error);
+      showNotification('Upload failed. Check console for details.', 'error');
     } finally {
       setIsUploading(false);
     }
@@ -107,11 +108,8 @@ const SessionWizard: React.FC<SessionWizardProps> = ({ intent }) => {
     if (vaultItems.length === 0) {
       items.push('No uploaded files yet; steps may run with partial context.');
     }
-    if (!quickInputs.region && !quickInputs.municipality) {
-      items.push('Region and municipality are unknown; geographic rules may be incomplete.');
-    }
     return items;
-  }, [vaultItems.length, quickInputs]);
+  }, [vaultItems.length]);
 
   const handleRun = () => {
     if (selectedSkillIds.length === 0 && !selectedFlowId) {
@@ -288,13 +286,14 @@ const SessionWizard: React.FC<SessionWizardProps> = ({ intent }) => {
     <div className="bg-white px-4 py-6 md:px-8">
       <WizardHeader
         title="New session"
-        description="Start with uploads, then select skills or flows and run a ledger-backed session."
+        description="Upload intake, select skills or flows, review readiness, then run."
       />
 
       <div className="flex items-center gap-4 text-xs text-slate-500">
-        <span className={stepIndex === 0 ? 'text-slate-900 font-semibold' : ''}>1. Vault</span>
+        <span className={stepIndex === 0 ? 'text-slate-900 font-semibold' : ''}>1. Upload</span>
         <span className={stepIndex === 1 ? 'text-slate-900 font-semibold' : ''}>2. Skills</span>
-        <span className={stepIndex === 2 ? 'text-slate-900 font-semibold' : ''}>3. Confirm</span>
+        <span className={stepIndex === 2 ? 'text-slate-900 font-semibold' : ''}>3. Review</span>
+        <span className={stepIndex === 3 ? 'text-slate-900 font-semibold' : ''}>4. Run</span>
       </div>
 
       <div className="mt-8 border-t border-slate-200 pt-6">
@@ -308,10 +307,6 @@ const SessionWizard: React.FC<SessionWizardProps> = ({ intent }) => {
             onToggleSaveToProject={setSaveToProject}
             onProjectChange={setSelectedProjectId}
             onUpload={handleUpload}
-            quickInputs={quickInputs}
-            onQuickInputChange={(field, value) => setQuickInputs((prev) => ({ ...prev, [field]: value }))}
-            geometry={geometry}
-            onGeometryChange={(field, value) => setGeometry((prev) => ({ ...prev, [field]: value }))}
           />
         ) : null}
 
@@ -327,6 +322,29 @@ const SessionWizard: React.FC<SessionWizardProps> = ({ intent }) => {
         ) : null}
 
         {stepIndex === 2 ? (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Review readiness</h2>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/30 p-4">
+              <h3 className="text-sm font-semibold text-slate-700">Coverage summary</h3>
+              {vaultItems.length === 0 ? (
+                <div className="mt-2 text-sm text-slate-600">No uploads yet. Add inputs to improve readiness.</div>
+              ) : (
+                <div className="mt-2 text-sm text-slate-600">Vault inputs ready for execution.</div>
+              )}
+              <button
+                type="button"
+                onClick={() => setStepIndex(0)}
+                className="mt-3 inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Add more inputs
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {stepIndex === 3 ? (
           <StepConfirmRun
             selectedSkills={selectedSkills}
             runMode={runMode}
@@ -348,10 +366,10 @@ const SessionWizard: React.FC<SessionWizardProps> = ({ intent }) => {
         >
           Back
         </button>
-        {stepIndex < 2 ? (
+        {stepIndex < 3 ? (
           <button
             type="button"
-            onClick={() => setStepIndex((prev) => Math.min(prev + 1, 2))}
+            onClick={() => setStepIndex((prev) => Math.min(prev + 1, 3))}
             className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
           >
             Next

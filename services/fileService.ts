@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { buildProjectVaultLinkRows, buildVaultStoragePath } from './vaultUtils';
 import type { FileEntity, FileScope, FileStatus, FileVisibility, ProjectFile, KnowledgeCategory } from '../types';
 import { FileSheetIcon, FilePdfIcon, FileCodeIcon } from '../components/icons';
 
@@ -48,6 +49,7 @@ export interface VaultObject {
   mimeType: string;
   sizeBytes: number;
   sha256?: string | null;
+  confidence?: number | null;
 
   storage: {
     bucket: string;
@@ -71,6 +73,7 @@ export interface VaultLink {
   createdAt: string;
   label?: string | null;
 }
+
 
 const formatFileSize = (sizeBytes: number) => `${(sizeBytes / 1024).toFixed(1)} KB`;
 
@@ -125,6 +128,7 @@ const mapRecordToVaultObject = (record: any): VaultObject => ({
   mimeType: record.mime_type ?? 'application/octet-stream',
   sizeBytes: record.size_bytes ?? 0,
   sha256: record.sha256 ?? null,
+  confidence: record.confidence ?? null,
   storage: {
     bucket: record.storage_bucket ?? VAULT_BUCKET,
     path: record.storage_path ?? ''
@@ -220,11 +224,25 @@ export const uploadToGlobalVault = async (files: File[]): Promise<VaultObject[]>
 
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
-    const storagePath = `vault/global/${userId}/${id}`;
+    const storagePath = buildVaultStoragePath(userId, id, file.name);
 
-    const { error: storageError } = await supabase.storage.from(VAULT_BUCKET).upload(storagePath, file);
+    const { error: storageError } = await supabase.storage
+      .from(VAULT_BUCKET)
+      .upload(storagePath, file, { upsert: false });
     if (storageError) {
-      throw new Error('Storage upload failed.');
+      const storageBaseUrl = (supabase as any)?.storageUrl ?? (supabase as any)?.url ?? '';
+      const requestUrl = storageBaseUrl
+        ? `${storageBaseUrl}/object/${VAULT_BUCKET}/${storagePath}`
+        : `/${VAULT_BUCKET}/${storagePath}`;
+      console.error('[vault-upload] storage error', {
+        requestUrl,
+        statusCode: storageError.statusCode,
+        errorCode: (storageError as any).code,
+        message: storageError.message,
+        details: (storageError as any).details,
+        name: storageError.name
+      });
+      throw new Error('Storage upload failed. Likely causes: missing bucket, RLS, invalid path, payload too large, or mime not allowed.');
     }
 
     const { data: inserted, error: insertError } = await supabase
@@ -249,6 +267,14 @@ export const uploadToGlobalVault = async (files: File[]): Promise<VaultObject[]>
       .single();
 
     if (insertError || !inserted) {
+      console.error('[vault-upload] database insert error', {
+        table: 'vault_objects',
+        storagePath,
+        statusCode: (insertError as any)?.status,
+        errorCode: (insertError as any)?.code,
+        message: insertError?.message,
+        details: (insertError as any)?.details
+      });
       throw new Error('Database error during vault insert.');
     }
 
@@ -270,25 +296,26 @@ export const linkVaultObjectsToProject = async (
   }
 
   const now = new Date().toISOString();
-  const rows = vaultObjectIds.map((vaultObjectId) => ({
-    id: crypto.randomUUID(),
-    project_id: projectId,
-    vault_object_id: vaultObjectId,
-    created_by: userId,
-    created_at: now,
-    label: null
-  }));
+  const rows = buildProjectVaultLinkRows(projectId, vaultObjectIds, now);
 
-  const { data, error } = await supabase.from('vault_links').insert(rows).select();
+  const { data, error } = await supabase.from('project_vault_links').insert(rows).select();
   if (error || !data) {
+    console.error('[vault-upload] link insert error', {
+      table: 'project_vault_links',
+      projectId,
+      statusCode: (error as any)?.status,
+      errorCode: (error as any)?.code,
+      message: error?.message,
+      details: (error as any)?.details
+    });
     throw new Error('Database error during vault link insert.');
   }
 
   return data.map((record: any) => ({
-    id: record.id,
+    id: record.id ?? `${record.project_id}-${record.vault_id}`,
     projectId: record.project_id,
-    vaultObjectId: record.vault_object_id,
-    createdBy: record.created_by,
+    vaultObjectId: record.vault_id,
+    createdBy: record.created_by ?? userId,
     createdAt: record.created_at,
     label: record.label ?? null
   }));
