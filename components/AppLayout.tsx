@@ -1,4 +1,5 @@
 import React from 'react';
+import DebugPanel from './ui/DebugPanel';
 import { Outlet } from 'react-router-dom';
 
 const AppLayout: React.FC = () => {
@@ -7,6 +8,7 @@ const AppLayout: React.FC = () => {
             <div className="flex-1 overflow-y-auto overflow-x-hidden relative">
                 <Outlet />
             </div>
+            <DebugPanel />
         </div>
     );
 };

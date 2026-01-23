@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import type { EventRecord, StepCompletedEvent, StepStartedEvent } from '../../src/agentic/contracts/ledger';
 import type { VaultPointer } from '../../src/agentic/contracts/vault';
+import { normalizeEvents } from '../../src/agentic/ledger/normalizeEvents';
 
 interface RunTimelineProps {
   events: EventRecord[];
@@ -15,19 +16,16 @@ const statusClasses: Record<string, string> = {
   running: 'bg-slate-50 text-slate-700 border border-slate-200'
 };
 
-const sortEvents = (events: EventRecord[]) => [...events].sort((a, b) => a.seq - b.seq);
-
 const asStepStarted = (event: EventRecord): event is StepStartedEvent => event.type === 'step.started';
 const asStepCompleted = (event: EventRecord): event is StepCompletedEvent => event.type === 'step.completed';
 
 const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events }) => {
-  const orderedEvents = useMemo(() => sortEvents(events), [events]);
-  const isDev = Boolean((import.meta as any)?.env?.DEV);
+  const orderedEvents = useMemo(() => normalizeEvents(events), [events]);
 
   const timelineBlocks = useMemo(() => {
     const stepGroups = new Map<
       string,
-      { order: number; stepId: string; stepStart?: StepStartedEvent; stepCompleted?: StepCompletedEvent; duplicates: number }
+      { order: number; stepId: string; stepStart?: StepStartedEvent; stepCompleted?: StepCompletedEvent }
     >();
     const blocks: Array<{ kind: 'step' | 'event'; order: number; stepId?: string; event?: EventRecord }> = [];
 
@@ -36,19 +34,17 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events }) => {
         const stepId = event.payload.step_id;
         const existing = stepGroups.get(stepId);
         if (!existing) {
-          const group = { order: index, stepId, duplicates: 0 } as {
+          const group = { order: index, stepId } as {
             order: number;
             stepId: string;
             stepStart?: StepStartedEvent;
             stepCompleted?: StepCompletedEvent;
-            duplicates: number;
           };
           if (asStepStarted(event)) group.stepStart = event;
           if (asStepCompleted(event)) group.stepCompleted = event;
           stepGroups.set(stepId, group);
           blocks.push({ kind: 'step', order: index, stepId });
         } else {
-          existing.duplicates += 1;
           if (asStepStarted(event) && !existing.stepStart) existing.stepStart = event;
           if (asStepCompleted(event) && !existing.stepCompleted) existing.stepCompleted = event;
         }
@@ -104,7 +100,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events }) => {
           const stepGroup = block.stepId ? timelineBlocks.stepGroups.get(block.stepId) : undefined;
           if (!stepGroup) return null;
 
-          const { stepStart, stepCompleted, duplicates } = stepGroup;
+          const { stepStart, stepCompleted } = stepGroup;
           const status = stepCompleted?.payload.status ?? 'running';
           const stepTitle = stepCompleted
             ? stepStart?.payload.title ?? stepCompleted.payload.agent_id

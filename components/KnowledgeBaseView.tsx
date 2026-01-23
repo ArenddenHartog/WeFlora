@@ -214,8 +214,8 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
 
     return (
         <AppPage
-            title="Files"
-            subtitle="Reference library and project files."
+            title="Raw files"
+            subtitle="Source uploads and reference files."
             actions={
                 <FilePicker accept={FILE_VALIDATION.ACCEPTED_FILE_TYPES} multiple onPick={handleFileSelect}>
                     {({ open }) => (

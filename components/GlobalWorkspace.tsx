@@ -14,6 +14,8 @@ import PromptTemplatesView from './PromptTemplatesView';
 import ResearchHistoryView from './ResearchHistoryView';
 import WorksheetWizard from './WorksheetWizard';
 import ReportWizard from './ReportWizard';
+import VaultInventoryView from './vault/VaultInventoryView';
+import VaultReviewQueueView from './vault/VaultReviewQueueView';
 import BaseModal from './BaseModal';
 import { FolderIcon, MenuIcon } from './icons';
 import { useData } from '../contexts/DataContext';
@@ -169,6 +171,10 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
                     </BaseModal>
                 </>
             );
+        case 'vault':
+            return <VaultInventoryView />;
+        case 'vault_review':
+            return <VaultReviewQueueView />;
         case 'projects':
             return (
                 <ProjectsView

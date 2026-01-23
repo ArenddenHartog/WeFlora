@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SparklesIcon } from '../icons';
+import PageShell from '../ui/PageShell';
 import { agentProfilesContract } from '../../src/agentic/registry/agents.ts';
 
 const SkillsIndex: React.FC = () => {
@@ -16,42 +17,34 @@ const SkillsIndex: React.FC = () => {
   }, [search]);
 
   return (
-    <div className="w-full bg-white p-4 md:p-8" data-layout-root>
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div className="flex items-start gap-4">
-            <div className="h-10 w-10 rounded-xl bg-weflora-mint/15 text-weflora-teal flex items-center justify-center">
-              <SparklesIcon className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-800">Skills</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              to="/sessions/new"
-              className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-            >
-              Run Skill
-            </Link>
-            <Link
-              to="/flows"
-              className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-            >
-              View Flows
-            </Link>
-          </div>
-        </div>
-
-        <div className="max-w-md">
-          <label className="text-xs font-semibold text-slate-600">Search skills</label>
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by name or tag"
-            className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
-          />
-        </div>
+    <PageShell
+      icon={<SparklesIcon className="h-5 w-5" />}
+      title="Skills"
+      actions={
+        <>
+          <Link
+            to="/sessions/new"
+            className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+          >
+            Run Skill
+          </Link>
+          <Link
+            to="/flows"
+            className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            View Flows
+          </Link>
+        </>
+      }
+    >
+      <div className="max-w-md">
+        <label className="text-xs font-semibold text-slate-600">Search skills</label>
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search by name or tag"
+          className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
+        />
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -88,7 +81,7 @@ const SkillsIndex: React.FC = () => {
           </div>
         ))}
       </div>
-    </div>
+    </PageShell>
   );
 };
 

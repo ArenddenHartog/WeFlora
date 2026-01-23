@@ -9,6 +9,8 @@ import type { EventRecord, Session } from '../../src/agentic/contracts/ledger';
 import type { RunContext } from '../../src/agentic/contracts/run_context';
 import type { VaultPointer } from '../../src/agentic/contracts/vault';
 import { linkVaultObjectsToProject, uploadToGlobalVault, VaultObject, VaultLink } from '../../services/fileService';
+import { track } from '../../src/agentic/telemetry/telemetry';
+import { supabase } from '../../services/supabaseClient';
 import WizardHeader from './wizard/WizardHeader';
 import StepVault, { type VaultUploadItem } from './wizard/StepVault';
 import StepSelectSkills from './wizard/StepSelectSkills';
@@ -43,6 +45,7 @@ const SessionWizard: React.FC<SessionWizardProps> = ({ intent }) => {
   const [showFlows, setShowFlows] = useState(false);
   const [runMode, setRunMode] = useState<'sequence' | 'parallel'>('sequence');
   const [allowPartial, setAllowPartial] = useState(true);
+  const [isStarting, setIsStarting] = useState(false);
   const quickInputs = { region: '', municipality: '', policyScope: '' };
   const geometry = { mode: 'none' as const, corridorWidth: '', polygonGeoJson: '' };
 
@@ -82,8 +85,8 @@ const SessionWizard: React.FC<SessionWizardProps> = ({ intent }) => {
       setVaultItems((prev) => [...prev, ...items]);
       showNotification('Upload complete.', 'success');
     } catch (error) {
-      console.error('[session-wizard] upload failed', error);
-      showNotification('Upload failed. Check console for details.', 'error');
+      track('session_wizard.upload_failed', { message: (error as Error).message });
+      showNotification('Upload failed. Open Debug panel for details.', 'error');
     } finally {
       setIsUploading(false);
     }
@@ -111,13 +114,46 @@ const SessionWizard: React.FC<SessionWizardProps> = ({ intent }) => {
     return items;
   }, [vaultItems.length]);
 
-  const handleRun = () => {
+  const handleRun = async () => {
     if (selectedSkillIds.length === 0 && !selectedFlowId) {
       showNotification('Select at least one skill or flow.', 'error');
       return;
     }
+    if (isStarting) return;
+    setIsStarting(true);
 
-    const sessionId = crypto.randomUUID();
+    const selectionState = {
+      skills: selectedSkillIds,
+      flow: selectedFlowId,
+      vault: vaultItems.map((item) => item.vaultObject.id),
+      project: selectedProjectId
+    };
+
+    let selectionHash = '';
+    try {
+      const hashBuffer = await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(JSON.stringify(selectionState))
+      );
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      selectionHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+    } catch (error) {
+      track('session_wizard.idempotency_hash_error', { message: (error as Error).message });
+    }
+    const idempotencyKey = `skill-run:${selectionHash || crypto.randomUUID()}`;
+
+    const { data: sessionRpc, error: sessionError } = await supabase
+      .rpc('create_session_with_idempotency', {
+        p_idempotency_key: idempotencyKey,
+        p_intent: { intent: 'Session Wizard', selection: selectionState }
+      })
+      .single();
+
+    if (sessionError) {
+      track('session_wizard.idempotency_error', { message: sessionError.message });
+    }
+
+    const sessionId = sessionRpc?.session_id ?? crypto.randomUUID();
     const createdAt = new Date().toISOString();
     const scopeId = selectedProjectId || 'scope-unknown';
 
@@ -276,6 +312,7 @@ const SessionWizard: React.FC<SessionWizardProps> = ({ intent }) => {
 
     addStoredSession({ session, runContext, events });
     navigate(`/sessions/${sessionId}`);
+    setIsStarting(false);
   };
 
   const selectedSkills = selectedSkillIds

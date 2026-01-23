@@ -119,7 +119,7 @@ export const mapFileEntityToProjectFile = (entity: FileEntity): ProjectFile => (
   relatedEntityId: entity.relatedEntityId ?? undefined
 });
 
-const mapRecordToVaultObject = (record: any): VaultObject => ({
+export const mapRecordToVaultObject = (record: any): VaultObject => ({
   id: record.id,
   ownerUserId: record.owner_user_id,
   createdAt: record.created_at ?? new Date().toISOString(),

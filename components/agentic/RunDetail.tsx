@@ -4,6 +4,7 @@ import { demoRuns } from '../../src/agentic/fixtures/demoRuns.ts';
 import { findStoredSession } from '../../src/agentic/sessions/storage';
 import LivingRecordRenderer from './RunTimeline';
 import { HistoryIcon } from '../icons';
+import PageShell from '../ui/PageShell';
 
 const statusBadgeClass = (status: string) => {
   switch (status) {
@@ -47,18 +48,12 @@ const RunDetail: React.FC = () => {
   }
 
   return (
-    <div className="bg-white px-4 py-6 md:px-8" data-layout-root>
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-6">
-        <div className="flex items-start gap-4">
-          <div className="h-10 w-10 rounded-xl bg-weflora-mint/15 text-weflora-teal flex items-center justify-center">
-            <HistoryIcon className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">{run.title}</h1>
-            <p className="mt-1 text-sm leading-6 text-slate-500">Scope: {run.scopeId}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
+    <PageShell
+      icon={<HistoryIcon className="h-5 w-5" />}
+      title={run.title}
+      meta={`Scope: ${run.scopeId}`}
+      actions={
+        <>
           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${statusBadgeClass(run.status)}`}>
             {run.status}
           </span>
@@ -68,17 +63,17 @@ const RunDetail: React.FC = () => {
           >
             Start new session
           </Link>
-        </div>
-      </div>
-
+        </>
+      }
+    >
       <Link to="/sessions" className="text-xs text-slate-500 hover:text-slate-700">
         ← Back to Sessions
       </Link>
 
-      <div className="mt-10">
+      <div className="mt-6">
         <LivingRecordRenderer events={run.events} />
       </div>
-    </div>
+    </PageShell>
   );
 };
 

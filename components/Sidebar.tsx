@@ -228,12 +228,18 @@ const Sidebar: React.FC<SidebarProps> = ({
                   path="/reports"
                   onClick={() => { navigate('/reports'); if(window.innerWidth < 768) onClose(); }} 
                />
-               <NavItem 
-                    icon={DatabaseIcon} 
-                    label="Files" 
-                    path="/files"
-                    onClick={() => { navigate('/files'); if(window.innerWidth < 768) onClose(); }} 
-               />
+            <NavItem 
+                icon={DatabaseIcon} 
+                label="Vault" 
+                path="/vault"
+                onClick={() => { navigate('/vault'); if(window.innerWidth < 768) onClose(); }} 
+            />
+            <NavItem 
+                icon={FileTextIcon} 
+                label="Raw files" 
+                path="/files"
+                onClick={() => { navigate('/files'); if(window.innerWidth < 768) onClose(); }} 
+            />
           </nav>
           
           {/* Bottom Mega Menu Button */}
