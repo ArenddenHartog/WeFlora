@@ -142,95 +142,96 @@ const SkillDetail: React.FC = () => {
   }
 
   return (
-    <PageShell
-      icon={<SparklesIcon className="h-5 w-5" />}
-      title={profile.title}
-      meta={
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-slate-100 px-2 py-0.5">v{profile.spec_version}</span>
-          {profile.tags.slice(0, 4).map((tag) => (
-            <span key={tag} className="rounded-full bg-slate-50 px-2 py-0.5 text-slate-500">
-              {tag}
-            </span>
-          ))}
-        </div>
-      }
-      actions={
-        <>
-          <button
-            type="button"
-            onClick={() => setActiveTab('readiness')}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            Check readiness
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate(requiredDataLink)}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            View required data
-          </button>
-          <Link
-            to={`/sessions/new?intent=skill:${profile.id}`}
-            className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-          >
-            Run Skill
-          </Link>
-        </>
-      }
-      tabs={
-        <div className="flex flex-wrap gap-2 text-xs font-semibold">
-          {(['contract', 'readiness', 'outputs', 'evidence', 'history'] as const).map((tab) => (
+    <div className="bg-white" data-layout-root>
+      <PageShell
+        icon={<SparklesIcon className="h-5 w-5" />}
+        title={profile.title}
+        meta={
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5">v{profile.spec_version}</span>
+            {profile.tags.slice(0, 4).map((tag) => (
+              <span key={tag} className="rounded-full bg-slate-50 px-2 py-0.5 text-slate-500">
+                {tag}
+              </span>
+            ))}
+          </div>
+        }
+        actions={
+          <>
             <button
-              key={tab}
               type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`rounded-full px-3 py-1 ${
-                activeTab === tab ? 'bg-weflora-mint/20 text-weflora-dark' : 'text-slate-500 hover:text-slate-700'
-              }`}
+              onClick={() => setActiveTab('readiness')}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
             >
-              {tab === 'evidence' ? 'Evidence rules' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              Check readiness
             </button>
-          ))}
-        </div>
-      }
-    >
-        <Link to="/skills" className="text-xs text-slate-500 hover:text-slate-700">
-          ← Back to Skills
-        </Link>
+            <button
+              type="button"
+              onClick={() => navigate(requiredDataLink)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              View required data
+            </button>
+            <Link
+              to={`/sessions/new?intent=skill:${profile.id}`}
+              className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+            >
+              Run Skill
+            </Link>
+          </>
+        }
+        tabs={
+          <div className="flex flex-wrap gap-2 text-xs font-semibold">
+            {(['contract', 'readiness', 'outputs', 'evidence', 'history'] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`rounded-full px-3 py-1 ${
+                  activeTab === tab ? 'bg-weflora-mint/20 text-weflora-dark' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {tab === 'evidence' ? 'Evidence rules' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
+        }
+      >
+          <Link to="/skills" className="text-xs text-slate-500 hover:text-slate-700">
+            ← Back to Skills
+          </Link>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold text-slate-500">Readiness</p>
-            <p className="mt-2 text-sm font-semibold text-slate-900">{readiness.status}</p>
-            <p className="mt-1 text-xs text-slate-500">
-              {readiness.missing.length > 0 ? `${readiness.missing.length} missing` : 'All required context present'}
-            </p>
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-xs font-semibold text-slate-500">Readiness</p>
+              <p className="mt-2 text-sm font-semibold text-slate-900">{readiness.status}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                {readiness.missing.length > 0 ? `${readiness.missing.length} missing` : 'All required context present'}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-xs font-semibold text-slate-500">Required Context</p>
+              <p className="mt-2 text-sm font-semibold text-slate-900">
+                {contractMeta.requiredContext.map((item) => `${item.recordType}`).join(' · ')}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {contractMeta.requiredContext.map((item) => `${item.recordType} (${item.requiredFields.length})`).join(' · ')}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-xs font-semibold text-slate-500">Provenance</p>
+              <p className="mt-2 text-sm font-semibold text-slate-900">
+                {contractMeta.evidenceRules.required ? 'Required' : 'Best-effort'}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">{contractMeta.evidenceRules.allowedSources.join(' · ')}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-xs font-semibold text-slate-500">Artifacts</p>
+              <p className="mt-2 text-sm font-semibold text-slate-900">
+                {contractMeta.output.artifacts.map((item) => `${item.label} (${item.format})`).join(' · ')}
+              </p>
+            </div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold text-slate-500">Required Context</p>
-            <p className="mt-2 text-sm font-semibold text-slate-900">
-              {contractMeta.requiredContext.map((item) => `${item.recordType}`).join(' · ')}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {contractMeta.requiredContext.map((item) => `${item.recordType} (${item.requiredFields.length})`).join(' · ')}
-            </p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold text-slate-500">Provenance</p>
-            <p className="mt-2 text-sm font-semibold text-slate-900">
-              {contractMeta.evidenceRules.required ? 'Required' : 'Best-effort'}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">{contractMeta.evidenceRules.allowedSources.join(' · ')}</p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold text-slate-500">Artifacts</p>
-            <p className="mt-2 text-sm font-semibold text-slate-900">
-              {contractMeta.output.artifacts.map((item) => `${item.label} (${item.format})`).join(' · ')}
-            </p>
-          </div>
-        </div>
 
         {activeTab === 'contract' && (
           <div className="mt-6 space-y-6">
@@ -488,7 +489,8 @@ const SkillDetail: React.FC = () => {
             </div>
           </div>
         )}
-    </PageShell>
+      </PageShell>
+    </div>
   );
 };
 

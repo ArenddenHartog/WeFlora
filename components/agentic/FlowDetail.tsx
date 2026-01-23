@@ -224,122 +224,124 @@ const FlowDetail: React.FC = () => {
   }
 
   return (
-    <PageShell
-      icon={<SparklesIcon className="h-5 w-5" />}
-      title={flow.title}
-      meta={`v${flow.template_version}`}
-      actions={
-        <>
-          <button
-            onClick={() => setStrictMode((prev) => !prev)}
-            className={`rounded-lg border px-3 py-2 text-xs font-semibold ${strictMode ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-          >
-            {strictMode ? 'Strict mode' : 'Non-strict'}
-          </button>
-          <button onClick={handleSave} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-            Save
-          </button>
-          <button onClick={handleValidate} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-            Validate
-          </button>
-          <button onClick={handleRun} className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">
-            Run
-          </button>
-        </>
-      }
-    >
-        <Link to="/flows" className="text-xs text-slate-500 hover:text-slate-700">
-          ← Back to Flows
-        </Link>
+    <div className="bg-white" data-layout-root>
+      <PageShell
+        icon={<SparklesIcon className="h-5 w-5" />}
+        title={flow.title}
+        meta={`v${flow.template_version}`}
+        actions={
+          <>
+            <button
+              onClick={() => setStrictMode((prev) => !prev)}
+              className={`rounded-lg border px-3 py-2 text-xs font-semibold ${strictMode ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+            >
+              {strictMode ? 'Strict mode' : 'Non-strict'}
+            </button>
+            <button onClick={handleSave} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+              Save
+            </button>
+            <button onClick={handleValidate} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+              Validate
+            </button>
+            <button onClick={handleRun} className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+              Run
+            </button>
+          </>
+        }
+      >
+          <Link to="/flows" className="text-xs text-slate-500 hover:text-slate-700">
+            ← Back to Flows
+          </Link>
 
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
-          <aside className="rounded-xl border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-slate-900">Skill palette</h2>
-            <input
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Search skills"
-              className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600"
-            />
-            <div className="mt-3 flex flex-wrap gap-2">
-              {Array.from(new Set(agentProfilesContract.flatMap((profile) => profile.tags))).slice(0, 6).map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => setActiveTags((prev) => (prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag]))}
-                  className={`rounded-full px-3 py-1 text-[11px] font-semibold border ${
-                    activeTags.includes(tag) ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark' : 'border-slate-200 text-slate-500'
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-            <div className="mt-4 space-y-3">
-              {paletteSkills.map((profile) => (
-                <PaletteSkillCard key={profile.id} skillId={profile.id} title={profile.title} tags={profile.tags} />
-              ))}
-            </div>
-          </aside>
-
-          <main className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-900">Flow canvas</h2>
-                <p className="mt-1 text-xs text-slate-500">Step groups run sequentially. Skills within a step run in parallel.</p>
-              </div>
-              <div className="text-xs text-slate-500 flex flex-wrap items-center gap-3">
-                <span>{requiredContextSummary.map((item) => `${item.recordType} (${item.count})`).join(' · ') || 'No required context'}</span>
-                <Link
-                  to={`/vault?types=${encodeURIComponent(requiredContextSummary.map((item) => item.recordType).join(','))}&scope=${selectedProjectId ? 'project' : 'global'}`}
-                  className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  View required data
-                </Link>
-              </div>
-            </div>
-
-            {validationIssues.length > 0 ? (
-              <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                {validationIssues.map((issue) => (
-                  <p key={issue}>{issue}</p>
+          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
+            <aside className="rounded-xl border border-slate-200 bg-white p-4">
+              <h2 className="text-sm font-semibold text-slate-900">Skill palette</h2>
+              <input
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder="Search skills"
+                className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600"
+              />
+              <div className="mt-3 flex flex-wrap gap-2">
+                {Array.from(new Set(agentProfilesContract.flatMap((profile) => profile.tags))).slice(0, 6).map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setActiveTags((prev) => (prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag]))}
+                    className={`rounded-full px-3 py-1 text-[11px] font-semibold border ${
+                      activeTags.includes(tag) ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark' : 'border-slate-200 text-slate-500'
+                    }`}
+                  >
+                    {tag}
+                  </button>
                 ))}
               </div>
-            ) : null}
-
-            <div className="mt-4 text-xs text-slate-500">
-              {isLoadingVault ? 'Loading vault context...' : 'Validation uses live vault coverage and skill contracts.'}
-            </div>
-            <div className="mt-2 text-xs text-slate-500">
-              Save keeps skillRef version as latest. Run freezes skillRef to a version + hash for the session ledger.
-            </div>
-
-            <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-              <CanvasDropZone>
-                {steps.map((step, index) => (
-                  <div key={step.id} className="relative">
-                    <GapDropZone id={`gap:${index}`} />
-                    <StepGroup
-                      step={step}
-                      onTitleChange={(value) =>
-                        setSteps((prev) => prev.map((item) => (item.id === step.id ? { ...item, title: value } : item)))
-                      }
-                      vaultRecords={vaultRecords}
-                      skillWriteMap={skillWriteMap}
-                    />
-                  </div>
+              <div className="mt-4 space-y-3">
+                {paletteSkills.map((profile) => (
+                  <PaletteSkillCard key={profile.id} skillId={profile.id} title={profile.title} tags={profile.tags} />
                 ))}
-                <GapDropZone id={`gap:${steps.length}`} />
-                {steps.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-xs text-slate-500">
-                    Drag a skill here to start your flow.
-                  </div>
-                ) : null}
-              </CanvasDropZone>
-            </DndContext>
-          </main>
-        </div>
-    </PageShell>
+              </div>
+            </aside>
+
+            <main className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900">Flow canvas</h2>
+                  <p className="mt-1 text-xs text-slate-500">Step groups run sequentially. Skills within a step run in parallel.</p>
+                </div>
+                <div className="text-xs text-slate-500 flex flex-wrap items-center gap-3">
+                  <span>{requiredContextSummary.map((item) => `${item.recordType} (${item.count})`).join(' · ') || 'No required context'}</span>
+                  <Link
+                    to={`/vault?types=${encodeURIComponent(requiredContextSummary.map((item) => item.recordType).join(','))}&scope=${selectedProjectId ? 'project' : 'global'}`}
+                    className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    View required data
+                  </Link>
+                </div>
+              </div>
+
+              {validationIssues.length > 0 ? (
+                <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                  {validationIssues.map((issue) => (
+                    <p key={issue}>{issue}</p>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="mt-4 text-xs text-slate-500">
+                {isLoadingVault ? 'Loading vault context...' : 'Validation uses live vault coverage and skill contracts.'}
+              </div>
+              <div className="mt-2 text-xs text-slate-500">
+                Save keeps skillRef version as latest. Run freezes skillRef to a version + hash for the session ledger.
+              </div>
+
+              <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+                <CanvasDropZone>
+                  {steps.map((step, index) => (
+                    <div key={step.id} className="relative">
+                      <GapDropZone id={`gap:${index}`} />
+                      <StepGroup
+                        step={step}
+                        onTitleChange={(value) =>
+                          setSteps((prev) => prev.map((item) => (item.id === step.id ? { ...item, title: value } : item)))
+                        }
+                        vaultRecords={vaultRecords}
+                        skillWriteMap={skillWriteMap}
+                      />
+                    </div>
+                  ))}
+                  <GapDropZone id={`gap:${steps.length}`} />
+                  {steps.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-xs text-slate-500">
+                      Drag a skill here to start your flow.
+                    </div>
+                  ) : null}
+                </CanvasDropZone>
+              </DndContext>
+            </main>
+          </div>
+      </PageShell>
+    </div>
   );
 };
 

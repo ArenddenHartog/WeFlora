@@ -48,32 +48,34 @@ const RunDetail: React.FC = () => {
   }
 
   return (
-    <PageShell
-      icon={<HistoryIcon className="h-5 w-5" />}
-      title={run.title}
-      meta={`Scope: ${run.scopeId}`}
-      actions={
-        <>
-          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${statusBadgeClass(run.status)}`}>
-            {run.status}
-          </span>
-          <Link
-            to="/sessions/new"
-            className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            Start new session
-          </Link>
-        </>
-      }
-    >
-      <Link to="/sessions" className="text-xs text-slate-500 hover:text-slate-700">
-        ← Back to Sessions
-      </Link>
+    <div className="bg-white" data-layout-root>
+      <PageShell
+        icon={<HistoryIcon className="h-5 w-5" />}
+        title={run.title}
+        meta={`Scope: ${run.scopeId}`}
+        actions={
+          <>
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${statusBadgeClass(run.status)}`}>
+              {run.status}
+            </span>
+            <Link
+              to="/sessions/new"
+              className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              Start new session
+            </Link>
+          </>
+        }
+      >
+        <Link to="/sessions" className="text-xs text-slate-500 hover:text-slate-700">
+          ← Back to Sessions
+        </Link>
 
-      <div className="mt-6">
-        <LivingRecordRenderer events={run.events} />
-      </div>
-    </PageShell>
+        <div className="mt-6">
+          <LivingRecordRenderer events={run.events} />
+        </div>
+      </PageShell>
+    </div>
   );
 };
 
