@@ -25,19 +25,10 @@ const SkillDetail: React.FC = () => {
   const [vaultRecords, setVaultRecords] = useState<VaultInventoryRecord[]>([]);
   const [isLoadingVault, setIsLoadingVault] = useState(false);
 
-  if (!profile) {
-    return (
-      <div className="bg-white px-4 py-6 md:px-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Skill not found</h1>
-        <p className="mt-2 text-sm text-slate-500">Skill not found.</p>
-        <Link to="/skills" className="mt-4 inline-block text-sm text-weflora-teal underline">
-          Back to Skills
-        </Link>
-      </div>
-    );
-  }
-
-  const payloadSchemaText = JSON.stringify(profile.output.payload_schema, null, 2);
+  const payloadSchemaText = useMemo(() => {
+    if (!profile) return '';
+    return JSON.stringify(profile.output.payload_schema, null, 2);
+  }, [profile]);
   const handleCopySchema = async () => {
     try {
       await navigator.clipboard.writeText(payloadSchemaText);
@@ -48,7 +39,7 @@ const SkillDetail: React.FC = () => {
     }
   };
 
-  const contractMeta = useMemo(() => buildSkillContractMeta(profile), [profile]);
+  const contractMeta = useMemo(() => (profile ? buildSkillContractMeta(profile) : null), [profile]);
 
   const loadVault = useCallback(async () => {
     setIsLoadingVault(true);
@@ -67,6 +58,7 @@ const SkillDetail: React.FC = () => {
 
   const relevanceForRecord = useCallback(
     (record: VaultInventoryRecord) => {
+      if (!profile) return 'Low';
       const tagMatches = record.tags.filter((tag) => profile.tags.some((p) => p.toLowerCase() === tag.toLowerCase()));
       if (tagMatches.length >= 2) return 'High';
       if (tagMatches.length === 1) return 'Medium';
@@ -77,6 +69,9 @@ const SkillDetail: React.FC = () => {
   );
 
   const readiness = useMemo(() => {
+    if (!contractMeta) {
+      return { required: [], satisfied: [], missing: [], weak: [], status: 'Missing' as const };
+    }
     const required = contractMeta.requiredContext.filter((item) => !item.optional);
     const satisfied: Array<{ requirement: typeof required[number]; record: VaultInventoryRecord }> = [];
     const missing: typeof required = [];
@@ -106,27 +101,45 @@ const SkillDetail: React.FC = () => {
     if (status === 'Ready' && weak.length > 0) status = 'Needs review';
 
     return { required, satisfied, missing, weak, status };
-  }, [contractMeta.requiredContext, vaultRecords]);
+  }, [contractMeta, vaultRecords]);
 
   const flowUsage = useMemo(() => {
+    if (!profile) return [];
     return flowTemplates.filter((flow) => flow.steps.some((step) => step.agent_id === profile.id));
-  }, [profile.id]);
+  }, [profile]);
 
   const runHistory = useMemo(() => {
+    if (!profile) return [];
     const sessions = loadStoredSessions();
     return sessions.filter((session) => session.events.some((event) => event.type === 'step.completed' && event.payload.agent_id === profile.id));
-  }, [profile.id]);
+  }, [profile]);
 
   const latestRun = runHistory[0];
   const latestStep = latestRun?.events.find((event) => event.type === 'step.completed' && event.payload.agent_id === profile.id);
 
-  const requiredDataLink = `/vault?types=${encodeURIComponent(
-    contractMeta.requiredContext.map((item) => item.recordType).join(',')
-  )}&scope=${selectedProjectId ? 'project' : 'global'}`;
+  const requiredDataLink = contractMeta
+    ? `/vault?types=${encodeURIComponent(contractMeta.requiredContext.map((item) => item.recordType).join(','))}&scope=${
+        selectedProjectId ? 'project' : 'global'
+      }`
+    : '/vault';
 
-  const intakeLink = `/vault?intake=1&types=${encodeURIComponent(
-    contractMeta.requiredContext.map((item) => item.recordType).join(',')
-  )}&scope=${selectedProjectId ? 'project' : 'global'}`;
+  const intakeLink = contractMeta
+    ? `/vault?intake=1&types=${encodeURIComponent(contractMeta.requiredContext.map((item) => item.recordType).join(','))}&scope=${
+        selectedProjectId ? 'project' : 'global'
+      }`
+    : '/vault?intake=1';
+
+  if (!profile || !contractMeta) {
+    return (
+      <div className="bg-white px-4 py-6 md:px-8">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Skill not found</h1>
+        <p className="mt-2 text-sm text-slate-500">Skill not found.</p>
+        <Link to="/skills" className="mt-4 inline-block text-sm text-weflora-teal underline">
+          Back to Skills
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <PageShell

@@ -32,17 +32,6 @@ const FlowDetail: React.FC = () => {
   const [strictMode, setStrictMode] = useState(false);
   const [draftUpdatedAt, setDraftUpdatedAt] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-  if (!flow) {
-    return (
-      <div className="bg-white px-4 py-6 md:px-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Flow not found</h1>
-        <p className="mt-2 text-sm text-slate-500">Flow not found.</p>
-        <Link to="/flows" className="mt-4 inline-block text-sm text-weflora-teal underline">
-          Back to Flows
-        </Link>
-      </div>
-    );
-  }
 
   const skillWriteMap = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -191,6 +180,7 @@ const FlowDetail: React.FC = () => {
   };
 
   const handleRun = () => {
+    if (!flow) return;
     navigate(`/sessions/new?intent=flow:${flow.id}`);
   };
 
@@ -220,6 +210,18 @@ const FlowDetail: React.FC = () => {
       });
     }
   };
+
+  if (!flow) {
+    return (
+      <div className="bg-white px-4 py-6 md:px-8">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Flow not found</h1>
+        <p className="mt-2 text-sm text-slate-500">Flow not found.</p>
+        <Link to="/flows" className="mt-4 inline-block text-sm text-weflora-teal underline">
+          Back to Flows
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <PageShell
