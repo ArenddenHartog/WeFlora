@@ -278,6 +278,13 @@ export const uploadToGlobalVault = async (files: File[]): Promise<VaultObject[]>
       throw new Error('Database error during vault insert.');
     }
 
+    await supabase.functions.invoke('ingest_all', {
+      body: {
+        vault_object_id: inserted.id,
+        mode: 'vault_ingest_v1'
+      }
+    });
+
     uploaded.push(mapRecordToVaultObject(inserted));
   }
 
