@@ -27,9 +27,14 @@ brew install supabase/tap/supabase
 
 **Linux:**
 ```bash
-# Download and install the latest version
-curl -L https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar -xz
+# For amd64/x86_64 (most common)
+curl -LO https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz
+tar -xzf supabase_linux_amd64.tar.gz
 sudo mv supabase /usr/local/bin/
+rm supabase_linux_amd64.tar.gz
+
+# For arm64, use: supabase_linux_arm64.tar.gz
+# See https://github.com/supabase/cli/releases for other architectures
 ```
 
 **Verify installation:**
