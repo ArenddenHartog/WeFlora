@@ -10,8 +10,34 @@ View your app in AI Studio: https://ai.studio/apps/drive/1eb9aVcW0xgHuqOEDYKId0h
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
+**Prerequisites:**  Node.js, Supabase CLI
 
+### Install Supabase CLI
+
+**Windows (using Scoop):**
+```powershell
+scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+scoop install supabase
+```
+
+**macOS (using Homebrew):**
+```bash
+brew install supabase/tap/supabase
+```
+
+**Linux:**
+```bash
+# Download and install the latest version
+curl -L https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar -xz
+sudo mv supabase /usr/local/bin/
+```
+
+**Verify installation:**
+```bash
+supabase --version
+```
+
+### Run the Application
 
 1. Install dependencies:
    `npm install`
