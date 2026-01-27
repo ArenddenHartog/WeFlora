@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { EventRecord, StepCompletedEvent, StepStartedEvent } from '../../src/agentic/contracts/ledger';
 import type { VaultPointer } from '../../src/agentic/contracts/vault';
 import { normalizeEvents } from '../../src/agentic/ledger/normalizeEvents';
+import { isDev } from '@/utils/env';
 
 interface RunTimelineProps {
   events: EventRecord[];
