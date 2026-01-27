@@ -1,8 +1,10 @@
 import { supabase } from './supabaseClient';
+import { buildProjectVaultLinkRows, buildVaultStoragePath } from './vaultUtils';
 import type { FileEntity, FileScope, FileStatus, FileVisibility, ProjectFile, KnowledgeCategory } from '../types';
 import { FileSheetIcon, FilePdfIcon, FileCodeIcon } from '../components/icons';
 
 export const FILE_BUCKET = 'project_files';
+export const VAULT_BUCKET = 'vault';
 export const FILE_VALIDATION = {
   MAX_FILE_SIZE: 10 * 1024 * 1024,
   ALLOWED_MIME_TYPES: [
@@ -35,6 +37,43 @@ export interface UploadFileResult {
   projectFile?: ProjectFile;
   error?: string;
 }
+
+export type VaultScope = 'global' | 'project';
+
+export interface VaultObject {
+  id: string;
+  ownerUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  sha256?: string | null;
+  confidence?: number | null;
+
+  storage: {
+    bucket: string;
+    path: string;
+  };
+
+  source: {
+    kind: 'upload' | 'connector' | 'manual';
+    connectorId?: string;
+    externalRef?: string;
+  };
+
+  tags?: string[];
+}
+
+export interface VaultLink {
+  id: string;
+  projectId: string;
+  vaultObjectId: string;
+  createdBy: string;
+  createdAt: string;
+  label?: string | null;
+}
+
 
 const formatFileSize = (sizeBytes: number) => `${(sizeBytes / 1024).toFixed(1)} KB`;
 
@@ -78,6 +117,28 @@ export const mapFileEntityToProjectFile = (entity: FileEntity): ProjectFile => (
   tags: entity.tags,
   status: entity.status === 'archived' ? 'archived' : 'active',
   relatedEntityId: entity.relatedEntityId ?? undefined
+});
+
+export const mapRecordToVaultObject = (record: any): VaultObject => ({
+  id: record.id,
+  ownerUserId: record.owner_user_id,
+  createdAt: record.created_at ?? new Date().toISOString(),
+  updatedAt: record.updated_at ?? new Date().toISOString(),
+  filename: record.filename,
+  mimeType: record.mime_type ?? 'application/octet-stream',
+  sizeBytes: record.size_bytes ?? 0,
+  sha256: record.sha256 ?? null,
+  confidence: record.confidence ?? null,
+  storage: {
+    bucket: record.storage_bucket ?? VAULT_BUCKET,
+    path: record.storage_path ?? ''
+  },
+  source: {
+    kind: record.source_kind ?? 'upload',
+    connectorId: record.connector_id ?? undefined,
+    externalRef: record.external_ref ?? undefined
+  },
+  tags: record.tags ?? []
 });
 
 export const validateFile = (file: File): string | null => {
@@ -144,6 +205,127 @@ export const uploadFile = async (file: File, options: UploadFileOptions = {}): P
   const entity = mapRecordToFileEntity(updatedRecord ?? fileRecord);
   const projectFile = mapFileEntityToProjectFile(entity);
   return { fileEntity: entity, projectFile };
+};
+
+export const uploadToGlobalVault = async (files: File[]): Promise<VaultObject[]> => {
+  if (files.length === 0) return [];
+
+  const userId = (await supabase.auth.getUser()).data.user?.id;
+  if (!userId) {
+    throw new Error('Missing user session.');
+  }
+
+  const uploaded: VaultObject[] = [];
+  for (const file of files) {
+    const validationError = validateFile(file);
+    if (validationError) {
+      throw new Error(validationError);
+    }
+
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const storagePath = buildVaultStoragePath(userId, id, file.name);
+
+    const { error: storageError } = await supabase.storage
+      .from(VAULT_BUCKET)
+      .upload(storagePath, file, { upsert: false });
+    if (storageError) {
+      const storageBaseUrl = (supabase as any)?.storageUrl ?? (supabase as any)?.url ?? '';
+      const requestUrl = storageBaseUrl
+        ? `${storageBaseUrl}/object/${VAULT_BUCKET}/${storagePath}`
+        : `/${VAULT_BUCKET}/${storagePath}`;
+      console.error('[vault-upload] storage error', {
+        requestUrl,
+        statusCode: storageError.statusCode,
+        errorCode: (storageError as any).code,
+        message: storageError.message,
+        details: (storageError as any).details,
+        name: storageError.name
+      });
+      throw new Error('Storage upload failed. Likely causes: missing bucket, RLS, invalid path, payload too large, or mime not allowed.');
+    }
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('vault_objects')
+      .insert({
+        id,
+        owner_user_id: userId,
+        created_at: now,
+        updated_at: now,
+        filename: file.name,
+        mime_type: file.type,
+        size_bytes: file.size,
+        sha256: null,
+        storage_bucket: VAULT_BUCKET,
+        storage_path: storagePath,
+        source_kind: 'upload',
+        connector_id: null,
+        external_ref: null,
+        tags: []
+      })
+      .select()
+      .single();
+
+    if (insertError || !inserted) {
+      console.error('[vault-upload] database insert error', {
+        table: 'vault_objects',
+        storagePath,
+        statusCode: (insertError as any)?.status,
+        errorCode: (insertError as any)?.code,
+        message: insertError?.message,
+        details: (insertError as any)?.details
+      });
+      throw new Error('Database error during vault insert.');
+    }
+
+    await supabase.functions.invoke('ingest_all', {
+      body: {
+        vault_object_id: inserted.id,
+        mode: 'vault_ingest_v1'
+      }
+    });
+
+    uploaded.push(mapRecordToVaultObject(inserted));
+  }
+
+  return uploaded;
+};
+
+export const linkVaultObjectsToProject = async (
+  projectId: string,
+  vaultObjectIds: string[]
+): Promise<VaultLink[]> => {
+  if (!projectId || vaultObjectIds.length === 0) return [];
+
+  const userId = (await supabase.auth.getUser()).data.user?.id;
+  if (!userId) {
+    throw new Error('Missing user session.');
+  }
+
+  const now = new Date().toISOString();
+  const rows = buildProjectVaultLinkRows(projectId, vaultObjectIds, now);
+
+  const { data, error } = await supabase.from('project_vault_links').insert(rows).select();
+  if (error || !data) {
+    console.error('[vault-upload] link insert error', {
+      table: 'project_vault_links',
+      projectId,
+      statusCode: (error as any)?.status,
+      errorCode: (error as any)?.code,
+      message: error?.message,
+      details: (error as any)?.details
+    });
+    throw new Error('Database error during vault link insert.');
+  }
+
+  return data.map((record: any) => ({
+    id: record.id ?? `${record.project_id}-${record.vault_id}`,
+    projectId: record.project_id,
+    vaultObjectId: record.vault_id,
+    createdBy: record.created_by ?? userId,
+    createdAt: record.created_at,
+    label: record.label ?? null
+  }));
 };
 
 export const deleteFile = async (fileId: string, userId?: string, hardDelete: boolean = true): Promise<{ error?: string }> => {

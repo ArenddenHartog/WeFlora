@@ -1,0 +1,63 @@
+{
+  "agent_id": "planning.site_constraints_summary",
+  "agent_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "samples": [
+    {
+      "schema_version": "1.0.0",
+      "id": "7a9bcb50-8f80-4ed2-8f0a-3fef4b5e44a1",
+      "run_id": "c1c7c8f1-0b02-4a05-86d7-5a3f1c1a3a66",
+      "scope_id": "scope-demo-004",
+      "agent_id": "planning.site_constraints_summary",
+      "agent_version": "1.0.0",
+      "status": "ok",
+      "inputs": {
+        "site_data": "Parcel 12B",
+        "constraints": "Utility easement, narrow sidewalk"
+      },
+      "output": {
+        "mode": "ok",
+        "payload": {
+          "summary": "Two constraints limit planting locations along the corridor.",
+          "constraints": ["Utility easement on east edge", "Sidewalk width under 2m"]
+        },
+        "confidence": { "level": "medium", "score": 0.62 },
+        "evidence": [
+          {
+            "kind": "user_provided",
+            "claim": "Utility easement noted in parcel data.",
+            "citations": []
+          }
+        ],
+        "assumptions": []
+      },
+      "created_at": "2026-01-19T10:20:00Z",
+      "started_at": "2026-01-19T10:19:40Z",
+      "finished_at": "2026-01-19T10:20:00Z"
+    },
+    {
+      "schema_version": "1.0.0",
+      "id": "3e377864-5d91-4f1a-a086-fba7cbbf0a1d",
+      "run_id": "c1c7c8f1-0b02-4a05-86d7-5a3f1c1a3a66",
+      "scope_id": "scope-demo-004",
+      "agent_id": "planning.site_constraints_summary",
+      "agent_version": "1.0.0",
+      "status": "insufficient_data",
+      "inputs": {
+        "site_data": "",
+        "constraints": ""
+      },
+      "output": {
+        "mode": "insufficient_data",
+        "confidence": { "level": "unknown" },
+        "insufficient_data": {
+          "missing": ["Site data"],
+          "recommended_next": ["Provide site data or parcel map to summarize constraints."]
+        }
+      },
+      "created_at": "2026-01-19T10:22:00Z",
+      "started_at": "2026-01-19T10:21:40Z",
+      "finished_at": "2026-01-19T10:22:00Z"
+    }
+  ]
+}

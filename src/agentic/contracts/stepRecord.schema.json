@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://weflora.app/schemas/agentic/stepRecord.schema.json",
+  "title": "StepRecord",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "$ref": "./common.schema.json#/$defs/SemVer" },
+    "id": { "$ref": "./common.schema.json#/$defs/UUID" },
+    "run_id": { "$ref": "./common.schema.json#/$defs/UUID" },
+    "scope_id": { "type": "string", "minLength": 1 },
+    "agent_id": { "$ref": "./common.schema.json#/$defs/AgentId" },
+    "agent_version": { "$ref": "./common.schema.json#/$defs/SemVer" },
+    "workflow_id": { "type": ["string", "null"] },
+    "workflow_version": { "type": ["string", "null"], "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z-.]+)?(?:\\+[0-9A-Za-z-.]+)?$" },
+    "workflow_step_id": { "type": ["string", "null"] },
+    "status": { "type": "string", "enum": ["queued", "running", "ok", "insufficient_data", "rejected", "error"] },
+    "inputs": { "type": "object" },
+    "output": { "$ref": "./common.schema.json#/$defs/OutputEnvelope" },
+    "metrics": { "type": ["object", "null"] },
+    "error": { "type": ["object", "null"] },
+    "created_at": { "$ref": "./common.schema.json#/$defs/ISODateTime" },
+    "started_at": { "$ref": "./common.schema.json#/$defs/ISODateTime" },
+    "finished_at": { "$ref": "./common.schema.json#/$defs/ISODateTime" }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "run_id",
+    "scope_id",
+    "agent_id",
+    "agent_version",
+    "status",
+    "inputs",
+    "output",
+    "created_at"
+  ]
+}

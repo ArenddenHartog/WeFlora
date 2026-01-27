@@ -1,0 +1,69 @@
+{
+  "agent_id": "compliance.invasive_risk_check",
+  "agent_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "samples": [
+    {
+      "schema_version": "1.0.0",
+      "id": "a8d76b3b-3026-4a62-9f06-9e3f4eb58b24",
+      "run_id": "74b40ee7-2144-4111-9fcb-6e45e7bd0c83",
+      "scope_id": "scope-demo-003",
+      "agent_id": "compliance.invasive_risk_check",
+      "agent_version": "1.0.0",
+      "status": "ok",
+      "inputs": {
+        "species_list": "Acer platanoides, Quercus rubra",
+        "region": "Great Lakes"
+      },
+      "output": {
+        "mode": "ok",
+        "payload": {
+          "summary": "One species carries a moderate invasive risk in the region.",
+          "risk_level": "moderate",
+          "rationale": "Acer platanoides is listed on the regional watch list."
+        },
+        "confidence": { "level": "medium", "score": 0.58 },
+        "evidence": [
+          {
+            "kind": "authoritative",
+            "claim": "Acer platanoides appears on the Great Lakes invasive watch list.",
+            "citations": [
+              {
+                "label": "Regional invasive list",
+                "vault_ref": { "kind": "url", "ref": "https://weflora.app/regs/invasive-watch" }
+              }
+            ]
+          }
+        ],
+        "assumptions": []
+      },
+      "created_at": "2026-01-19T10:15:00Z",
+      "started_at": "2026-01-19T10:14:40Z",
+      "finished_at": "2026-01-19T10:15:00Z"
+    },
+    {
+      "schema_version": "1.0.0",
+      "id": "8a1b7f03-4186-4e2d-8c6c-26360663d30d",
+      "run_id": "74b40ee7-2144-4111-9fcb-6e45e7bd0c83",
+      "scope_id": "scope-demo-003",
+      "agent_id": "compliance.invasive_risk_check",
+      "agent_version": "1.0.0",
+      "status": "insufficient_data",
+      "inputs": {
+        "species_list": "",
+        "region": "Great Lakes"
+      },
+      "output": {
+        "mode": "insufficient_data",
+        "confidence": { "level": "unknown" },
+        "insufficient_data": {
+          "missing": ["Species list"],
+          "recommended_next": ["Provide a species list for invasive screening."]
+        }
+      },
+      "created_at": "2026-01-19T10:17:00Z",
+      "started_at": "2026-01-19T10:16:45Z",
+      "finished_at": "2026-01-19T10:17:00Z"
+    }
+  ]
+}

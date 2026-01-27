@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import AppPage from '../AppPage';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { getPlanningScopeId } from '../../src/lib/planningScope';
-import { bootstrapIntervention, listInterventionsForScope, setGeometry } from '../../src/planner-pack/v1/storage/supabase';
+import { listInterventionsForScope, setGeometry } from '../../src/planner-pack/v1/storage/supabase';
 import type { PlannerIntervention } from '../../src/planner-pack/v1/schemas';
 import { plannerPackCompose } from '../../src/planner-pack/v1/workers/plannerPackCompose';
 import { useUI } from '../../contexts/UIContext';
@@ -65,6 +66,26 @@ const PlannerPackIndex: React.FC = () => {
     }
   }, [scopeId, showNotification]);
 
+  const bootstrapIntervention = useCallback(
+    async (args: { scopeId: string; name: string; municipality?: string | null; interventionType: string }) => {
+      const { data, error } = await supabase.rpc('planner_bootstrap_intervention', {
+        p_scope_id: args.scopeId,
+        p_name: args.name,
+        p_municipality: args.municipality ?? null,
+        p_intervention_type: args.interventionType
+      });
+      if (error) {
+        throw new Error(error.message);
+      }
+      const row = data?.[0];
+      if (!row?.intervention_id) {
+        throw new Error('bootstrapIntervention failed: no intervention id returned');
+      }
+      return { interventionId: row.intervention_id, scopeId: row.scope_id };
+    },
+    []
+  );
+
   useEffect(() => {
     loadInterventions();
   }, [loadInterventions]);
@@ -104,7 +125,7 @@ const PlannerPackIndex: React.FC = () => {
     if (!isLoading) {
       seedDemo();
     }
-  }, [interventions.length, isLoading, scopeId, loadInterventions]);
+  }, [interventions.length, isLoading, scopeId, loadInterventions, bootstrapIntervention]);
 
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -133,23 +154,23 @@ const PlannerPackIndex: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold text-slate-900">Planner Pack</h1>
-        <p className="text-sm text-slate-500">Submission-ready intervention packs prepared by WeFlora.</p>
-      </header>
-
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-slate-500">
-          {isLoading ? 'Loading interventions…' : `${interventions.length} intervention${interventions.length === 1 ? '' : 's'}`}
-        </div>
+    <AppPage
+      title="Planner Pack"
+      subtitle="Submission-ready intervention packs prepared by WeFlora."
+      actions={
         <button
           onClick={() => setFormOpen(true)}
-          className="px-4 py-2 bg-weflora-teal text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-weflora-dark"
+          className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold shadow-sm hover:bg-slate-800"
         >
           New Intervention
         </button>
-      </div>
+      }
+      toolbar={
+        <div className="text-sm text-slate-500">
+          {isLoading ? 'Loading interventions…' : `${interventions.length} intervention${interventions.length === 1 ? '' : 's'}`}
+        </div>
+      }
+    >
 
       {formOpen && (
         <form onSubmit={handleCreate} className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
@@ -226,7 +247,7 @@ const PlannerPackIndex: React.FC = () => {
           </button>
         ))}
       </div>
-    </div>
+    </AppPage>
   );
 };
 

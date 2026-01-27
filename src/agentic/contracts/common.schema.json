@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://weflora.app/schemas/agentic/common.schema.json",
+  "title": "Agentic Common Types",
+  "$defs": {
+    "SemVer": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z-.]+)?(?:\\+[0-9A-Za-z-.]+)?$"
+    },
+    "AgentId": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "description": "Stable agent identifier (dot/underscore/kebab allowed)."
+    },
+    "UUID": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "ISODateTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ConfidenceLevel": {
+      "type": "string",
+      "enum": ["high", "medium", "low", "unknown"]
+    },
+    "Confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": { "$ref": "#/$defs/ConfidenceLevel" },
+        "score": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "reasons": { "type": "array", "items": { "type": "string" }, "maxItems": 20 }
+      },
+      "required": ["level"]
+    },
+    "EvidenceKind": {
+      "type": "string",
+      "enum": ["authoritative", "proxy", "heuristic", "user_provided", "computed", "external_tool"]
+    },
+    "VaultRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["file", "dataset", "record", "url", "inline"] },
+        "ref": { "type": "string", "minLength": 1 },
+        "locator": { "type": ["string", "null"] },
+        "hash": { "type": "string", "pattern": "^[a-fA-F0-9]{32,128}$" }
+      },
+      "required": ["kind", "ref"]
+    },
+    "Citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "vault_ref": { "$ref": "#/$defs/VaultRef" },
+        "excerpt": { "type": ["string", "null"], "maxLength": 500 }
+      },
+      "required": ["label", "vault_ref"]
+    },
+    "EvidenceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "$ref": "#/$defs/EvidenceKind" },
+        "claim": { "type": "string", "minLength": 1 },
+        "citations": { "type": "array", "items": { "$ref": "#/$defs/Citation" }, "maxItems": 20 },
+        "notes": { "type": ["string", "null"], "maxLength": 1000 }
+      },
+      "required": ["kind", "claim"]
+    },
+    "Assumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "claim": { "type": "string", "minLength": 1 },
+        "basis": {
+          "type": "string",
+          "enum": ["authoritative", "proxy", "heuristic", "user_input", "missing_data"]
+        },
+        "risk": { "type": "string", "enum": ["low", "medium", "high"] },
+        "confidence": { "$ref": "#/$defs/Confidence" },
+        "how_to_validate": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "enum": ["weflora", "user", "shared"] }
+      },
+      "required": ["id", "claim", "basis", "risk", "confidence", "how_to_validate", "owner"]
+    },
+    "OutputMode": {
+      "type": "string",
+      "enum": ["ok", "insufficient_data", "rejected"]
+    },
+    "InsufficientData": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "missing": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 50 },
+        "recommended_next": { "type": "array", "items": { "type": "string" }, "maxItems": 50 }
+      },
+      "required": ["missing"]
+    },
+    "OutputEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "$ref": "#/$defs/OutputMode" },
+        "payload": { "type": ["object", "null"] },
+        "confidence": { "$ref": "#/$defs/Confidence" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/EvidenceItem" }, "maxItems": 100 },
+        "assumptions": { "type": "array", "items": { "$ref": "#/$defs/Assumption" }, "maxItems": 100 },
+        "insufficient_data": { "$ref": "#/$defs/InsufficientData" }
+      },
+      "required": ["mode"]
+    },
+    "ArtifactFormat": {
+      "type": "string",
+      "enum": ["json", "markdown", "html", "text"]
+    },
+    "ArtifactContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": { "$ref": "#/$defs/ArtifactFormat" },
+        "body": { "type": ["string", "object", "array", "null"] }
+      },
+      "required": ["format", "body"]
+    }
+  }
+}

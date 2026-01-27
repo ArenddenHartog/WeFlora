@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
+import AppPage from './AppPage';
 import type { KnowledgeItem, ProjectFile, PinnedProject } from '../types';
 import { 
     SearchIcon, MenuIcon, UploadIcon, DatabaseIcon, 
@@ -212,38 +213,38 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
     };
 
     return (
-        <div className="h-full overflow-y-auto bg-white p-4 md:p-8">
-            <header className="mb-8">
-                <div className="flex items-center justify-between mb-6">
-                     <div className="flex items-center gap-4">
+        <AppPage
+            title="Raw files"
+            subtitle="Source uploads and reference files."
+            actions={
+                <FilePicker accept={FILE_VALIDATION.ACCEPTED_FILE_TYPES} multiple onPick={handleFileSelect}>
+                    {({ open }) => (
+                        <button 
+                            onClick={open}
+                            className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-semibold text-xs"
+                        >
+                            <UploadIcon className="h-4 w-4" />
+                            <span className="hidden sm:inline">Upload Files</span>
+                        </button>
+                    )}
+                </FilePicker>
+            }
+            toolbar={
+                <div className="flex flex-col md:flex-row gap-6 items-center">
+                    <div className="flex items-center gap-3">
                         <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
                             <MenuIcon className="h-6 w-6" />
                         </button>
-                        <div className="h-10 w-10 bg-weflora-mint/20 rounded-xl flex items-center justify-center text-weflora-teal">
-                            <DatabaseIcon className="h-6 w-6" />
+                        <div className="h-9 w-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-700">
+                            <DatabaseIcon className="h-5 w-5" />
                         </div>
-                        <h1 className="text-2xl font-bold text-slate-800">Files Hub</h1>
-                     </div>
-                     <FilePicker accept={FILE_VALIDATION.ACCEPTED_FILE_TYPES} multiple onPick={handleFileSelect}>
-                        {({ open }) => (
-                            <button 
-                                onClick={open}
-                                className="flex items-center gap-2 px-4 py-2 bg-weflora-teal text-white rounded-lg hover:bg-weflora-dark font-medium shadow-sm transition-colors"
-                            >
-                                <UploadIcon className="h-4 w-4" />
-                                <span className="hidden sm:inline">Upload Files</span>
-                            </button>
-                        )}
-                     </FilePicker>
-                </div>
-
-                <div className="flex flex-col md:flex-row gap-6 items-center">
+                    </div>
                     <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 hide-scrollbar flex-1 border-b border-slate-100 w-full">
                         <button
                             onClick={() => { setActiveTab('all'); setSelectedProjectId(null); }}
                             className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap capitalize ${
                                 activeTab === 'all' 
-                                ? 'border-weflora-teal text-weflora-teal' 
+                                ? 'border-slate-900 text-slate-900' 
                                 : 'border-transparent text-slate-500 hover:text-slate-800'
                             }`}
                         >
@@ -253,7 +254,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                             onClick={() => { setActiveTab('knowledge'); setSelectedProjectId(null); }}
                             className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap capitalize ${
                                 activeTab === 'knowledge' 
-                                ? 'border-weflora-teal text-weflora-teal' 
+                                ? 'border-slate-900 text-slate-900' 
                                 : 'border-transparent text-slate-500 hover:text-slate-800'
                             }`}
                         >
@@ -263,7 +264,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                             onClick={() => { setActiveTab('project'); setSelectedProjectId(null); }}
                             className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap capitalize ${
                                 activeTab === 'project' 
-                                ? 'border-weflora-teal text-weflora-teal' 
+                                ? 'border-slate-900 text-slate-900' 
                                 : 'border-transparent text-slate-500 hover:text-slate-800'
                             }`}
                         >
@@ -277,11 +278,12 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                             placeholder={activeTab === 'project' && !selectedProjectId ? "Search projects..." : "Search files..."}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-weflora-teal focus:border-weflora-teal outline-none text-slate-900"
+                            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none text-slate-900"
                         />
                     </div>
                 </div>
-            </header>
+            }
+        >
 
             {/* If in Project Tab AND viewing specific project */}
             {activeTab === 'project' && selectedProjectId && (
@@ -385,7 +387,7 @@ const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({
                     setPendingDeleteItem(null);
                 }}
             />
-        </div>
+        </AppPage>
     );
 };
 

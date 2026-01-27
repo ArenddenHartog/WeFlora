@@ -162,7 +162,7 @@ const GlobalTopBar: React.FC = () => {
     }
     if (result.type === 'chat') {
       setSessionOpenOrigin('other');
-      navigate('/sessions');
+      navigate('/research-history');
       return;
     }
     if (result.type === 'file') {

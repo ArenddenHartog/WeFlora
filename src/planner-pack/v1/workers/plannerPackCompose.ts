@@ -102,27 +102,36 @@ export const buildPlannerPackArtifacts = (args: {
   const assumptionsDetailed = [
     {
       id: 'zoning-proxy',
+      claim: 'Zoning plan is planner-provided or proxy until official dataset is attached.',
       statement: 'Zoning plan is planner-provided or proxy until official dataset is attached.',
       basis: 'proxy',
+      howToValidate: 'Attach official zoning plan dataset when available.',
       how_to_validate: 'Attach official zoning plan dataset when available.',
-      confidence: 'Medium'
+      confidence: 'Medium',
+      owner: 'WeFlora'
     },
     {
       id: 'baseline-proxy',
+      claim: 'Baseline proxy dataset used for existing conditions unless overridden by uploaded sources.',
       statement: 'Baseline proxy dataset used for existing conditions unless overridden by uploaded sources.',
       basis: 'proxy',
+      howToValidate: 'Upload or connect authoritative baseline dataset.',
       how_to_validate: 'Upload or connect authoritative baseline dataset.',
-      confidence: 'Medium'
+      confidence: 'Medium',
+      owner: 'WeFlora'
     },
     {
       id: 'biodiversity-heuristic',
+      claim: 'Biodiversity heuristic (Santamour 10-20-30) applied based on available inventory.',
       statement: 'Biodiversity heuristic (Santamour 10-20-30) applied based on available inventory.',
       basis: 'heuristic',
+      howToValidate: 'Verify inventory completeness and distribution.',
       how_to_validate: 'Verify inventory completeness and distribution.',
-      confidence: 'Low'
+      confidence: 'Low',
+      owner: 'WeFlora'
     }
   ];
-  const assumptions = assumptionsDetailed.map((item) => item.statement);
+  const assumptions = assumptionsDetailed.map((item) => item.claim ?? item.statement);
 
   const memoSections = [
     {
@@ -130,7 +139,7 @@ export const buildPlannerPackArtifacts = (args: {
       body: `Prepared by WeFlora on behalf of ${args.municipality ?? 'Municipality'} · ${now()}`
     },
     {
-      title: 'Here is the evidence supporting compliance',
+      title: 'Here is the evidence supporting compliance.',
       body: [
         'Zoning plan check (Planner-provided / not yet connected)',
         'Spatial exclusion zones verified (proxy)',
@@ -236,9 +245,9 @@ export const buildPlannerPackArtifacts = (args: {
     subject: `Submission-ready Planner Pack: ${args.interventionName}`,
     body: `Submitted by WeFlora on behalf of ${args.municipality ?? 'Municipality'}.
 
-Attached is the Planner Pack for ${args.interventionName}. It includes the compliance memo, option set, and procurement notes.
+  Attached is the Planner Pack for ${args.interventionName}. It includes the compliance memo, option set, procurement notes, and maintenance plan.
 
-Prepared by WeFlora.`
+  WeFlora concludes that, under stated assumptions, this intervention is submission-ready.`
   };
 
   const speciesMixPayload = {
@@ -277,13 +286,82 @@ Prepared by WeFlora.`
       hasInventory: Boolean(args.inventorySummary),
       geometryProvided
     }),
-    schedule: [
-      { phase: 'Year 0–1 Establishment', tasks: ['Weekly watering', 'Monthly health inspection'] },
-      { phase: 'Year 2–5 Growth', tasks: ['Seasonal pruning', 'Annual safety inspection'] },
-      { phase: 'Year 5+ Steady State', tasks: ['Annual pruning', 'Replacement planning'] }
+    summary: [
+      'Establishment care is highest in Year 0–1; prioritize watering and survival audits.',
+      'Pruning cadence drops after Year 3 with annual safety inspections.',
+      'OPEX bands stabilize after Year 3 with cyclical replacements.'
     ],
-    mowingGuidance: ['Native verge: 6–8 cuts/year', 'Rain-adaptive: 4–6 cuts/year', 'Low-maintenance: 2–4 cuts/year'],
-    opexBands: ['€12–€18 per m² annually (establishment)', '€6–€10 per m² annually (steady state)']
+    phases: [
+      {
+        phase: 'Year 0–1 Establishment',
+        tasks: [
+          {
+            task: 'Watering & survival checks',
+            frequency: 'Weekly (Apr–Sep)',
+            seasonality: 'Spring–Summer',
+            responsibleParty: 'Municipal contractor',
+            opexBand: '€12–€18 per m² annually',
+            risks: ['Drought stress', 'Establishment failure'],
+            mitigations: ['Adjust irrigation schedule', 'Replace failed stock within 90 days']
+          },
+          {
+            task: 'Stake/guard inspection',
+            frequency: 'Monthly',
+            seasonality: 'All seasons',
+            responsibleParty: 'Municipal contractor',
+            opexBand: '€3–€5 per m² annually',
+            risks: ['Wind damage', 'Vandalism'],
+            mitigations: ['Repair stakes', 'Install temporary guards']
+          }
+        ]
+      },
+      {
+        phase: 'Year 1–3 Growth',
+        tasks: [
+          {
+            task: 'Formative pruning',
+            frequency: '2x per year',
+            seasonality: 'Late winter & late summer',
+            responsibleParty: 'Municipal arborist',
+            opexBand: '€6–€10 per m² annually',
+            risks: ['Canopy imbalance', 'Branch failure'],
+            mitigations: ['Annual arborist review', 'Corrective pruning plan']
+          },
+          {
+            task: 'Weed & mulch management',
+            frequency: 'Quarterly',
+            seasonality: 'Spring–Autumn',
+            responsibleParty: 'Maintenance crew',
+            opexBand: '€4–€7 per m² annually',
+            risks: ['Weed pressure', 'Soil compaction'],
+            mitigations: ['Mulch replenishment', 'Soil aeration']
+          }
+        ]
+      },
+      {
+        phase: 'Year 3–10 Steady State',
+        tasks: [
+          {
+            task: 'Safety inspection & pruning',
+            frequency: 'Annual',
+            seasonality: 'Winter',
+            responsibleParty: 'Municipal arborist',
+            opexBand: '€4–€8 per m² annually',
+            risks: ['Storm damage', 'Branch failure'],
+            mitigations: ['Storm response plan', 'Targeted pruning']
+          },
+          {
+            task: 'Replacement planning',
+            frequency: 'Every 2 years',
+            seasonality: 'Autumn',
+            responsibleParty: 'Municipal planner',
+            opexBand: '€3–€6 per m² annually',
+            risks: ['Species loss', 'Canopy gaps'],
+            mitigations: ['Maintain 10-20-30 targets', 'Advance replacement orders']
+          }
+        ]
+      }
+    ]
   };
 
   return {

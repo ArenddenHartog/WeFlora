@@ -1,0 +1,57 @@
+{
+  "agent_id": "planning.project_brief",
+  "agent_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "samples": [
+    {
+      "schema_version": "1.0.0",
+      "id": "189bba90-d27f-4dad-88b6-7ae9c861d463",
+      "run_id": "a5b7f41d-23dd-42ad-9646-1fc2b88a0db7",
+      "scope_id": "scope-demo-005",
+      "agent_id": "planning.project_brief",
+      "agent_version": "1.0.0",
+      "status": "ok",
+      "inputs": {
+        "objectives": "Increase canopy, improve safety",
+        "stakeholders": "City parks, neighborhood council"
+      },
+      "output": {
+        "mode": "ok",
+        "payload": {
+          "summary": "A concise brief capturing canopy expansion and safety goals for key stakeholders.",
+          "key_objectives": ["Increase canopy coverage by 10%", "Improve nighttime visibility"]
+        },
+        "confidence": { "level": "high", "score": 0.72 },
+        "evidence": [],
+        "assumptions": []
+      },
+      "created_at": "2026-01-19T10:25:00Z",
+      "started_at": "2026-01-19T10:24:40Z",
+      "finished_at": "2026-01-19T10:25:00Z"
+    },
+    {
+      "schema_version": "1.0.0",
+      "id": "cb70a4a2-90d3-4dd4-8f51-1ca0edc8a2c6",
+      "run_id": "a5b7f41d-23dd-42ad-9646-1fc2b88a0db7",
+      "scope_id": "scope-demo-005",
+      "agent_id": "planning.project_brief",
+      "agent_version": "1.0.0",
+      "status": "insufficient_data",
+      "inputs": {
+        "objectives": "",
+        "stakeholders": ""
+      },
+      "output": {
+        "mode": "insufficient_data",
+        "confidence": { "level": "unknown" },
+        "insufficient_data": {
+          "missing": ["Objectives"],
+          "recommended_next": ["Share the project objectives to draft a brief."]
+        }
+      },
+      "created_at": "2026-01-19T10:26:30Z",
+      "started_at": "2026-01-19T10:26:10Z",
+      "finished_at": "2026-01-19T10:26:30Z"
+    }
+  ]
+}

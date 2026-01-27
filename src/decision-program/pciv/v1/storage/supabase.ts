@@ -19,7 +19,7 @@ import {
   type PcivScopeMemberV1,
   type PcivScopeMemberRole
 } from '../schemas.ts';
-import { PcivRlsDeniedError, PcivAuthRequiredError } from './rls-errors.ts';
+import { PcivRlsDeniedError, PcivAuthRequiredError, PcivSchemaMismatchError } from './rls-errors.ts';
 import { invariantPCIVValueColumnsMatchKind } from '../runtimeInvariants.ts';
 
 // ============================================================================
@@ -39,12 +39,14 @@ const getCurrentUserId = async (): Promise<string | null> => {
  * Handle Supabase errors with RLS/auth classification.
  * Throws PcivAuthRequiredError for 401/PGRST301 (missing/invalid auth).
  * Throws PcivRlsDeniedError for 403/42501 (RLS policy denial).
+ * Throws PcivSchemaMismatchError for 400/PGRST204 (column not found).
  * Rethrows other errors unchanged.
  */
 const handleSupabaseError = (error: any, operation: string): never => {
   // Check HTTP status and PostgREST error codes
   const isAuthError = error?.status === 401 || error?.code === 'PGRST301';
   const isRlsError = error?.status === 403 || error?.code === '42501';
+  const isSchemaMismatch = error?.status === 400 || error?.code === 'PGRST204' || error?.code === '42703';
 
   if (isAuthError) {
     throw new PcivAuthRequiredError(
@@ -56,6 +58,13 @@ const handleSupabaseError = (error: any, operation: string): never => {
   if (isRlsError) {
     throw new PcivRlsDeniedError(
       `Access denied by RLS policy for ${operation}: ${error.message}`,
+      error
+    );
+  }
+
+  if (isSchemaMismatch) {
+    throw new PcivSchemaMismatchError(
+      `Schema mismatch in ${operation}: ${error.message}. Do not retry - check query columns.`,
       error
     );
   }
@@ -205,9 +214,9 @@ export const listScopeMembers = async (scopeId: string): Promise<PcivScopeMember
   try {
     const { data, error } = await supabase
       .from('pciv_scope_members')
-      .select('*')
+      .select('scope_id,user_id,role,granted_by,granted_at')
       .eq('scope_id', scopeId)
-      .order('created_at', { ascending: true });
+      .order('granted_at', { ascending: false });
 
     if (error) throw error;
 

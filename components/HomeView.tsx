@@ -1,5 +1,6 @@
 
 import React, { useMemo, useRef, useEffect } from 'react';
+import AppPage from './AppPage';
 import { useNavigate } from 'react-router-dom';
 import type { PinnedProject, RecentItem, PromptTemplate, KnowledgeItem, ChatMessage, Thread, ProjectFile, Report, Matrix, ContextItem } from '../types';
 import ChatInput from './ChatInput';
@@ -54,14 +55,26 @@ const HomeView: React.FC<HomeViewProps> = ({
     // Only show dashboard if no thread is active AND we are not currently creating one (generating)
     if (!activeThreadId && !isGenerating) {
         return (
-            <div className="h-full flex flex-col bg-white">
-                {/* Mobile Menu Trigger for Zero State */}
-                <div className="md:hidden flex items-center p-4 pb-0">
-                    <button onClick={onOpenMenu} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-                        <MenuIcon className="h-6 w-6" />
+            <AppPage
+                title="Workspace"
+                subtitle="Knowledge work starts here."
+                actions={
+                    <button
+                        onClick={onOpenCreateProject}
+                        className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                    >
+                        Create Project
                     </button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center">
+                }
+                toolbar={
+                    <div className="flex items-center gap-3">
+                        <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
+                            <MenuIcon className="h-6 w-6" />
+                        </button>
+                    </div>
+                }
+            >
+                <div className="flex flex-col items-center">
                     <header className="mb-8 md:mb-10 text-center relative w-full max-w-3xl mt-4 md:mt-8">
                         <div className="flex flex-col items-center gap-4 mb-6">
                             <div className="h-16 w-16 bg-weflora-mint/20 rounded-2xl flex items-center justify-center text-weflora-teal shadow-sm">
@@ -75,13 +88,13 @@ const HomeView: React.FC<HomeViewProps> = ({
                     <div className="w-full max-w-3xl flex flex-col items-center mb-12 relative z-10">
                         <div className="w-full max-w-2xl space-y-8">
                             <button
-                                onClick={() => navigate('/planning')}
+                                onClick={() => navigate('/sessions/new')}
                                 className="w-full bg-weflora-teal text-white rounded-2xl px-6 py-4 font-semibold text-sm shadow-md hover:bg-weflora-dark transition-colors relative flex items-center"
                             >
                                 <span className="absolute left-5 flex items-center text-white">
                                     <FlowerIcon className="h-5 w-5" />
                                 </span>
-                                <span className="w-full text-center">Start Automated Planning Flow</span>
+                                <span className="w-full text-center">Start Session</span>
                             </button>
                             <p className="text-lg text-slate-500 text-center">Or start a search or chat</p>
                             <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 p-1">
@@ -118,44 +131,20 @@ const HomeView: React.FC<HomeViewProps> = ({
                         </button>
                     </div>
                 </div>
-            </div>
+            </AppPage>
         );
     }
 
     // --- ACTIVE THREAD STATE: RESEARCH INTERFACE ---
     return (
-        <div className="h-full flex flex-col bg-white relative">
-            {/* Thread Context Header */}
-            <header className="flex-none h-14 border-b border-slate-100 flex items-center justify-between px-4 bg-white/80 backdrop-blur-md z-30">
-                <div className="flex items-center gap-4">
-                    <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
-                        <MenuIcon className="h-6 w-6" />
-                    </button>
-
-                    {onBack && (
-                        <button 
-                            onClick={onBack}
-                            className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-sm font-medium -ml-1 pr-3 border-r border-slate-200 h-6 mr-1"
-                            title="Back to Sessions"
-                        >
-                            <ChevronRightIcon className="h-4 w-4 rotate-180" />
-                            <span className="hidden sm:inline">Back</span>
-                        </button>
-                    )}
-
-                    <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-800 text-sm truncate max-w-[200px] md:max-w-xs">
-                            {activeThread?.title || 'New Research'}
-                        </span>
-                        <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full hidden sm:inline-block">Research Session</span>
-                    </div>
-                </div>
-
+        <AppPage
+            title={activeThread?.title || 'Research'}
+            actions={
                 <div className="flex items-center gap-2">
                     {onNewChat && (
                         <button 
                             onClick={onNewChat}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-all"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold"
                             title="Start a new research session"
                         >
                             <PlusIcon className="h-3.5 w-3.5" />
@@ -164,17 +153,33 @@ const HomeView: React.FC<HomeViewProps> = ({
                     )}
                     <button 
                         onClick={onPromoteToProject}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-weflora-teal text-weflora-teal hover:bg-weflora-mint/10 rounded-lg text-xs font-bold transition-all shadow-sm"
+                        className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-xs font-semibold"
                         title="Move this research into a Project context"
                     >
                         <FolderIcon className="h-3.5 w-3.5" />
                         <span className="hidden sm:inline">Promote to Project</span>
                     </button>
                 </div>
-            </header>
-
-            {/* Chat Stream - flex-1 scrollable */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-0 scroll-smooth">
+            }
+            toolbar={
+                <div className="flex items-center gap-3">
+                    <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
+                        <MenuIcon className="h-6 w-6" />
+                    </button>
+                    {onBack && (
+                        <button 
+                            onClick={onBack}
+                            className="flex items-center gap-1 text-slate-500 hover:text-slate-800 text-xs font-semibold"
+                            title="Back to Research"
+                        >
+                            <ChevronRightIcon className="h-4 w-4 rotate-180" />
+                            <span className="hidden sm:inline">Back</span>
+                        </button>
+                    )}
+                </div>
+            }
+        >
+            <div className="scroll-smooth">
                 <div className="max-w-3xl mx-auto w-full pt-6 px-4 md:px-0 pb-4">
                     {/* Only show "Start Research" if NOT generating and NO messages */}
                     {messages.length === 0 && !isGenerating && (
@@ -268,7 +273,7 @@ const HomeView: React.FC<HomeViewProps> = ({
                     />
                 </div>
             </div>
-        </div>
+        </AppPage>
     );
 };
 

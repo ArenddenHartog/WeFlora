@@ -1,0 +1,57 @@
+{
+  "agent_id": "risk.tree_failure_risk",
+  "agent_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "samples": [
+    {
+      "schema_version": "1.0.0",
+      "id": "dc1f0ac8-1f4d-4f5b-a09f-0c3f2a0c0a1f",
+      "run_id": "f64c1b5d-2a0f-4c61-90c1-6b0f9f2a9cc0",
+      "scope_id": "scope-demo-012",
+      "agent_id": "risk.tree_failure_risk",
+      "agent_version": "1.0.0",
+      "status": "ok",
+      "inputs": {
+        "tree_inventory": "Oak 12, Elm 7",
+        "weather_history": "High wind events"
+      },
+      "output": {
+        "mode": "ok",
+        "payload": {
+          "summary": "Overall risk is moderate with elevated exposure near wind corridors.",
+          "risk_band": "moderate"
+        },
+        "confidence": { "level": "medium", "score": 0.54 },
+        "evidence": [],
+        "assumptions": []
+      },
+      "created_at": "2026-01-19T10:46:00Z",
+      "started_at": "2026-01-19T10:45:40Z",
+      "finished_at": "2026-01-19T10:46:00Z"
+    },
+    {
+      "schema_version": "1.0.0",
+      "id": "7e2bcb4e-3f53-4ee5-bef7-0cd0d2eec0bf",
+      "run_id": "f64c1b5d-2a0f-4c61-90c1-6b0f9f2a9cc0",
+      "scope_id": "scope-demo-012",
+      "agent_id": "risk.tree_failure_risk",
+      "agent_version": "1.0.0",
+      "status": "insufficient_data",
+      "inputs": {
+        "tree_inventory": "",
+        "weather_history": ""
+      },
+      "output": {
+        "mode": "insufficient_data",
+        "confidence": { "level": "unknown" },
+        "insufficient_data": {
+          "missing": ["Tree inventory"],
+          "recommended_next": ["Provide tree inventory and weather history to assess risk."]
+        }
+      },
+      "created_at": "2026-01-19T10:47:30Z",
+      "started_at": "2026-01-19T10:47:00Z",
+      "finished_at": "2026-01-19T10:47:30Z"
+    }
+  ]
+}

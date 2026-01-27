@@ -1,0 +1,57 @@
+{
+  "agent_id": "carbon.canopy_carbon_estimate",
+  "agent_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "samples": [
+    {
+      "schema_version": "1.0.0",
+      "id": "3e0b75f9-5ee9-4b8a-8f8b-6f9aef0a74b3",
+      "run_id": "b14f6c3d-35e0-4d2a-8a16-1cf3f0ad2f41",
+      "scope_id": "scope-demo-009",
+      "agent_id": "carbon.canopy_carbon_estimate",
+      "agent_version": "1.0.0",
+      "status": "ok",
+      "inputs": {
+        "tree_inventory": "Maple 40, Oak 20",
+        "time_horizon": "10 years"
+      },
+      "output": {
+        "mode": "ok",
+        "payload": {
+          "summary": "Projected carbon sequestration over 10 years is moderate.",
+          "tonnes_co2": 18.5
+        },
+        "confidence": { "level": "medium", "score": 0.55 },
+        "evidence": [],
+        "assumptions": []
+      },
+      "created_at": "2026-01-19T10:37:00Z",
+      "started_at": "2026-01-19T10:36:40Z",
+      "finished_at": "2026-01-19T10:37:00Z"
+    },
+    {
+      "schema_version": "1.0.0",
+      "id": "782d1e56-94ff-4a86-92d8-7b2d0bf9d6b4",
+      "run_id": "b14f6c3d-35e0-4d2a-8a16-1cf3f0ad2f41",
+      "scope_id": "scope-demo-009",
+      "agent_id": "carbon.canopy_carbon_estimate",
+      "agent_version": "1.0.0",
+      "status": "insufficient_data",
+      "inputs": {
+        "tree_inventory": "",
+        "time_horizon": ""
+      },
+      "output": {
+        "mode": "insufficient_data",
+        "confidence": { "level": "unknown" },
+        "insufficient_data": {
+          "missing": ["Tree inventory"],
+          "recommended_next": ["Provide a tree inventory to estimate carbon."]
+        }
+      },
+      "created_at": "2026-01-19T10:38:30Z",
+      "started_at": "2026-01-19T10:38:00Z",
+      "finished_at": "2026-01-19T10:38:30Z"
+    }
+  ]
+}

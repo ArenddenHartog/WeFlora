@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AppPage from '../../AppPage';
 import type { PcivContextIntakeRun, PcivDraft, PcivMetrics, PcivSource } from '../../../src/decision-program/pciv/v0/types';
 import {
   applyPcivAutoMapping,
@@ -417,7 +418,7 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
   // Error state
   if (error) {
     return (
-      <div className="h-full flex items-center justify-center bg-slate-50">
+      <AppPage title="Context intake" actions={null}>
         <div className="max-w-md text-center space-y-4">
           <div className="text-red-600 font-semibold text-lg">Couldn't load context intake</div>
           <div className="text-sm text-slate-600">{error}</div>
@@ -445,21 +446,22 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
             )}
           </div>
         </div>
-      </div>
+      </AppPage>
     );
   }
 
   // Loading state
   if (!draft || !run) {
     return (
-      <div className="h-full flex items-center justify-center text-sm text-slate-500 bg-slate-50">
-        Loading context intake...
-      </div>
+      <AppPage title="Context intake" actions={null}>
+        <div className="text-sm text-slate-500">Loading context intake...</div>
+      </AppPage>
     );
   }
 
   return (
-    <div className="flex h-full flex-col bg-slate-50">
+    <AppPage title="Context intake" actions={null}>
+    <div className="flex flex-col bg-slate-50">
       {/* Commit Error Modal */}
       {commitError && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -564,7 +566,7 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-8">
+      <div className="px-6 py-8">
         <div className="max-w-5xl mx-auto space-y-8">
           {stage === 'import' && (
             <ImportStage
@@ -590,6 +592,7 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
         </div>
       </div>
     </div>
+    </AppPage>
   );
 };
 

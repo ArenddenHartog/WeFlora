@@ -1,0 +1,68 @@
+{
+  "agent_id": "compliance.procurement_screen",
+  "agent_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "samples": [
+    {
+      "schema_version": "1.0.0",
+      "id": "28a7866b-66fd-4e21-8a42-80a1dfac7f76",
+      "run_id": "6bf232be-95a9-4b44-9a0a-9f1bbdce1e87",
+      "scope_id": "scope-demo-002",
+      "agent_id": "compliance.procurement_screen",
+      "agent_version": "1.0.0",
+      "status": "ok",
+      "inputs": {
+        "vendor_list": "ACME Nursery; GreenRoot Supply",
+        "requirements": "Local sourcing preferred"
+      },
+      "output": {
+        "mode": "ok",
+        "payload": {
+          "summary": "Two vendors meet baseline requirements; one substitution flagged.",
+          "flags": ["GreenRoot supply needs soil certification"]
+        },
+        "confidence": { "level": "medium", "score": 0.6 },
+        "evidence": [
+          {
+            "kind": "proxy",
+            "claim": "GreenRoot soil certification not listed.",
+            "citations": [
+              {
+                "label": "Vendor catalog",
+                "vault_ref": { "kind": "url", "ref": "https://vendors.weflora.app/greenroot" }
+              }
+            ]
+          }
+        ],
+        "assumptions": []
+      },
+      "created_at": "2026-01-19T10:10:00Z",
+      "started_at": "2026-01-19T10:09:45Z",
+      "finished_at": "2026-01-19T10:10:00Z"
+    },
+    {
+      "schema_version": "1.0.0",
+      "id": "d26d2a62-9830-4a5f-8b5b-3cc5c55d1580",
+      "run_id": "6bf232be-95a9-4b44-9a0a-9f1bbdce1e87",
+      "scope_id": "scope-demo-002",
+      "agent_id": "compliance.procurement_screen",
+      "agent_version": "1.0.0",
+      "status": "insufficient_data",
+      "inputs": {
+        "vendor_list": "",
+        "requirements": "Local sourcing preferred"
+      },
+      "output": {
+        "mode": "insufficient_data",
+        "confidence": { "level": "unknown" },
+        "insufficient_data": {
+          "missing": ["Vendor list"],
+          "recommended_next": ["Provide the vendor list to continue screening."]
+        }
+      },
+      "created_at": "2026-01-19T10:12:00Z",
+      "started_at": "2026-01-19T10:11:40Z",
+      "finished_at": "2026-01-19T10:12:00Z"
+    }
+  ]
+}

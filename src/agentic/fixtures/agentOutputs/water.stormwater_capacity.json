@@ -1,0 +1,57 @@
+{
+  "agent_id": "water.stormwater_capacity",
+  "agent_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "samples": [
+    {
+      "schema_version": "1.0.0",
+      "id": "54d1b88c-5910-41d8-9106-9c6111d60385",
+      "run_id": "0f478a5e-b5a9-4f61-9d4e-37a7b6b66b8e",
+      "scope_id": "scope-demo-008",
+      "agent_id": "water.stormwater_capacity",
+      "agent_version": "1.0.0",
+      "status": "ok",
+      "inputs": {
+        "site_area": "2.1 acres",
+        "soil_profile": "Sandy loam"
+      },
+      "output": {
+        "mode": "ok",
+        "payload": {
+          "summary": "Estimated stormwater retention capacity is moderate.",
+          "capacity_m3": 420
+        },
+        "confidence": { "level": "low", "score": 0.45 },
+        "evidence": [],
+        "assumptions": []
+      },
+      "created_at": "2026-01-19T10:34:00Z",
+      "started_at": "2026-01-19T10:33:40Z",
+      "finished_at": "2026-01-19T10:34:00Z"
+    },
+    {
+      "schema_version": "1.0.0",
+      "id": "f3a8f5fd-0a41-4c99-9b77-1c0f4b7b8f9c",
+      "run_id": "0f478a5e-b5a9-4f61-9d4e-37a7b6b66b8e",
+      "scope_id": "scope-demo-008",
+      "agent_id": "water.stormwater_capacity",
+      "agent_version": "1.0.0",
+      "status": "insufficient_data",
+      "inputs": {
+        "site_area": "",
+        "soil_profile": ""
+      },
+      "output": {
+        "mode": "insufficient_data",
+        "confidence": { "level": "unknown" },
+        "insufficient_data": {
+          "missing": ["Site area"],
+          "recommended_next": ["Provide site area and soil profile to estimate capacity."]
+        }
+      },
+      "created_at": "2026-01-19T10:35:30Z",
+      "started_at": "2026-01-19T10:35:00Z",
+      "finished_at": "2026-01-19T10:35:30Z"
+    }
+  ]
+}
