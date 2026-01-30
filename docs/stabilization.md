@@ -354,69 +354,123 @@ Extend `components/ui/DebugPanel.tsx`:
 
 ## 5. SQL Scripts for Supabase SQL Editor
 
-### 5.1 Vault Review RPCs
+> **Note:** These scripts can be copy-pasted directly into Supabase SQL Editor.
+> Full migration files are in `/supabase/migrations/`.
+
+### 5.1 Vault Review Table & RPCs
 
 ```sql
--- Copy-paste into Supabase SQL Editor
+-- ==============================================
+-- VAULT REVIEW SYSTEM - Copy to SQL Editor
+-- ==============================================
 
--- Claim next review item
+-- 1. Create vault_reviews table
+create table if not exists public.vault_reviews (
+  id uuid primary key default gen_random_uuid(),
+  vault_id uuid not null references public.vault_objects(id) on delete cascade,
+  reviewer_id uuid not null references auth.users(id),
+  status text not null check (status in ('in_progress', 'approved', 'rejected', 'deferred')),
+  notes text,
+  previous_confidence numeric,
+  new_confidence numeric,
+  created_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
+create index if not exists vault_reviews_vault_idx on public.vault_reviews (vault_id, created_at desc);
+create index if not exists vault_reviews_reviewer_idx on public.vault_reviews (reviewer_id, status);
+
+alter table public.vault_reviews enable row level security;
+
+create policy "Vault reviews select" on public.vault_reviews
+  for select to authenticated using (reviewer_id = auth.uid());
+create policy "Vault reviews insert" on public.vault_reviews
+  for insert to authenticated with check (reviewer_id = auth.uid());
+create policy "Vault reviews update" on public.vault_reviews
+  for update to authenticated using (reviewer_id = auth.uid());
+
+-- 2. Claim next review item RPC
 create or replace function public.vault_claim_next_review()
-returns table(id uuid, filename text, mime_type text, confidence numeric)
-language sql
-security definer
-as $$
-  select 
-    v.id,
-    v.filename,
-    v.mime_type,
-    v.confidence
+returns table(
+  id uuid, filename text, mime_type text, size_bytes bigint,
+  confidence numeric, storage_bucket text, storage_path text,
+  tags text[], created_at timestamptz
+)
+language plpgsql security definer as $$
+declare v_vault_id uuid;
+begin
+  select v.id into v_vault_id
   from public.vault_objects v
   where v.owner_user_id = auth.uid()
     and (v.confidence is null or v.confidence < 0.8)
-    and v.id not in (
-      select vault_id from public.vault_reviews 
-      where reviewer_id = auth.uid() and status = 'in_progress'
+    and not exists (
+      select 1 from public.vault_reviews r
+      where r.vault_id = v.id and r.reviewer_id = auth.uid() and r.status = 'in_progress'
     )
-  order by v.created_at asc
+  order by case when v.confidence is null then 0 else 1 end, v.confidence asc, v.created_at asc
   limit 1;
-$$;
 
--- Update review (approve/reject with confidence update)
-create or replace function public.vault_update_review(
-  p_vault_id uuid,
-  p_status text,
-  p_confidence numeric default null,
-  p_notes text default null
-)
-returns void
-language plpgsql
-security definer
-as $$
-begin
-  -- Update vault object confidence if provided
-  if p_confidence is not null then
-    update public.vault_objects
-    set confidence = p_confidence, updated_at = now()
-    where id = p_vault_id and owner_user_id = auth.uid();
-  end if;
-  
-  -- Note: Could also track review history in a vault_reviews table
+  if v_vault_id is null then return; end if;
+
+  insert into public.vault_reviews (vault_id, reviewer_id, status, previous_confidence)
+  select v_vault_id, auth.uid(), 'in_progress', vo.confidence
+  from public.vault_objects vo where vo.id = v_vault_id;
+
+  return query select v.id, v.filename, v.mime_type, v.size_bytes, v.confidence,
+    v.storage_bucket, v.storage_path, v.tags, v.created_at
+  from public.vault_objects v where v.id = v_vault_id;
 end;
 $$;
+
+-- 3. Update review RPC
+create or replace function public.vault_update_review(
+  p_vault_id uuid, p_status text, p_confidence numeric default null, p_notes text default null
+)
+returns jsonb language plpgsql security definer as $$
+declare v_review_id uuid; v_old_confidence numeric;
+begin
+  if p_status not in ('approved', 'rejected', 'deferred') then
+    raise exception 'Invalid status';
+  end if;
+
+  select r.id, r.previous_confidence into v_review_id, v_old_confidence
+  from public.vault_reviews r
+  where r.vault_id = p_vault_id and r.reviewer_id = auth.uid() and r.status = 'in_progress'
+  order by r.created_at desc limit 1;
+
+  if v_review_id is null then raise exception 'No in_progress review found'; end if;
+
+  update public.vault_reviews set status = p_status, notes = p_notes,
+    new_confidence = p_confidence, completed_at = now() where id = v_review_id;
+
+  if p_confidence is not null and p_status = 'approved' then
+    update public.vault_objects set confidence = p_confidence, updated_at = now()
+    where id = p_vault_id and owner_user_id = auth.uid();
+  end if;
+
+  return jsonb_build_object('success', true, 'review_id', v_review_id, 'status', p_status);
+end;
+$$;
+
+grant execute on function public.vault_claim_next_review() to authenticated;
+grant execute on function public.vault_update_review(uuid, text, numeric, text) to authenticated;
 ```
 
 ### 5.2 Flow Drafts Fix
 
 ```sql
--- Fix flow_drafts to auto-set user_id
+-- ==============================================
+-- FLOW DRAFTS FIX - Copy to SQL Editor
+-- ==============================================
 
--- Option 1: Add trigger
+-- 1. Trigger to auto-set user_id
 create or replace function public.set_flow_draft_user_id()
-returns trigger
-language plpgsql
-as $$
+returns trigger language plpgsql security definer as $$
 begin
   new.user_id := coalesce(new.user_id, auth.uid());
+  if new.user_id != auth.uid() then
+    raise exception 'Cannot create flow draft for another user';
+  end if;
   return new;
 end;
 $$;
@@ -425,6 +479,46 @@ drop trigger if exists set_flow_draft_user_id_trigger on public.flow_drafts;
 create trigger set_flow_draft_user_id_trigger
   before insert or update on public.flow_drafts
   for each row execute function public.set_flow_draft_user_id();
+
+-- 2. Helper RPC for upserting flow drafts
+create or replace function public.upsert_flow_draft(p_flow_id text, p_payload jsonb)
+returns jsonb language plpgsql security definer as $$
+declare v_result record;
+begin
+  insert into public.flow_drafts (user_id, flow_id, payload, updated_at)
+  values (auth.uid(), p_flow_id, p_payload, now())
+  on conflict (user_id, flow_id) do update set payload = p_payload, updated_at = now()
+  returning id, flow_id, updated_at into v_result;
+  return jsonb_build_object('success', true, 'id', v_result.id, 'updated_at', v_result.updated_at);
+end;
+$$;
+
+grant execute on function public.upsert_flow_draft(text, jsonb) to authenticated;
+
+-- 3. Session idempotency RPC
+create or replace function public.create_session_with_idempotency(
+  p_idempotency_key text, p_intent jsonb default '{}'::jsonb
+)
+returns jsonb language plpgsql security definer as $$
+declare v_session_id uuid; v_existing_id uuid;
+begin
+  select ar.id into v_existing_id from public.agent_runs ar
+  where ar.user_id = auth.uid() and ar.title = p_idempotency_key
+    and ar.created_at > now() - interval '24 hours' limit 1;
+
+  if v_existing_id is not null then
+    return jsonb_build_object('session_id', v_existing_id, 'idempotent', true);
+  end if;
+
+  insert into public.agent_runs (scope_id, user_id, title, status)
+  values (coalesce(p_intent->>'scope_id', 'default'), auth.uid(), p_idempotency_key, 'running')
+  returning id into v_session_id;
+
+  return jsonb_build_object('session_id', v_session_id, 'idempotent', false);
+end;
+$$;
+
+grant execute on function public.create_session_with_idempotency(text, jsonb) to authenticated;
 ```
 
 ---
