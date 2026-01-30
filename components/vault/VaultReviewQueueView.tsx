@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { DatabaseIcon, FileTextIcon, SparklesIcon } from '../icons';
 import { useProject } from '../../contexts/ProjectContext';
 import { useUI } from '../../contexts/UIContext';
+import { supabase } from '../../services/supabaseClient';
 import {
   deriveVaultInventoryRecords,
   fetchVaultInventorySources,
@@ -11,6 +12,7 @@ import {
 
 const VaultReviewQueueView: React.FC = () => {
   const navigate = useNavigate();
+  const { id } = useParams();
   const { projects } = useProject();
   const { showNotification } = useUI();
   const [records, setRecords] = useState<VaultInventoryRecord[]>([]);
@@ -33,6 +35,23 @@ const VaultReviewQueueView: React.FC = () => {
   useEffect(() => {
     loadQueue();
   }, [loadQueue]);
+
+  const startReview = useCallback(async () => {
+    const { data, error } = await supabase.rpc('vault_claim_next_review');
+
+    if (error) {
+      console.error(error);
+      alert(error.message);
+      return;
+    }
+
+    if (!data?.id) {
+      alert('No items to review');
+      return;
+    }
+
+    navigate(`/vault/review/${data.id}`);
+  }, [navigate]);
 
   const queueItems = useMemo(() => {
     return records
@@ -79,12 +98,32 @@ const VaultReviewQueueView: React.FC = () => {
           </button>
           <button
             type="button"
+            onClick={startReview}
             className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
           >
             Start review
           </button>
         </div>
       </header>
+
+      {!id ? (
+        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-600">
+          <span>Select a record from the queue or claim the next one to begin reviewing.</span>
+          <div>
+            <button
+              type="button"
+              onClick={startReview}
+              className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+            >
+              Claim next
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+          Reviewing record: <span className="font-semibold text-slate-800">{id}</span>
+        </div>
+      )}
 
       <div className="mt-6 rounded-2xl border border-slate-200 bg-white">
         <div className="grid grid-cols-[120px_1.6fr_160px_120px_1fr_140px_140px] gap-3 border-b border-slate-200 px-4 py-3 text-xs font-semibold text-slate-500">

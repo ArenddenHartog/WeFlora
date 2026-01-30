@@ -687,6 +687,7 @@ const MainContent: React.FC<MainContentProps> = ({
                     <Route path="/files" element={<GlobalWorkspace view="knowledge_base" {...sharedProps} />} />
                     <Route path="/vault" element={<GlobalWorkspace view="vault" {...sharedProps} />} />
                     <Route path="/vault/review" element={<GlobalWorkspace view="vault_review" {...sharedProps} />} />
+                    <Route path="/vault/review/:id" element={<GlobalWorkspace view="vault_review" {...sharedProps} />} />
                     <Route path="/prompts" element={<GlobalWorkspace view="prompts" {...sharedProps} />} />
                 </Route>
                 
