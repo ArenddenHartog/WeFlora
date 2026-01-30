@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { getTelemetryEvents } from '../../src/agentic/telemetry/telemetry';
 import { getDebugState, getLastError } from '../../utils/safeAction';
-import { useUI } from '../../contexts/UIContext';
+
+// Import the context directly to check if it exists without throwing
+import { UIContext } from '../../contexts/UIContext';
 
 type DebugTab = 'state' | 'telemetry' | 'errors';
 
@@ -17,13 +19,9 @@ const DebugPanel: React.FC = () => {
   const debugState = getDebugState();
   const lastError = getLastError();
   
-  // Get UI context safely (might not be available)
-  let uiContext: ReturnType<typeof useUI> | null = null;
-  try {
-    uiContext = useUI();
-  } catch {
-    // UIContext not available
-  }
+  // Get UI context safely - useContext returns undefined if not in provider
+  // This is safe because useContext doesn't throw when context is missing
+  const uiContext = useContext(UIContext);
 
   // Parse URL params
   const urlParams = new URLSearchParams(location.search);
