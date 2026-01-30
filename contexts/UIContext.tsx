@@ -83,7 +83,8 @@ interface UIContextType {
     closeAssistantPanel: () => void;
 }
 
-const UIContext = createContext<UIContextType | undefined>(undefined);
+// Export the context for components that need direct access (e.g., DebugPanel)
+export const UIContext = createContext<UIContextType | undefined>(undefined);
 
 export const UIProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const navigate = useNavigate();
