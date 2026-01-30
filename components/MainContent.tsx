@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import type { 
     PinnedProject, Chat, ProjectFile, Matrix, Report, 
     ChatMessage, DiscoveredStructure, FloraGPTResponseEnvelope
@@ -14,7 +14,16 @@ import PlannerPackRoute from './routes/PlannerPackRoute';
 import ContextIntakeRoute from './routes/ContextIntakeRoute';
 import { planningRoutePaths } from './routes/planningRoutePaths';
 import { plannerPackRoutePaths } from './routes/plannerPackRoutePaths';
-import GlobalLayout from './GlobalLayout';
+import { agenticRoutePaths } from '../src/agentic/routes';
+import SkillsIndex from './agentic/SkillsIndex';
+import SkillDetail from './agentic/SkillDetail';
+import RunsIndex from './agentic/RunsIndex';
+import FlowsIndex from './agentic/FlowsIndex';
+import FlowDetail from './agentic/FlowDetail';
+import RunDetail from './agentic/RunDetail';
+import SessionWizardRoute from './sessions/SessionWizardRoute';
+import AppLayout from './AppLayout';
+import CanvasLayout from './CanvasLayout';
 import BaseModal from './BaseModal';
 import { DatabaseIcon, FolderIcon, PlusIcon, CheckIcon, SparklesIcon, RefreshIcon } from './icons';
 import { aiService, hasMarkdownPipeTable, parseMarkdownPipeTableAsMatrix } from '../services/aiService';
@@ -626,11 +635,11 @@ const MainContent: React.FC<MainContentProps> = ({
     return (
         <>
             <Routes>
-                {/* Global Routes wrapped in Global Layout */}
-                <Route element={<GlobalLayout />}>
+                {/* Global Routes wrapped in App Layout */}
+                <Route element={<AppLayout />}>
                     <Route path="/" element={<GlobalWorkspace view="home" {...sharedProps} />} />
                     <Route path="/projects" element={<GlobalWorkspace view="projects" {...sharedProps} />} />
-                    <Route path="/sessions" element={<GlobalWorkspace view="research_history" {...sharedProps} />} />
+                    <Route path="/research-history" element={<GlobalWorkspace view="research_history" {...sharedProps} />} />
                     <Route path="/chat" element={<GlobalWorkspace view="chat" {...sharedProps} />} />
                     {planningRoutePaths.planning.map((path) => (
                       <Route key={path} path={path} element={<PlanningRoute />} />
@@ -638,6 +647,37 @@ const MainContent: React.FC<MainContentProps> = ({
                     {planningRoutePaths.contextIntake.map((path) => (
                       <Route key={path} path={path} element={<ContextIntakeRoute />} />
                     ))}
+                                        {agenticRoutePaths.skills.map((path) => (
+                                            <Route
+                                                key={path}
+                                                path={path}
+                                                element={path.includes(':agentId') ? <SkillDetail /> : <SkillsIndex />}
+                                            />
+                                        ))}
+                                        {agenticRoutePaths.flows.map((path) => (
+                                            <Route
+                                                key={path}
+                                                path={path}
+                                                element={path.includes(':flowId') ? <FlowDetail /> : <FlowsIndex />}
+                                            />
+                                        ))}
+                                                                                <Route path="/sessions/new" element={<SessionWizardRoute />} />
+                                                                                {agenticRoutePaths.sessions
+                                                                                    .filter((path) => path !== '/sessions/new')
+                                                                                    .map((path) => (
+                                                                                        <Route
+                                                                                            key={path}
+                                                                                            path={path}
+                                                                                            element={path.includes(':runId') ? <RunDetail /> : <RunsIndex />}
+                                                                                        />
+                                                                                    ))}
+                                                                                {agenticRoutePaths.legacyRuns.map((path) => (
+                                                                                    <Route
+                                                                                        key={path}
+                                                                                        path={path}
+                                                                                        element={<LegacyRunRedirect />}
+                                                                                    />
+                                                                                ))}
                                         {plannerPackRoutePaths.list.map((path) => (
                                             <Route key={path} path={path} element={<PlannerPackRoute />} />
                                         ))}
@@ -645,17 +685,20 @@ const MainContent: React.FC<MainContentProps> = ({
                                             <Route key={path} path={path} element={<PlannerPackRoute />} />
                                         ))}
                     <Route path="/files" element={<GlobalWorkspace view="knowledge_base" {...sharedProps} />} />
+                    <Route path="/vault" element={<GlobalWorkspace view="vault" {...sharedProps} />} />
+                    <Route path="/vault/review" element={<GlobalWorkspace view="vault_review" {...sharedProps} />} />
+                    <Route path="/vault/review/:id" element={<GlobalWorkspace view="vault_review" {...sharedProps} />} />
                     <Route path="/prompts" element={<GlobalWorkspace view="prompts" {...sharedProps} />} />
                 </Route>
                 
-                {/* Standalone Editors (Have their own headers) */}
-                <Route path="/worksheets/*" element={<WorksheetsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
-                <Route path="/worksheets/:matrixId" element={<WorksheetsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
-                <Route path="/reports/*" element={<ReportsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
-                <Route path="/reports/:reportId" element={<ReportsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
-                
-                {/* Project Workspace */}
-                <Route path="/project/:projectId/*" element={<ProjectWorkspace />} />
+                {/* Canvas Editors (own scroll/zoom/pan) */}
+                <Route element={<CanvasLayout />}>
+                    <Route path="/worksheets/*" element={<WorksheetsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
+                    <Route path="/worksheets/:matrixId" element={<WorksheetsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
+                    <Route path="/reports/*" element={<ReportsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
+                    <Route path="/reports/:reportId" element={<ReportsRoute onOpenDestinationModal={handleOpenDestinationModal} />} />
+                    <Route path="/project/:projectId/*" element={<ProjectWorkspace />} />
+                </Route>
                 
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
@@ -874,6 +917,14 @@ const MainContent: React.FC<MainContentProps> = ({
             </BaseModal>
         </>
     );
+};
+
+const LegacyRunRedirect: React.FC = () => {
+    const { runId } = useParams();
+    if (runId) {
+        return <Navigate to={`/sessions/${runId}`} replace />;
+    }
+    return <Navigate to="/sessions" replace />;
 };
 
 export default MainContent;

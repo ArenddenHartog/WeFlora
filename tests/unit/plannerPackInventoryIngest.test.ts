@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseInventoryCsv } from '../../src/planner-pack/v1/workers/inventoryIngest.ts';
+import { parseInventoryCsv } from '../../src/planner-pack/v1/workers/inventoryParse.ts';
 
 test('inventory ingest parses CSV and computes missing rates', () => {
   const csv = `species,dbh,genus\nAcer platanoides,20,Acer\n,15,\nQuercus robur,,Quercus`;

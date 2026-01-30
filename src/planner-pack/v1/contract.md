@@ -19,7 +19,7 @@ Artifacts embed evidence links back to:
 
 ## Evidence Supporting Compliance
 Every compliance artifact must include the section:
-**“Here is the evidence supporting compliance”**
+**“Here is the evidence supporting compliance.”**
 
 Evidence entries must be linkable to a source or system operation. Baseline data is always labeled as **“Baseline proxy dataset.”**
 
@@ -30,8 +30,31 @@ Evidence entries must be linkable to a source or system operation. Baseline data
 - Users can override or correct assumptions; the system logs overrides.
 
 UI expectation:
-- Assumptions are visible in the artifact preview (no defensive or hedged language).
+- Assumptions are visible in the Assumptions module as a 3-column grid (Claim, Basis, How to validate) with confidence and owner.
+- No duplication: assumptions are not repeated in every artifact preview (unless explicitly auditing historical changes).
 - Re-run creates a new version and updates the submission-ready status.
+
+## Living Record Semantics (v1.1)
+- Planner Pack is a living record workspace: a web-first, submission-ready record with explicit evidence, assumptions, and export.
+- Middle pane should render document-style artifacts with sanitized HTML or markdown and avoid raw tags.
+- Record header shows status, confidence, last updated, and export control.
+- Timeline order: Memo → Assumptions → Options → Procurement → Maintenance → Email → Check report.
+
+### Confidence & Risk
+- Record-level confidence is derived from evidence coverage (geometry, metrics, inventory, zoning evidence) and assumption risk.
+- Assumption risk is driven by low-confidence items; high-risk assumptions must be called out in summary.
+- Zoning evidence can be proxy in v1.1 but must be labeled as such.
+
+## Maintenance Artifact (v1.1)
+Maintenance artifact type: **maintenance**
+
+Required payload fields:
+- summary: string[] (at-a-glance lifecycle summary)
+- phases: array of phase objects with:
+	- phase: string (Year 0–1, 1–3, 3–10)
+	- tasks: array of task objects (task, frequency, seasonality, responsibleParty, opexBand, risks, mitigations)
+
+Maintenance output must read like a municipal asset plan: schedule-driven, with frequency, seasonality, responsible party, OPEX bands, and explicit risks/mitigations.
 
 ## Submission-Ready (v1)
 Submission-ready means:

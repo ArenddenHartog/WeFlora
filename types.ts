@@ -515,4 +515,16 @@ export interface TeamComment {
     projectId: string;
 }
 
-export type ViewMode = 'home' | 'projects' | 'project' | 'chat' | 'knowledge_base' | 'worksheets' | 'prompts' | 'reports' | 'research_history' | 'report_editor';
+export type ViewMode =
+    | 'home'
+    | 'vault'
+    | 'vault_review'
+    | 'projects'
+    | 'project'
+    | 'chat'
+    | 'knowledge_base'
+    | 'worksheets'
+    | 'prompts'
+    | 'reports'
+    | 'research_history'
+    | 'report_editor';

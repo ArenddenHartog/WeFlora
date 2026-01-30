@@ -5,7 +5,8 @@ import type {
     ViewMode, PinnedProject, Matrix, Report, 
     ContextItem, Chat
 } from '../types';
-import HomeView from './HomeView';
+import HomeRoute from './home/HomeRoute';
+import AppPage from './AppPage';
 import ProjectsView from './ProjectsView';
 import ChatView from './ChatView';
 import KnowledgeBaseView from './KnowledgeBaseView';
@@ -13,8 +14,10 @@ import PromptTemplatesView from './PromptTemplatesView';
 import ResearchHistoryView from './ResearchHistoryView';
 import WorksheetWizard from './WorksheetWizard';
 import ReportWizard from './ReportWizard';
+import VaultInventoryView from './vault/VaultInventoryView';
+import VaultReviewQueueView from './vault/VaultReviewQueueView';
 import BaseModal from './BaseModal';
-import { FolderIcon } from './icons';
+import { FolderIcon, MenuIcon } from './icons';
 import { useData } from '../contexts/DataContext';
 import { useProject } from '../contexts/ProjectContext';
 import { useChat } from '../contexts/ChatContext';
@@ -47,15 +50,15 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
         knowledgeItems, deleteKnowledgeItem, currentWorkspace, 
         promptTemplates, savePromptTemplate, reportTemplates, 
         worksheetTemplates, saveWorksheetTemplate, saveReportTemplate,
-        species, recentItems 
+        species
     } = useData();
     
     const { 
-        chats, threads, activeThreadId, isGenerating, messages,
-        sendMessage, setActiveThreadId
+        chats, isGenerating, messages,
+        sendMessage
     } = useChat();
 
-    const { selectedChatId, sessionOpenOrigin, setSessionOpenOrigin } = useUI();
+    const { selectedChatId } = useUI();
 
     // Derived Data
     const standaloneMatrices = useMemo(() => allMatrices.filter(m => !m.projectId), [allMatrices]);
@@ -138,29 +141,7 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
         case 'home':
             return (
                 <>
-                    <HomeView
-                        pinnedProjects={pinnedProjects}
-                        recentItems={recentItems}
-                        activeThreadId={activeThreadId}
-                        threads={threads}
-                        onSelectProject={onSelectProject}
-                        onSendQuery={(text, files, instructions, model, contextItems) => 
-                            sendMessage(text, files, instructions, model, contextItems, 'home')
-                        }
-                        onOpenMenu={onOpenMenu}
-                        onOpenCreateWorksheet={() => setIsCreateWorksheetOpen(true)}
-                        onOpenCreateProject={() => setIsCreateProjectOpen(true)}
-                        onCreateReport={() => setIsCreateReportOpen(true)}
-                        onPromoteToProject={() => {}}
-                        onCopyContentToReport={(msg) => onOpenDestinationModal('report', msg)}
-                        onCopyContentToWorksheet={(msg) => onOpenDestinationModal('worksheet', msg)}
-                        isGenerating={isGenerating}
-                        onBack={sessionOpenOrigin === 'sessions' ? () => {
-                            setSessionOpenOrigin(null);
-                            setActiveThreadId(null);
-                            navigate('/sessions');
-                        } : undefined}
-                    />
+                    <HomeRoute />
                     {isCreateWorksheetOpen && (
                         <WorksheetWizard 
                             onClose={() => setIsCreateWorksheetOpen(false)} 
@@ -190,6 +171,10 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
                     </BaseModal>
                 </>
             );
+        case 'vault':
+            return <VaultInventoryView />;
+        case 'vault_review':
+            return <VaultReviewQueueView />;
         case 'projects':
             return (
                 <ProjectsView
@@ -204,7 +189,32 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
                 />
             );
         case 'chat':
-            if (selectedChat) return <div className="h-full flex flex-col bg-white"><ChatView chat={selectedChat} messages={messages} onBack={() => onNavigate('home')} onSendMessage={sendMessage} isGenerating={isGenerating} onOpenMenu={onOpenMenu} onRegenerateMessage={() => {}} onContinueInReport={(msg) => onOpenDestinationModal('report', msg)} onContinueInWorksheet={(msg) => onOpenDestinationModal('worksheet', msg)} /></div>;
+            if (selectedChat) return (
+                <AppPage
+                    title={selectedChat.title || 'Chat'}
+                    actions={null}
+                    toolbar={
+                        <div className="flex items-center gap-3">
+                            <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
+                                <MenuIcon className="h-6 w-6" />
+                            </button>
+                        </div>
+                    }
+                >
+                    <ChatView
+                        chat={selectedChat}
+                        messages={messages}
+                        onBack={() => onNavigate('home')}
+                        onSendMessage={sendMessage}
+                        isGenerating={isGenerating}
+                        onOpenMenu={onOpenMenu}
+                        onRegenerateMessage={() => {}}
+                        onContinueInReport={(msg) => onOpenDestinationModal('report', msg)}
+                        onContinueInWorksheet={(msg) => onOpenDestinationModal('worksheet', msg)}
+                        showHeader={false}
+                    />
+                </AppPage>
+            );
             return <div className="p-10 text-center text-slate-400">Chat not found</div>;
         case 'knowledge_base':
             return (

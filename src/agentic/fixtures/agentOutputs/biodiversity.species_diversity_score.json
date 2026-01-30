@@ -1,0 +1,55 @@
+{
+  "agent_id": "biodiversity.species_diversity_score",
+  "agent_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "samples": [
+    {
+      "schema_version": "1.0.0",
+      "id": "1f4781b7-0c0a-46b7-9d93-7c9e5511da9f",
+      "run_id": "07ef7c57-ec3d-4b60-b0f0-68f03ad7070e",
+      "scope_id": "scope-demo-006",
+      "agent_id": "biodiversity.species_diversity_score",
+      "agent_version": "1.0.0",
+      "status": "ok",
+      "inputs": {
+        "species_mix": "Oak 30%, Maple 20%, Elm 10%"
+      },
+      "output": {
+        "mode": "ok",
+        "payload": {
+          "summary": "Diversity score indicates moderate species spread.",
+          "score": 0.68
+        },
+        "confidence": { "level": "medium", "score": 0.58 },
+        "evidence": [],
+        "assumptions": []
+      },
+      "created_at": "2026-01-19T10:28:00Z",
+      "started_at": "2026-01-19T10:27:40Z",
+      "finished_at": "2026-01-19T10:28:00Z"
+    },
+    {
+      "schema_version": "1.0.0",
+      "id": "2c71cba5-0be6-49ac-8b28-ccda92d1ef78",
+      "run_id": "07ef7c57-ec3d-4b60-b0f0-68f03ad7070e",
+      "scope_id": "scope-demo-006",
+      "agent_id": "biodiversity.species_diversity_score",
+      "agent_version": "1.0.0",
+      "status": "insufficient_data",
+      "inputs": {
+        "species_mix": ""
+      },
+      "output": {
+        "mode": "insufficient_data",
+        "confidence": { "level": "unknown" },
+        "insufficient_data": {
+          "missing": ["Species mix"],
+          "recommended_next": ["Provide a species mix to score diversity."]
+        }
+      },
+      "created_at": "2026-01-19T10:29:30Z",
+      "started_at": "2026-01-19T10:29:00Z",
+      "finished_at": "2026-01-19T10:29:30Z"
+    }
+  ]
+}

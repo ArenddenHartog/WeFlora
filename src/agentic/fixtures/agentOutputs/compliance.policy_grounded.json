@@ -1,0 +1,86 @@
+{
+  "agent_id": "compliance.policy_grounded",
+  "agent_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "samples": [
+    {
+      "schema_version": "1.0.0",
+      "id": "2f6e2fa5-1a05-4b38-93ad-c9f1e57066f1",
+      "run_id": "9ad4b9a7-9a6f-4f62-8ad7-e5a5a41d5e45",
+      "scope_id": "scope-demo-001",
+      "agent_id": "compliance.policy_grounded",
+      "agent_version": "1.0.0",
+      "status": "ok",
+      "inputs": {
+        "policy_refs": "Urban forestry policy v3.2",
+        "project_context": "Downtown corridor refresh"
+      },
+      "output": {
+        "mode": "ok",
+        "payload": {
+          "summary": "The plan aligns with canopy coverage requirements and preservation thresholds.",
+          "status": "compliant",
+          "rationale": "Key thresholds are met based on provided policy excerpts."
+        },
+        "confidence": {
+          "level": "medium",
+          "score": 0.67,
+          "reasons": ["Policy excerpt coverage", "No conflicting clauses detected"]
+        },
+        "evidence": [
+          {
+            "kind": "authoritative",
+            "claim": "Canopy coverage threshold is 35% for the corridor zone.",
+            "citations": [
+              {
+                "label": "Urban Forestry Policy v3.2",
+                "vault_ref": {
+                  "kind": "url",
+                  "ref": "https://weflora.app/policies/urban-forestry-v3"
+                }
+              }
+            ]
+          }
+        ],
+        "assumptions": [
+          {
+            "id": "corridor-data-current",
+            "claim": "The corridor inventory reflects the most recent survey.",
+            "basis": "user_input",
+            "risk": "medium",
+            "confidence": { "level": "medium" },
+            "how_to_validate": "Confirm inventory date with the municipal forester.",
+            "owner": "shared"
+          }
+        ]
+      },
+      "created_at": "2026-01-19T10:00:00Z",
+      "started_at": "2026-01-19T09:59:40Z",
+      "finished_at": "2026-01-19T10:00:00Z"
+    },
+    {
+      "schema_version": "1.0.0",
+      "id": "4b3b9485-8b2f-4ac8-bfd6-9d45614e6b90",
+      "run_id": "9ad4b9a7-9a6f-4f62-8ad7-e5a5a41d5e45",
+      "scope_id": "scope-demo-001",
+      "agent_id": "compliance.policy_grounded",
+      "agent_version": "1.0.0",
+      "status": "insufficient_data",
+      "inputs": {
+        "policy_refs": "",
+        "project_context": "Downtown corridor refresh"
+      },
+      "output": {
+        "mode": "insufficient_data",
+        "confidence": { "level": "unknown" },
+        "insufficient_data": {
+          "missing": ["Policy references"],
+          "recommended_next": ["Upload or link policy documents to evaluate compliance."]
+        }
+      },
+      "created_at": "2026-01-19T10:05:00Z",
+      "started_at": "2026-01-19T10:04:45Z",
+      "finished_at": "2026-01-19T10:05:00Z"
+    }
+  ]
+}

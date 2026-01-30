@@ -1,0 +1,57 @@
+{
+  "agent_id": "climate_resilience.heat_resilience",
+  "agent_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "samples": [
+    {
+      "schema_version": "1.0.0",
+      "id": "9f79f92e-6e83-4e1a-94e0-9e9716b4ac3e",
+      "run_id": "b6e0c96e-0c9f-4a3a-9a77-3f872b25f9db",
+      "scope_id": "scope-demo-007",
+      "agent_id": "climate_resilience.heat_resilience",
+      "agent_version": "1.0.0",
+      "status": "ok",
+      "inputs": {
+        "species_mix": "Ginkgo, Honeylocust",
+        "heat_profile": "High heat island index"
+      },
+      "output": {
+        "mode": "ok",
+        "payload": {
+          "summary": "The mix should perform well under projected heat loads.",
+          "resilience_rating": "high"
+        },
+        "confidence": { "level": "medium", "score": 0.63 },
+        "evidence": [],
+        "assumptions": []
+      },
+      "created_at": "2026-01-19T10:31:00Z",
+      "started_at": "2026-01-19T10:30:40Z",
+      "finished_at": "2026-01-19T10:31:00Z"
+    },
+    {
+      "schema_version": "1.0.0",
+      "id": "19a6e7ac-1a1b-4d1e-b6f1-9a2e0e676e3c",
+      "run_id": "b6e0c96e-0c9f-4a3a-9a77-3f872b25f9db",
+      "scope_id": "scope-demo-007",
+      "agent_id": "climate_resilience.heat_resilience",
+      "agent_version": "1.0.0",
+      "status": "insufficient_data",
+      "inputs": {
+        "species_mix": "",
+        "heat_profile": ""
+      },
+      "output": {
+        "mode": "insufficient_data",
+        "confidence": { "level": "unknown" },
+        "insufficient_data": {
+          "missing": ["Species mix", "Heat profile"],
+          "recommended_next": ["Share a species mix and heat profile to assess resilience."]
+        }
+      },
+      "created_at": "2026-01-19T10:32:30Z",
+      "started_at": "2026-01-19T10:32:00Z",
+      "finished_at": "2026-01-19T10:32:30Z"
+    }
+  ]
+}

@@ -116,6 +116,7 @@ const PlanningView: React.FC = () => {
     );
     return selectedDocs;
   }, [files, planningProjectId]);
+
   const [planningState, setPlanningState] = useState<ExecutionState | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [pcivContextView, setPcivContextView] = useState<PcivContextViewV1 | null>(null);
@@ -130,30 +131,33 @@ const PlanningView: React.FC = () => {
     actionCards: buildActionCards(state)
   }), []);
 
-  const startPlanningRun = useCallback(async (targetProjectId?: string | null, contextView?: PcivContextViewV1 | null) => {
-    setIsStarting(true);
-    const activeProjectId = targetProjectId ?? planningProjectId;
-    const selectedDocs = await buildSelectedDocs(activeProjectId);
-    const baseContext = {
-      ...defaultPlanningContext,
-      selectedDocs,
-      scopeId: planningScopeId
-    };
-    const baseState = planRun(program, baseContext);
-    const hydrated = contextView
-      ? applyContextViewToPlanningState(baseState, contextView, { debug: FEATURES.pcivDebug })
-      : baseState;
-    const planned = withActionCards(hydrated);
-    setPlanningState(planned);
-    setInputChangeNotice(null);
-    if (contextView) {
-      setPcivContextView(contextView);
-    }
-    navigate(`/planning/${planned.runId}`);
-    const stepped = await runAgentStep(planned, program, agentRegistry);
-    setPlanningState(withActionCards(stepped));
-    setIsStarting(false);
-  }, [agentRegistry, buildSelectedDocs, defaultPlanningContext, planningScopeId, program, withActionCards, navigate, planningProjectId]);
+  const startPlanningRun = useCallback(
+    async (targetProjectId?: string | null, contextView?: PcivContextViewV1 | null) => {
+      setIsStarting(true);
+      const activeProjectId = targetProjectId ?? planningProjectId;
+      const selectedDocs = await buildSelectedDocs(activeProjectId);
+      const baseContext = {
+        ...defaultPlanningContext,
+        selectedDocs,
+        scopeId: planningScopeId
+      };
+      const baseState = planRun(program, baseContext);
+      const hydrated = contextView
+        ? applyContextViewToPlanningState(baseState, contextView, { debug: FEATURES.pcivDebug })
+        : baseState;
+      const planned = withActionCards(hydrated);
+      setPlanningState(planned);
+      setInputChangeNotice(null);
+      if (contextView) {
+        setPcivContextView(contextView);
+      }
+      navigate(`/planning/${planned.runId}`);
+      const stepped = await runAgentStep(planned, program, agentRegistry);
+      setPlanningState(withActionCards(stepped));
+      setIsStarting(false);
+    },
+    [agentRegistry, buildSelectedDocs, defaultPlanningContext, planningScopeId, program, withActionCards, navigate, planningProjectId]
+  );
 
   useEffect(() => {
     if (routeProjectId) {
@@ -556,7 +560,7 @@ const PlanningView: React.FC = () => {
           return;
         }
 
-        const resumeStateBase =
+        const resumeStateBase: ExecutionState =
           nextStateSnapshot.status === 'done'
             ? {
                 ...nextStateSnapshot,
@@ -565,7 +569,7 @@ const PlanningView: React.FC = () => {
               }
             : nextStateSnapshot;
 
-        const resumeState =
+        const resumeState: ExecutionState =
           impactedStepIds.length > 0
             ? {
                 ...resumeStateBase,
@@ -596,7 +600,7 @@ const PlanningView: React.FC = () => {
   const handleRerunImpactedSteps = useCallback(async () => {
     if (!planningState || !inputChangeNotice) return;
     const impactedStepIds = inputChangeNotice.impactedStepIds;
-    const resumeState = {
+    const resumeState: ExecutionState = {
       ...planningState,
       status: 'running',
       steps: planningState.steps.map((step) =>
@@ -692,7 +696,7 @@ const PlanningView: React.FC = () => {
 
   if (planningState) {
     return (
-      <div className="flex h-full flex-col bg-slate-50">
+      <div className="flex flex-col bg-slate-50" data-layout-root>
         <header className="flex-none h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30">
           <div className="flex items-center gap-3">
             {showBackButton && (
@@ -762,7 +766,7 @@ const PlanningView: React.FC = () => {
   }
 
   return (
-    <div className="flex h-full flex-col bg-slate-50">
+    <div className="flex flex-col bg-slate-50" data-layout-root>
       <header className="flex-none h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-30">
         <div className="flex items-center gap-3">
           {showBackButton && (

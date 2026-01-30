@@ -1,0 +1,55 @@
+{
+  "agent_id": "procurement.market_availability",
+  "agent_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "samples": [
+    {
+      "schema_version": "1.0.0",
+      "id": "d9db0e26-7f59-44f4-8616-0b3b5bfb7ad8",
+      "run_id": "4d0f3f6f-7870-4c45-9b8b-27c2dbd4aa18",
+      "scope_id": "scope-demo-011",
+      "agent_id": "procurement.market_availability",
+      "agent_version": "1.0.0",
+      "status": "ok",
+      "inputs": {
+        "procurement_list": "Quercus rubra 20, Acer rubrum 30"
+      },
+      "output": {
+        "mode": "ok",
+        "payload": {
+          "summary": "Market availability is stable with a 6-8 week lead time.",
+          "availability": "stable"
+        },
+        "confidence": { "level": "medium", "score": 0.59 },
+        "evidence": [],
+        "assumptions": []
+      },
+      "created_at": "2026-01-19T10:43:00Z",
+      "started_at": "2026-01-19T10:42:40Z",
+      "finished_at": "2026-01-19T10:43:00Z"
+    },
+    {
+      "schema_version": "1.0.0",
+      "id": "a7406b7b-0f1e-44d5-93bb-50d3a37f5cf5",
+      "run_id": "4d0f3f6f-7870-4c45-9b8b-27c2dbd4aa18",
+      "scope_id": "scope-demo-011",
+      "agent_id": "procurement.market_availability",
+      "agent_version": "1.0.0",
+      "status": "insufficient_data",
+      "inputs": {
+        "procurement_list": ""
+      },
+      "output": {
+        "mode": "insufficient_data",
+        "confidence": { "level": "unknown" },
+        "insufficient_data": {
+          "missing": ["Procurement list"],
+          "recommended_next": ["Provide a procurement list to check availability."]
+        }
+      },
+      "created_at": "2026-01-19T10:44:30Z",
+      "started_at": "2026-01-19T10:44:00Z",
+      "finished_at": "2026-01-19T10:44:30Z"
+    }
+  ]
+}

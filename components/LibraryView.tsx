@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import AppPage from './AppPage';
 import type { LibraryTemplate, TemplateType } from '../types';
 import { 
     SearchIcon, MenuIcon, MagicWandIcon, PlusIcon, 
@@ -36,29 +37,25 @@ const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTempl
     };
 
     return (
-        <div className="h-full overflow-y-auto bg-white p-4 md:p-8">
-            <header className="mb-8">
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4">
+        <AppPage
+            title="Library"
+            subtitle="Receipts, prompts, and reusable workflows."
+            actions={
+                <button className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-semibold text-xs">
+                    <PlusIcon className="h-4 w-4" />
+                    <span className="hidden sm:inline">Create Template</span>
+                </button>
+            }
+            toolbar={
+                <div className="flex flex-col md:flex-row gap-6">
+                    <div className="flex items-center gap-3">
                         <button onClick={onOpenMenu} className="md:hidden p-1 -ml-1 text-slate-600">
                             <MenuIcon className="h-6 w-6" />
                         </button>
-                        <div className="h-10 w-10 bg-weflora-teal/20 rounded-xl flex items-center justify-center text-weflora-dark">
-                            <MagicWandIcon className="h-6 w-6" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold text-slate-800">Library</h1>
-                            <p className="text-slate-500 text-sm">Receipts, prompts, and reusable workflows.</p>
+                        <div className="h-9 w-9 bg-slate-100 rounded-lg flex items-center justify-center text-slate-700">
+                            <MagicWandIcon className="h-5 w-5" />
                         </div>
                     </div>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 font-medium shadow-sm">
-                        <PlusIcon className="h-4 w-4" />
-                        <span className="hidden sm:inline">Create Template</span>
-                    </button>
-                </div>
-
-                {/* Navigation & Search */}
-                <div className="flex flex-col md:flex-row gap-6">
                     <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 hide-scrollbar flex-1 border-b border-slate-100">
                         {tabs.map(tab => (
                             <button
@@ -66,7 +63,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTempl
                                 onClick={() => setActiveTab(tab)}
                                 className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
                                     activeTab === tab 
-                                    ? 'border-weflora-teal text-weflora-dark' 
+                                    ? 'border-slate-900 text-slate-900' 
                                     : 'border-transparent text-slate-500 hover:text-slate-800'
                                 }`}
                             >
@@ -81,11 +78,12 @@ const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTempl
                             placeholder="Search receipts..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-weflora-teal focus:border-weflora-teal outline-none"
+                            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-slate-500 outline-none"
                         />
                     </div>
                 </div>
-            </header>
+            }
+        >
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredItems.map(item => (
@@ -132,7 +130,7 @@ const LibraryView: React.FC<LibraryViewProps> = ({ items, onOpenMenu, onUseTempl
                     <p className="text-slate-500 font-medium">No receipts found matching your search.</p>
                 </div>
             )}
-        </div>
+        </AppPage>
     );
 };
 
