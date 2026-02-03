@@ -1,10 +1,15 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { getTelemetryEvents } from '../../src/agentic/telemetry/telemetry';
-import { getDebugState, getLastError } from '../../utils/safeAction';
+import { getDebugState, getLastError, getLastRpcCall } from '../../utils/safeAction';
+import { supabase } from '../../services/supabaseClient';
 
 // Import the context directly to check if it exists without throwing
 import { UIContext } from '../../contexts/UIContext';
+
+// Build stamp (injected by Vite at build time)
+declare const __BUILD_SHA__: string;
+declare const __BUILD_TIME__: string;
 
 type DebugTab = 'state' | 'telemetry' | 'errors';
 
@@ -12,12 +17,18 @@ const DebugPanel: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<DebugTab>('state');
   const [copySuccess, setCopySuccess] = useState(false);
+  const [authStatus, setAuthStatus] = useState<{
+    authenticated: boolean;
+    userId: string | null;
+    email: string | null;
+  } | null>(null);
   
   const location = useLocation();
   const params = useParams();
   const events = getTelemetryEvents();
   const debugState = getDebugState();
   const lastError = getLastError();
+  const lastRpcCall = getLastRpcCall();
   
   // Get UI context safely - useContext returns undefined if not in provider
   // This is safe because useContext doesn't throw when context is missing
@@ -25,11 +36,32 @@ const DebugPanel: React.FC = () => {
 
   // Parse URL params
   const urlParams = new URLSearchParams(location.search);
-  const selectedFromUrl = urlParams.get('selected') || urlParams.get('record') || null;
+  const selectedFromUrl = urlParams.get('selected') || urlParams.get('record') || urlParams.get('id') || null;
   const intentFromUrl = urlParams.get('intent') || null;
 
   // Get localStorage session info
   const [lastSessionId, setLastSessionId] = useState<string | null>(null);
+  
+  // Check auth status when panel opens
+  useEffect(() => {
+    if (!open) return;
+    
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setAuthStatus({
+          authenticated: !!user,
+          userId: user?.id || null,
+          email: user?.email || null
+        });
+      } catch {
+        setAuthStatus({ authenticated: false, userId: null, email: null });
+      }
+    };
+    
+    checkAuth();
+  }, [open]);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem('weflora.sessions.v1');
@@ -43,6 +75,13 @@ const DebugPanel: React.FC = () => {
       // Ignore parse errors
     }
   }, [open]);
+  
+  // Build info
+  const buildInfo = {
+    sha: typeof __BUILD_SHA__ !== 'undefined' ? __BUILD_SHA__ : 'dev',
+    time: typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : new Date().toISOString(),
+    mode: (import.meta as any).env?.MODE || 'development'
+  };
 
   if (!(import.meta as any).env?.DEV) return null;
 
@@ -60,11 +99,14 @@ const DebugPanel: React.FC = () => {
         selectedChatId: uiContext.selectedChatId,
         isSidebarOpen: uiContext.isSidebarOpen
       } : null,
+      auth: authStatus,
       debug: {
         lastTraceId: debugState.lastTraceId,
         lastError: debugState.lastError,
+        lastRpcCall: debugState.lastRpcCall,
         lastSessionId
       },
+      build: buildInfo,
       telemetry: {
         eventCount: events.length,
         recentEvents: events.slice(0, 5).map(e => ({ name: e.name, at: e.at }))
@@ -137,6 +179,30 @@ const DebugPanel: React.FC = () => {
           <div className="flex-1 overflow-auto p-3 text-xs text-slate-600">
             {activeTab === 'state' && (
               <div className="space-y-3">
+                {/* Auth Status - Critical for RLS */}
+                <div className={`rounded-lg border p-2 ${authStatus?.authenticated ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
+                  <p className={`font-semibold text-[10px] uppercase tracking-wide mb-2 ${authStatus?.authenticated ? 'text-emerald-700' : 'text-rose-700'}`}>Auth Status</p>
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className={authStatus?.authenticated ? 'text-emerald-600' : 'text-rose-600'}>Authenticated</span>
+                      <span className={`font-semibold ${authStatus?.authenticated ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        {authStatus?.authenticated ? 'Yes' : 'No'}
+                      </span>
+                    </div>
+                    {authStatus?.userId && (
+                      <div className="flex justify-between">
+                        <span className="text-emerald-600">User ID</span>
+                        <span className="font-mono text-emerald-700 truncate max-w-[180px]">{authStatus.userId}</span>
+                      </div>
+                    )}
+                    {!authStatus?.authenticated && (
+                      <p className="text-rose-600 text-[10px] mt-1">
+                        Warning: RPC calls using auth.uid() will return empty results.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
                 {/* Route Info */}
                 <div className="rounded-lg border border-slate-200 p-2">
                   <p className="font-semibold text-slate-700 text-[10px] uppercase tracking-wide mb-2">Route</p>
@@ -184,6 +250,60 @@ const DebugPanel: React.FC = () => {
                         </div>
                       </>
                     )}
+                  </div>
+                </div>
+
+                {/* Last RPC Call */}
+                {lastRpcCall && (
+                  <div className={`rounded-lg border p-2 ${lastRpcCall.status && lastRpcCall.status >= 400 ? 'border-amber-200 bg-amber-50' : 'border-slate-200'}`}>
+                    <p className="font-semibold text-slate-700 text-[10px] uppercase tracking-wide mb-2">Last RPC Call</p>
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Name</span>
+                        <span className="font-mono text-slate-700">{lastRpcCall.name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Status</span>
+                        <span className={`font-mono ${lastRpcCall.status && lastRpcCall.status >= 400 ? 'text-amber-700' : 'text-slate-700'}`}>
+                          {lastRpcCall.status ?? '—'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Latency</span>
+                        <span className="font-mono text-slate-700">{lastRpcCall.latencyMs}ms</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Auth Header</span>
+                        <span className={`font-semibold ${lastRpcCall.hasAuthHeader ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {lastRpcCall.hasAuthHeader ? 'Present' : 'Missing'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">API Key</span>
+                        <span className={`font-semibold ${lastRpcCall.hasApiKey ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {lastRpcCall.hasApiKey ? 'Present' : 'Missing'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Build Info */}
+                <div className="rounded-lg border border-slate-200 p-2">
+                  <p className="font-semibold text-slate-700 text-[10px] uppercase tracking-wide mb-2">Build Stamp</p>
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">SHA</span>
+                      <span className="font-mono text-slate-700 truncate max-w-[180px]">{buildInfo.sha}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Time</span>
+                      <span className="font-mono text-slate-700 text-[10px]">{buildInfo.time}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Mode</span>
+                      <span className="font-mono text-slate-700">{buildInfo.mode}</span>
+                    </div>
                   </div>
                 </div>
 

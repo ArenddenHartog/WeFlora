@@ -199,24 +199,36 @@ export function safeSyncHandler(
 }
 
 /**
- * Utility hook for using safeAction with React state.
- * Returns [execute, isLoading, error, traceId]
+ * Last RPC call info for debugging
  */
-export function useSafeAction<T, Args extends unknown[]>(
-  action: (...args: Args) => Promise<T>,
-  options: SafeActionOptions<T> = {}
-) {
-  // Note: This would need useState/useCallback from React
-  // Leaving as a pattern for future implementation
-  return {
-    execute: (...args: Args) => safeAction(() => action(...args), options),
-  };
+interface RpcCallInfo {
+  name: string;
+  status: number | null;
+  latencyMs: number;
+  at: string;
+  hasAuthHeader: boolean;
+  hasApiKey: boolean;
 }
 
+let lastRpcCall: RpcCallInfo | null = null;
+
+export const getLastRpcCall = (): RpcCallInfo | null => lastRpcCall;
+
 /**
- * Debug state accessor for the enhanced debug panel
+ * Records an RPC call for debugging
+ */
+export const recordRpcCall = (info: Omit<RpcCallInfo, 'at'>) => {
+  lastRpcCall = {
+    ...info,
+    at: new Date().toISOString()
+  };
+};
+
+/**
+ * Enhanced debug state accessor for the debug panel
  */
 export const getDebugState = () => ({
   lastTraceId,
-  lastError
+  lastError,
+  lastRpcCall
 });
