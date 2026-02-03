@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { FILE_VALIDATION, mapRecordToVaultObject, type VaultObject } from './fileService';
+import { VAULT_STATUS, type VaultStatus, mapToLegacyReviewState } from '../utils/vaultStatus';
 
 export type VaultProjectLink = {
   projectId: string;
@@ -40,6 +41,9 @@ export type VaultInventoryRecord = {
   scope: string;
   tags: string[];
   confidence: number | null;
+  /** Canonical status from the status taxonomy */
+  status: VaultStatus;
+  /** @deprecated Use status instead. Kept for backward compatibility. */
   reviewState: 'Auto-accepted' | 'Needs review' | 'Blocked' | 'Draft';
   completeness: { missingCount: number };
   validations: VaultValidationSummary;
@@ -86,11 +90,22 @@ const buildValidationSummary = (vault: VaultObject): VaultValidationSummary => {
   return { warnings, errors };
 };
 
+/**
+ * Derive canonical status from vault object
+ */
+const deriveStatus = (vault: VaultObject, validations: VaultValidationSummary): VaultStatus => {
+  if (validations.errors.length > 0) return VAULT_STATUS.BLOCKED;
+  if (vault.confidence === null || vault.confidence === undefined) return VAULT_STATUS.DRAFT;
+  if (vault.confidence >= 0.8) return VAULT_STATUS.ACCEPTED;
+  return VAULT_STATUS.NEEDS_REVIEW;
+};
+
+/**
+ * @deprecated Derive legacy review state for backward compatibility
+ */
 const deriveReviewState = (vault: VaultObject, validations: VaultValidationSummary): VaultInventoryRecord['reviewState'] => {
-  if (validations.errors.length > 0) return 'Blocked';
-  if (vault.confidence === null || vault.confidence === undefined) return 'Draft';
-  if (vault.confidence >= 0.8) return 'Auto-accepted';
-  return 'Needs review';
+  const status = deriveStatus(vault, validations);
+  return mapToLegacyReviewState(status) as VaultInventoryRecord['reviewState'];
 };
 
 const deriveMissingCount = (vault: VaultObject): number => {
@@ -165,6 +180,7 @@ export const deriveVaultInventoryRecords = (
       .map((link) => ({ id: link.projectId, name: projectMap.get(link.projectId) ?? link.projectId }))
       .sort((a, b) => a.name.localeCompare(b.name));
     const validations = buildValidationSummary(vault);
+    const status = deriveStatus(vault, validations);
     const reviewState = deriveReviewState(vault, validations);
     const missingCount = deriveMissingCount(vault);
 
@@ -175,6 +191,7 @@ export const deriveVaultInventoryRecords = (
       scope: linked.length > 0 ? `Projects: ${linked.length}` : 'Global',
       tags: vault.tags ?? [],
       confidence: vault.confidence ?? null,
+      status,
       reviewState,
       completeness: { missingCount },
       validations,

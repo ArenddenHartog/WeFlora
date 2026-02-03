@@ -218,7 +218,7 @@ const FlowDetail: React.FC = () => {
 
         // Build input bindings from vault records
         const inputBindings: Record<string, any> = {};
-        const selectedRecords = vaultRecords.filter(r => r.reviewState === 'Auto-accepted');
+        const selectedRecords = vaultRecords.filter(r => r.status === 'accepted');
         selectedRecords.forEach((record, index) => {
           const pointerPath = `/inputs/${record.type.toLowerCase()}_${index + 1}`;
           inputBindings[pointerPath] = {
@@ -314,7 +314,7 @@ const FlowDetail: React.FC = () => {
             if (!profile) return false;
             const meta = buildSkillContractMeta(profile as any);
             return meta.requiredContext.some(ctx => 
-              !vaultRecords.some(r => r.type === ctx.recordType && r.reviewState === 'Auto-accepted')
+              !vaultRecords.some(r => r.type === ctx.recordType && r.status === 'accepted')
             );
           });
 

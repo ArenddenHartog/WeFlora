@@ -16,6 +16,7 @@ import { flowTemplates } from '../../src/agentic/registry/flows';
 import { getSkillContextTypes } from '../../src/agentic/contracts/contractCatalog';
 import { track } from '../../src/agentic/telemetry/telemetry';
 import { safeAction, formatErrorWithTrace } from '../../utils/safeAction';
+import { STATUS_META, getStatusBadgeClasses, type VaultStatus } from '../../utils/vaultStatus';
 import {
   ChevronDownIcon,
   DatabaseIcon,
@@ -27,12 +28,31 @@ import {
 } from '../icons';
 
 const RECORD_TYPES = ['Policy', 'SpeciesList', 'Site', 'Vision', 'Climate', 'Other'] as const;
+/** @deprecated Use VaultStatus instead */
 const REVIEW_STATES = ['Auto-accepted', 'Needs review', 'Blocked', 'Draft'] as const;
+/** Canonical status values for filtering */
+const STATUS_VALUES: VaultStatus[] = ['draft', 'pending', 'needs_review', 'in_review', 'accepted', 'blocked'];
 
 export type ContextRecordType = (typeof RECORD_TYPES)[number];
+/** @deprecated Use VaultStatus instead */
 export type ReviewState = (typeof REVIEW_STATES)[number];
 
-const statusBadge = (state: ReviewState) => {
+/**
+ * Get badge styling for canonical status
+ */
+const statusBadge = (status: VaultStatus) => {
+  return getStatusBadgeClasses(status);
+};
+
+/**
+ * Get status label for display
+ */
+const statusLabel = (status: VaultStatus) => {
+  return STATUS_META[status]?.label ?? status;
+};
+
+/** @deprecated Use statusBadge(status) instead */
+const legacyStatusBadge = (state: ReviewState) => {
   switch (state) {
     case 'Auto-accepted':
       return 'bg-weflora-mint/20 text-weflora-teal border border-weflora-mint/40';
@@ -62,7 +82,7 @@ const VaultInventoryView: React.FC = () => {
 
   const [search, setSearch] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<ContextRecordType[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<ReviewState[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<VaultStatus[]>([]);
   const [missingOnly, setMissingOnly] = useState(false);
   const [activeTab, setActiveTab] = useState<'fields' | 'evidence' | 'validations' | 'usage' | 'history'>('fields');
   const [isIntakeOpen, setIsIntakeOpen] = useState(false);
@@ -175,7 +195,7 @@ const VaultInventoryView: React.FC = () => {
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
       if (selectedTypes.length && !selectedTypes.includes(record.type)) return false;
-      if (selectedStatuses.length && !selectedStatuses.includes(record.reviewState)) return false;
+      if (selectedStatuses.length && !selectedStatuses.includes(record.status)) return false;
       if (missingOnly && record.completeness.missingCount === 0) return false;
       const needle = search.trim().toLowerCase();
       if (!needle) return true;
@@ -191,11 +211,11 @@ const VaultInventoryView: React.FC = () => {
     setSelectedTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
   };
 
-  const toggleStatus = (status: ReviewState) => {
+  const toggleStatus = (status: VaultStatus) => {
     setSelectedStatuses((prev) => (prev.includes(status) ? prev.filter((t) => t !== status) : [...prev, status]));
   };
 
-  const reviewCount = records.filter((record) => record.reviewState === 'Needs review').length;
+  const reviewCount = records.filter((record) => record.status === 'needs_review' || record.status === 'pending').length;
 
   const handleIntakeFiles = async (files: File[]) => {
     if (files.length === 0) return;
@@ -306,18 +326,18 @@ const VaultInventoryView: React.FC = () => {
               {type}
             </button>
           ))}
-          {REVIEW_STATES.map((state) => (
+          {STATUS_VALUES.map((status) => (
             <button
-              key={state}
+              key={status}
               type="button"
-              onClick={() => toggleStatus(state)}
+              onClick={() => toggleStatus(status)}
               className={`rounded-full px-3 py-1 text-xs font-semibold border ${
-                selectedStatuses.includes(state)
+                selectedStatuses.includes(status)
                   ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark'
                   : 'border-slate-200 text-slate-600 hover:bg-slate-50'
               }`}
             >
-              {state}
+              {statusLabel(status)}
             </button>
           ))}
           <button
@@ -411,8 +431,8 @@ const VaultInventoryView: React.FC = () => {
                     {record.confidence === null ? '—' : record.confidence.toFixed(2)}
                   </span>
                 </div>
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${statusBadge(record.reviewState)}`}>
-                  {record.reviewState}
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${statusBadge(record.status)}`}>
+                  {statusLabel(record.status)}
                 </span>
                 <span className="text-xs text-slate-500">
                   {record.completeness.missingCount === 0 ? 'Complete' : `${record.completeness.missingCount} missing`}
@@ -473,8 +493,8 @@ const VaultInventoryView: React.FC = () => {
               <div className="border-b border-slate-200 pb-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${statusBadge(selectedRecord.reviewState)}`}>
-                      {selectedRecord.reviewState}
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${statusBadge(selectedRecord.status)}`}>
+                      {statusLabel(selectedRecord.status)}
                     </span>
                     <span className="rounded-full border border-slate-200 px-2 py-0.5 text-xs text-slate-500">
                       {selectedRecord.completeness.missingCount === 0 ? 'Complete' : `${selectedRecord.completeness.missingCount} missing`}
@@ -579,7 +599,7 @@ const VaultInventoryView: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          if (selectedRecord.reviewState === 'Needs review' || selectedRecord.reviewState === 'Draft') {
+                          if (selectedRecord.status === 'needs_review' || selectedRecord.status === 'pending' || selectedRecord.status === 'draft') {
                             navigate(`/vault/review/${selectedRecord.recordId}`);
                           } else {
                             showNotification('Only records needing review can be sent to review.', 'error');

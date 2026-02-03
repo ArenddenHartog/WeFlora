@@ -54,7 +54,7 @@ const RunTab: React.FC<RunTabProps> = ({
   const groupedRecords = useMemo(() => {
     const groups: Record<string, VaultInventoryRecord[]> = {};
     contractMeta.requiredContext.forEach(ctx => {
-      groups[ctx.recordType] = vaultRecords.filter(r => r.type === ctx.recordType && r.reviewState === 'Auto-accepted');
+      groups[ctx.recordType] = vaultRecords.filter(r => r.type === ctx.recordType && r.status === 'accepted');
     });
     return groups;
   }, [vaultRecords, contractMeta]);
