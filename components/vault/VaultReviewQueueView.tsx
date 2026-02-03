@@ -10,7 +10,7 @@ import {
   XIcon
 } from '../icons';
 import { useUI } from '../../contexts/UIContext';
-import { safeAction, generateTraceId } from '../../utils/safeAction';
+import { safeAction, generateTraceId, formatErrorWithTrace } from '../../utils/safeAction';
 import { STATUS_META, getStatusBadgeClasses, type VaultStatus } from '../../utils/vaultStatus';
 import {
   fetchReviewQueue,
@@ -335,8 +335,8 @@ const VaultReviewQueueView: React.FC = () => {
     const result = await safeAction(
       () => fetchReviewQueue(50),
       {
-        onError: (error) => {
-          showNotification(`Failed to load review queue: ${error.message}`, 'error');
+        onError: (error, traceId) => {
+          showNotification(formatErrorWithTrace('Failed to load review queue', error.message, traceId), 'error');
           setLastError(error.message);
         }
       }
@@ -354,8 +354,8 @@ const VaultReviewQueueView: React.FC = () => {
     const result = await safeAction(
       () => getVaultForReview(reviewId),
       {
-        onError: (error) => {
-          showNotification(`Failed to load review: ${error.message}`, 'error');
+        onError: (error, traceId) => {
+          showNotification(formatErrorWithTrace('Failed to load review', error.message, traceId), 'error');
         }
       }
     );
@@ -388,8 +388,8 @@ const VaultReviewQueueView: React.FC = () => {
     const result = await safeAction(
       () => claimNextReview(),
       {
-        onError: (error) => {
-          showNotification(`Failed to claim review: ${error.message}`, 'error');
+        onError: (error, traceId) => {
+          showNotification(formatErrorWithTrace('Failed to claim review', error.message, traceId), 'error');
         }
       }
     );
@@ -416,17 +416,17 @@ const VaultReviewQueueView: React.FC = () => {
     const result = await safeAction(
       () => updateReview(input),
       {
-        onError: (error) => {
-          showNotification(`Failed to save review: ${error.message}`, 'error');
+        onError: (error, traceId) => {
+          showNotification(formatErrorWithTrace('Failed to save review', error.message, traceId), 'error');
         },
-        onSuccess: (res) => {
+        onSuccess: (res, traceId) => {
           if (res.success) {
             showNotification('Review saved successfully', 'success');
             // Reload queue and go back
             loadQueue();
             navigate('/vault/review');
           } else if (res.error) {
-            showNotification(`Save failed: ${res.error}`, 'error');
+            showNotification(formatErrorWithTrace('Save failed', res.error, traceId), 'error');
           }
         }
       }

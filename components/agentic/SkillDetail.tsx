@@ -13,7 +13,7 @@ import { useProject } from '../../contexts/ProjectContext';
 import { useUI } from '../../contexts/UIContext';
 import { loadStoredSessions, addStoredSession } from '../../src/agentic/sessions/storage';
 import { flowTemplates } from '../../src/agentic/registry/flows';
-import { safeAction } from '../../utils/safeAction';
+import { safeAction, formatErrorWithTrace } from '../../utils/safeAction';
 import { supabase } from '../../services/supabaseClient';
 import type { EventRecord, Session } from '../../src/agentic/contracts/ledger';
 import type { RunContext } from '../../src/agentic/contracts/run_context';
@@ -859,8 +859,8 @@ const SkillDetail: React.FC = () => {
                   navigate(`/sessions/${sessionId}`);
                 },
                 {
-                  onError: (error) => {
-                    showNotification(`Run failed: ${error.message}`, 'error');
+                  onError: (error, traceId) => {
+                    showNotification(formatErrorWithTrace('Run failed', error.message, traceId), 'error');
                   }
                 }
               );

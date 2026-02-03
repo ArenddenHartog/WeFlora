@@ -232,3 +232,26 @@ export const getDebugState = () => ({
   lastError,
   lastRpcCall
 });
+
+/**
+ * Formats an error message with a trace ID for user-facing notifications.
+ * 
+ * Usage:
+ * ```typescript
+ * safeAction(
+ *   async () => { ... },
+ *   {
+ *     onError: (error, traceId) => {
+ *       showNotification(formatErrorWithTrace('Save failed', error.message, traceId), 'error');
+ *     }
+ *   }
+ * );
+ * ```
+ */
+export const formatErrorWithTrace = (
+  prefix: string,
+  message: string,
+  traceId: string
+): string => {
+  return `${prefix}: ${message} [${traceId}]`;
+};

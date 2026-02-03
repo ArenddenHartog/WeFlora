@@ -14,7 +14,7 @@ import { useProject } from '../../contexts/ProjectContext';
 import { useUI } from '../../contexts/UIContext';
 import { supabase } from '../../services/supabaseClient';
 import { track } from '../../src/agentic/telemetry/telemetry';
-import { safeAction } from '../../utils/safeAction';
+import { safeAction, formatErrorWithTrace } from '../../utils/safeAction';
 import { addStoredSession } from '../../src/agentic/sessions/storage';
 import type { EventRecord, Session } from '../../src/agentic/contracts/ledger';
 import type { RunContext } from '../../src/agentic/contracts/run_context';
@@ -186,9 +186,9 @@ const FlowDetail: React.FC = () => {
         return data;
       },
       {
-        onError: (error) => {
-          track('flow_draft.save_error', { message: error.message });
-          showNotification(`Failed to save draft: ${error.message}`, 'error');
+        onError: (error, traceId) => {
+          track('flow_draft.save_error', { message: error.message, traceId });
+          showNotification(formatErrorWithTrace('Failed to save draft', error.message, traceId), 'error');
         },
         onSuccess: () => {
           showNotification('Draft flow saved (latest skill versions).', 'success');
@@ -362,8 +362,8 @@ const FlowDetail: React.FC = () => {
         navigate(`/sessions/${sessionId}`);
       },
       {
-        onError: (error) => {
-          showNotification(`Run failed: ${error.message}`, 'error');
+        onError: (error, traceId) => {
+          showNotification(formatErrorWithTrace('Run failed', error.message, traceId), 'error');
         }
       }
     );

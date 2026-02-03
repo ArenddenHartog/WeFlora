@@ -15,7 +15,7 @@ import { agentProfilesContract } from '../../src/agentic/registry/agents';
 import { flowTemplates } from '../../src/agentic/registry/flows';
 import { getSkillContextTypes } from '../../src/agentic/contracts/contractCatalog';
 import { track } from '../../src/agentic/telemetry/telemetry';
-import { safeAction } from '../../utils/safeAction';
+import { safeAction, formatErrorWithTrace } from '../../utils/safeAction';
 import {
   ChevronDownIcon,
   DatabaseIcon,
@@ -112,9 +112,9 @@ const VaultInventoryView: React.FC = () => {
         return derived;
       },
       {
-        onError: (error) => {
-          track('vault_inventory.load_error', { message: error.message });
-          showNotification('Failed to load vault inventory.', 'error');
+        onError: (error, traceId) => {
+          track('vault_inventory.load_error', { message: error.message, traceId });
+          showNotification(formatErrorWithTrace('Failed to load vault inventory', error.message, traceId), 'error');
         }
       }
     );
@@ -138,9 +138,9 @@ const VaultInventoryView: React.FC = () => {
         return derived;
       },
       {
-        onError: (error) => {
-          track('vault_inventory.load_more_error', { message: error.message });
-          showNotification('Failed to load more records.', 'error');
+        onError: (error, traceId) => {
+          track('vault_inventory.load_more_error', { message: error.message, traceId });
+          showNotification(formatErrorWithTrace('Failed to load more records', error.message, traceId), 'error');
         }
       }
     );
