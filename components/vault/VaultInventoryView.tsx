@@ -169,6 +169,7 @@ const VaultInventoryView: React.FC = () => {
       setSelectedTypes([typeParam as ContextRecordType]);
     }
     // Note: selected ID is handled via selectedRecord derived from URL
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filteredRecords = useMemo(() => {
