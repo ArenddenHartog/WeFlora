@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import PageShell from '../ui/PageShell';
 import { useProject } from '../../contexts/ProjectContext';
 import { useUI } from '../../contexts/UIContext';
@@ -8,7 +8,6 @@ import { FILE_VALIDATION, linkVaultObjectsToProject, uploadToGlobalVault } from 
 import {
   deriveVaultInventoryRecords,
   fetchVaultInventoryPage,
-  fetchVaultInventorySources,
   getVaultFileUrl,
   type VaultInventoryRecord
 } from '../../services/vaultInventoryService';
@@ -16,13 +15,15 @@ import { agentProfilesContract } from '../../src/agentic/registry/agents';
 import { flowTemplates } from '../../src/agentic/registry/flows';
 import { getSkillContextTypes } from '../../src/agentic/contracts/contractCatalog';
 import { track } from '../../src/agentic/telemetry/telemetry';
+import { safeAction } from '../../utils/safeAction';
 import {
   ChevronDownIcon,
   DatabaseIcon,
   FileTextIcon,
   PlusIcon,
   SearchIcon,
-  SparklesIcon
+  SparklesIcon,
+  XIcon
 } from '../icons';
 
 const RECORD_TYPES = ['Policy', 'SpeciesList', 'Site', 'Vision', 'Climate', 'Other'] as const;
@@ -55,6 +56,7 @@ const confidenceSegments = (confidence: number) => {
 const VaultInventoryView: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { projects } = useProject();
   const { selectedProjectId, setSelectedProjectId, showNotification } = useUI();
 
@@ -62,7 +64,6 @@ const VaultInventoryView: React.FC = () => {
   const [selectedTypes, setSelectedTypes] = useState<ContextRecordType[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<ReviewState[]>([]);
   const [missingOnly, setMissingOnly] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<VaultInventoryRecord | null>(null);
   const [activeTab, setActiveTab] = useState<'fields' | 'evidence' | 'validations' | 'usage' | 'history'>('fields');
   const [isIntakeOpen, setIsIntakeOpen] = useState(false);
   const [intakeStep, setIntakeStep] = useState(1);
@@ -74,24 +75,50 @@ const VaultInventoryView: React.FC = () => {
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
 
+  // URL-driven selection: Get selected ID from URL
+  const selectedId = searchParams.get('selected');
+  
+  // Derive selectedRecord from URL and records (not component state)
+  const selectedRecord = useMemo(() => {
+    if (!selectedId) return null;
+    return records.find((record) => record.recordId === selectedId) ?? null;
+  }, [selectedId, records]);
+
+  // Function to update selection in URL (deterministic, survives refresh)
+  const setSelectedId = useCallback((id: string | null) => {
+    setSearchParams((prev) => {
+      const newParams = new URLSearchParams(prev);
+      if (id) {
+        newParams.set('selected', id);
+      } else {
+        newParams.delete('selected');
+      }
+      return newParams;
+    }, { replace: true });
+  }, [setSearchParams]);
+
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
   const recentProjects = projects.slice(0, 5);
 
   const loadInventory = useCallback(async () => {
     setIsLoading(true);
-    try {
-      const { vaultObjects, projectLinks, cursor: nextCursor } = await fetchVaultInventoryPage({ projectId: selectedProjectId, limit: 50, cursor: null });
-      const derived = deriveVaultInventoryRecords(vaultObjects, projectLinks, projects);
-      setRecords(derived);
-      setCursor(nextCursor ?? null);
-      setHasMore(Boolean(nextCursor));
-      setSelectedRecord((prev) => (prev ? derived.find((record) => record.recordId === prev.recordId) ?? null : null));
-    } catch (error) {
-      track('vault_inventory.load_error', { message: (error as Error).message });
-      showNotification('Failed to load vault inventory.', 'error');
-    } finally {
-      setIsLoading(false);
-    }
+    await safeAction(
+      async () => {
+        const { vaultObjects, projectLinks, cursor: nextCursor } = await fetchVaultInventoryPage({ projectId: selectedProjectId, limit: 50, cursor: null });
+        const derived = deriveVaultInventoryRecords(vaultObjects, projectLinks, projects);
+        setRecords(derived);
+        setCursor(nextCursor ?? null);
+        setHasMore(Boolean(nextCursor));
+        return derived;
+      },
+      {
+        onError: (error) => {
+          track('vault_inventory.load_error', { message: error.message });
+          showNotification('Failed to load vault inventory.', 'error');
+        }
+      }
+    );
+    setIsLoading(false);
   }, [projects, selectedProjectId, showNotification]);
 
   useEffect(() => {
@@ -101,24 +128,29 @@ const VaultInventoryView: React.FC = () => {
   const loadMore = async () => {
     if (!cursor || isLoading) return;
     setIsLoading(true);
-    try {
-      const { vaultObjects, projectLinks, cursor: nextCursor } = await fetchVaultInventoryPage({ projectId: selectedProjectId, limit: 50, cursor });
-      const derived = deriveVaultInventoryRecords(vaultObjects, projectLinks, projects);
-      setRecords((prev) => [...prev, ...derived]);
-      setCursor(nextCursor ?? null);
-      setHasMore(Boolean(nextCursor));
-    } catch (error) {
-      track('vault_inventory.load_more_error', { message: (error as Error).message });
-      showNotification('Failed to load more records.', 'error');
-    } finally {
-      setIsLoading(false);
-    }
+    await safeAction(
+      async () => {
+        const { vaultObjects, projectLinks, cursor: nextCursor } = await fetchVaultInventoryPage({ projectId: selectedProjectId, limit: 50, cursor });
+        const derived = deriveVaultInventoryRecords(vaultObjects, projectLinks, projects);
+        setRecords((prev) => [...prev, ...derived]);
+        setCursor(nextCursor ?? null);
+        setHasMore(Boolean(nextCursor));
+        return derived;
+      },
+      {
+        onError: (error) => {
+          track('vault_inventory.load_more_error', { message: error.message });
+          showNotification('Failed to load more records.', 'error');
+        }
+      }
+    );
+    setIsLoading(false);
   };
 
+  // Initialize filters from URL params (only on mount)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const intake = params.get('intake');
-    const recordId = params.get('record');
     const typeParam = params.get('type');
     const typesParam = params.get('types');
     const scopeParam = params.get('scope');
@@ -136,11 +168,8 @@ const VaultInventoryView: React.FC = () => {
     } else if (typeParam && RECORD_TYPES.includes(typeParam as ContextRecordType)) {
       setSelectedTypes([typeParam as ContextRecordType]);
     }
-
-    if (recordId) {
-      setSelectedRecord((prev) => prev?.recordId === recordId ? prev : records.find((record) => record.recordId === recordId) ?? null);
-    }
-  }, [location.search, records]);
+    // Note: selected ID is handled via selectedRecord derived from URL
+  }, []);
 
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
@@ -324,8 +353,10 @@ const VaultInventoryView: React.FC = () => {
               <button
                 key={record.recordId}
                 type="button"
-                onClick={() => setSelectedRecord(record)}
-                className="grid w-full grid-cols-[120px_1.6fr_1fr_140px_140px_140px_160px_160px_120px_60px] items-center gap-3 px-4 py-4 text-left text-sm text-slate-700 hover:bg-slate-50"
+                onClick={() => setSelectedId(record.recordId)}
+                className={`grid w-full grid-cols-[120px_1.6fr_1fr_140px_140px_140px_160px_160px_120px_60px] items-center gap-3 px-4 py-4 text-left text-sm text-slate-700 hover:bg-slate-50 ${
+                  selectedId === record.recordId ? 'bg-weflora-mint/10 border-l-2 border-weflora-teal' : ''
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-weflora-mint/20 text-weflora-teal">
@@ -395,27 +426,38 @@ const VaultInventoryView: React.FC = () => {
           </div>
         </div>
 
-        <aside className="rounded-2xl border border-slate-200 bg-white p-4">
+        <aside className="rounded-2xl border border-slate-200 bg-white p-4 sticky top-4">
           {selectedRecord ? (
             <div className="space-y-4">
               <div className="border-b border-slate-200 pb-4">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${statusBadge(selectedRecord.reviewState)}`}>
-                    {selectedRecord.reviewState}
-                  </span>
-                  <span className="rounded-full border border-slate-200 px-2 py-0.5 text-xs text-slate-500">
-                    {selectedRecord.completeness.missingCount === 0 ? 'Complete' : `${selectedRecord.completeness.missingCount} missing`}
-                  </span>
-                  <span className="rounded-full border border-slate-200 px-2 py-0.5 text-xs text-slate-500">
-                    {selectedRecord.validations.errors.length > 0
-                      ? `${selectedRecord.validations.errors.length} errors`
-                      : selectedRecord.validations.warnings.length > 0
-                        ? `${selectedRecord.validations.warnings.length} warnings`
-                        : 'Valid'}
-                  </span>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${statusBadge(selectedRecord.reviewState)}`}>
+                      {selectedRecord.reviewState}
+                    </span>
+                    <span className="rounded-full border border-slate-200 px-2 py-0.5 text-xs text-slate-500">
+                      {selectedRecord.completeness.missingCount === 0 ? 'Complete' : `${selectedRecord.completeness.missingCount} missing`}
+                    </span>
+                    <span className="rounded-full border border-slate-200 px-2 py-0.5 text-xs text-slate-500">
+                      {selectedRecord.validations.errors.length > 0
+                        ? `${selectedRecord.validations.errors.length} errors`
+                        : selectedRecord.validations.warnings.length > 0
+                          ? `${selectedRecord.validations.warnings.length} warnings`
+                          : 'Valid'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(null)}
+                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                    title="Close panel"
+                  >
+                    <XIcon className="h-4 w-4" />
+                  </button>
                 </div>
                 <h2 className="mt-3 text-lg font-semibold text-slate-900">{selectedRecord.title}</h2>
                 <p className="mt-1 text-xs text-slate-500">{selectedRecord.type} · {selectedRecord.scope}</p>
+                <p className="mt-1 text-[10px] text-slate-400 font-mono">ID: {selectedRecord.recordId}</p>
                 <div className="mt-3">
                   <p className="text-xs font-semibold text-slate-700">Confidence</p>
                   <div className="mt-2 flex items-center gap-2">
@@ -484,14 +526,36 @@ const VaultInventoryView: React.FC = () => {
                 <div className="space-y-3">
                   <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-600">
                     <p className="text-xs font-semibold text-slate-700">Primary source</p>
-                    <p className="mt-2 text-xs text-slate-500">{selectedRecord.vault.storage.bucket}/{selectedRecord.vault.storage.path}</p>
-                    <button
-                      type="button"
-                      onClick={handleOpenSource}
-                      className="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                    >
-                      Open source file
-                    </button>
+                    <p className="mt-2 text-xs text-slate-500 font-mono break-all">{selectedRecord.vault.storage.bucket}/{selectedRecord.vault.storage.path}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={handleOpenSource}
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                      >
+                        Preview file
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedRecord.reviewState === 'Needs review' || selectedRecord.reviewState === 'Draft') {
+                            navigate(`/vault/review/${selectedRecord.recordId}`);
+                          } else {
+                            showNotification('Only records needing review can be sent to review.', 'error');
+                          }
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                      >
+                        Review
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/skills?vaultId=${selectedRecord.recordId}`)}
+                        className="inline-flex items-center gap-2 rounded-lg bg-weflora-teal px-3 py-2 text-xs font-semibold text-white hover:bg-weflora-dark"
+                      >
+                        Send to Skill…
+                      </button>
+                    </div>
                   </div>
                   <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-600">
                     <p className="text-xs font-semibold text-slate-700">Linked projects</p>
