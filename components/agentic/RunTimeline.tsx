@@ -258,12 +258,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events }) => {
                   )}
                 </section>
 
-                {isDev && duplicates > 0 ? (
-                  <section>
-                    <p className="text-xs text-slate-500">Duplicate suppressed</p>
-                    <p className="mt-2 text-sm text-slate-500">{duplicates} duplicate step events suppressed.</p>
-                  </section>
-                ) : null}
+{/* Duplicate suppression display removed - duplicate tracking handled by normalizeEvents */}
               </div>
             </article>
           );
