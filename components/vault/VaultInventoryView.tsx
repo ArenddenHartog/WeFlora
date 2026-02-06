@@ -30,7 +30,17 @@ import {
   tableHeaderRow,
   tableRow,
   tableRowSelected,
+  relevanceHigh,
+  relevanceMedium,
+  relevanceLow,
+  memorySignalLabel,
+  memorySignalValue,
+  agentSuggestionBox,
+  agentSuggestionLabel,
+  cognitiveLoopBadge,
+  loopMemory,
 } from '../../src/ui/tokens';
+import type { RelevanceLevel } from '../../services/vaultInventoryService';
 import {
   ChevronDownIcon,
   DatabaseIcon,
@@ -73,11 +83,19 @@ const confidenceSegments = (confidence: number) => {
   return Array.from({ length: segments }, (_, idx) => idx < active);
 };
 
-const relevanceLabel = (relevance: number | null | undefined): string => {
-  if (relevance == null) return '—';
-  if (relevance >= 0.7) return 'H';
-  if (relevance >= 0.4) return 'M';
-  return 'L';
+const relevanceBadgeClass = (level: RelevanceLevel): string => {
+  switch (level) {
+    case 'high': return relevanceHigh;
+    case 'medium': return relevanceMedium;
+    case 'low': return relevanceLow;
+  }
+};
+const relevanceShortLabel = (level: RelevanceLevel): string => {
+  switch (level) {
+    case 'high': return 'H';
+    case 'medium': return 'M';
+    case 'low': return 'L';
+  }
 };
 
 const VaultInventoryView: React.FC = () => {
@@ -470,7 +488,9 @@ const VaultInventoryView: React.FC = () => {
                     {record.confidence === null ? '—' : record.confidence.toFixed(2)}
                   </span>
                   {/* Relevance */}
-                  <span className="text-xs text-slate-500">{relevanceLabel(record.confidence)}</span>
+                  <span className={`${chip} ${relevanceBadgeClass(record.relevance)} inline-block w-fit text-[10px]`}>
+                    {relevanceShortLabel(record.relevance)}
+                  </span>
                 </button>
               ))}
 
@@ -567,26 +587,45 @@ const VaultInventoryView: React.FC = () => {
                 )}
               </div>
 
-              {/* 3. Readiness snapshot */}
-              <div className="rounded-lg border border-slate-200 p-3">
-                <p className="text-xs font-semibold text-slate-700">Readiness snapshot</p>
-                <p className={`mt-1 ${muted}`}>
-                  {selectedRecord.completeness.missingCount === 0
-                    ? 'This record satisfies all detected pointers.'
-                    : `${selectedRecord.completeness.missingCount} required fields missing. Fill now to improve readiness.`}
-                </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="flex items-center gap-0.5">
-                    {confidenceSegments(selectedRecord.confidence ?? 0).map((active, idx) => (
-                      <span
-                        key={`${selectedRecord.recordId}-conf-${idx}`}
-                        className={`h-2 w-2 rounded-sm ${active ? 'bg-weflora-teal' : 'bg-slate-200'}`}
-                      />
-                    ))}
+              {/* 3. Memory signals — Confidence (truth) + Relevance (decision) */}
+              <div className="rounded-lg border border-slate-200 p-3 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className={`${cognitiveLoopBadge} ${loopMemory}`}>Memory</span>
+                  <p className={`${muted} flex-1`}>
+                    {selectedRecord.completeness.missingCount === 0
+                      ? 'Record satisfies all detected pointers.'
+                      : `${selectedRecord.completeness.missingCount} required fields missing.`}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Confidence — truth signal */}
+                  <div>
+                    <p className={memorySignalLabel}>Confidence</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <div className="flex items-center gap-0.5">
+                        {confidenceSegments(selectedRecord.confidence ?? 0).map((active, idx) => (
+                          <span
+                            key={`${selectedRecord.recordId}-conf-${idx}`}
+                            className={`h-2 w-2 rounded-sm ${active ? 'bg-weflora-teal' : 'bg-slate-200'}`}
+                          />
+                        ))}
+                      </div>
+                      <span className={memorySignalValue}>
+                        {selectedRecord.confidence === null ? '—' : selectedRecord.confidence.toFixed(2)}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-[10px] text-slate-400">How correct is this record?</p>
                   </div>
-                  <span className="text-xs text-slate-500">
-                    {selectedRecord.confidence === null ? '—' : selectedRecord.confidence.toFixed(2)}
-                  </span>
+                  {/* Relevance — decision signal */}
+                  <div>
+                    <p className={memorySignalLabel}>Relevance</p>
+                    <div className="mt-1">
+                      <span className={`${chip} ${relevanceBadgeClass(selectedRecord.relevance)}`}>
+                        {selectedRecord.relevance.charAt(0).toUpperCase() + selectedRecord.relevance.slice(1)}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-[10px] text-slate-400">How useful for reasoning?</p>
+                  </div>
                 </div>
               </div>
 

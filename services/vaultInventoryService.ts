@@ -34,13 +34,24 @@ export type VaultValidationSummary = {
   errors: string[];
 };
 
+/**
+ * Relevance level — decision signal for reasoning input ranking.
+ * High: automatically included in agent reasoning.
+ * Medium: candidate for reasoning.
+ * Low: ignored unless explicitly selected.
+ */
+export type RelevanceLevel = 'high' | 'medium' | 'low';
+
 export type VaultInventoryRecord = {
   recordId: string;
   type: 'Policy' | 'SpeciesList' | 'Site' | 'Vision' | 'Climate' | 'Other';
   title: string;
   scope: string;
   tags: string[];
+  /** Confidence — truth signal: "How correct is this record?" */
   confidence: number | null;
+  /** Relevance — decision signal: "How useful is this record for reasoning?" */
+  relevance: RelevanceLevel;
   /** Canonical status from the status taxonomy */
   status: VaultStatus;
   /** @deprecated Use status instead. Kept for backward compatibility. */
@@ -106,6 +117,24 @@ const deriveStatus = (vault: VaultObject, validations: VaultValidationSummary): 
 const deriveReviewState = (vault: VaultObject, validations: VaultValidationSummary): VaultInventoryRecord['reviewState'] => {
   const status = deriveStatus(vault, validations);
   return mapToLegacyReviewState(status) as VaultInventoryRecord['reviewState'];
+};
+
+/**
+ * Derive relevance level from vault object signals.
+ *
+ * Relevance is an independent decision signal:
+ * - High: accepted + high confidence + tags present → auto-included in reasoning
+ * - Medium: some signal present → candidate
+ * - Low: missing metadata → ignored unless explicitly selected
+ *
+ * Future: dynamic relevance via usage frequency, time decay, contextual per-Flow
+ */
+const deriveRelevance = (vault: VaultObject, status: VaultStatus): RelevanceLevel => {
+  const conf = vault.confidence ?? 0;
+  const hasTags = (vault.tags ?? []).length > 0;
+  if (status === 'accepted' && conf >= 0.7 && hasTags) return 'high';
+  if (status === 'accepted' || (conf >= 0.5 && hasTags)) return 'medium';
+  return 'low';
 };
 
 const deriveMissingCount = (vault: VaultObject): number => {
@@ -230,6 +259,7 @@ export const deriveVaultInventoryRecords = (
       scope: linked.length > 0 ? `Projects: ${linked.length}` : 'Global',
       tags: vault.tags ?? [],
       confidence: vault.confidence ?? null,
+      relevance: deriveRelevance(vault, status),
       status,
       reviewState,
       completeness: { missingCount },

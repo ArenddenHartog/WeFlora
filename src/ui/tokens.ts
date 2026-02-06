@@ -60,3 +60,27 @@ export const statusReady = 'bg-emerald-50 text-emerald-700 border border-emerald
 export const statusWarning = 'bg-amber-50 text-amber-700 border border-amber-200';
 export const statusError = 'bg-rose-50 text-rose-700 border border-rose-200';
 export const statusNeutral = 'bg-slate-50 text-slate-600 border border-slate-200';
+
+/* ─── Relevance (decision signal) ─────────────────────── */
+export const relevanceHigh = 'bg-weflora-mint/20 text-weflora-dark border border-weflora-mint';
+export const relevanceMedium = 'bg-amber-50 text-amber-700 border border-amber-200';
+export const relevanceLow = 'bg-slate-50 text-slate-500 border border-slate-200';
+
+/* ─── Memory signals (Vault as cognitive memory) ──────── */
+export const memorySignalLabel = 'text-[10px] font-semibold text-slate-500 uppercase tracking-wide';
+export const memorySignalValue = 'text-sm font-semibold text-slate-800';
+
+/* ─── Agent suggestion (future-ready) ─────────────────── */
+export const agentSuggestionBox =
+  'rounded-xl border border-dashed border-weflora-mint bg-weflora-mint/5 p-4';
+export const agentSuggestionLabel =
+  'text-xs font-semibold text-weflora-teal';
+
+/* ─── Cognitive loop badge ────────────────────────────── */
+export const cognitiveLoopBadge =
+  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold border';
+export const loopMemory = 'bg-blue-50 text-blue-700 border-blue-200';
+export const loopUnderstand = 'bg-amber-50 text-amber-700 border-amber-200';
+export const loopReason = 'bg-violet-50 text-violet-700 border-violet-200';
+export const loopAct = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+export const loopLearn = 'bg-weflora-mint/20 text-weflora-dark border-weflora-mint';
