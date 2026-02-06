@@ -39,9 +39,10 @@ for (const relativePath of layoutFiles) {
   const src = fs.readFileSync(filePath, 'utf8');
   const matches = Array.from(src.matchAll(/<[^>]*data-layout-root[^>]*>/g));
   const usesAppPage = /<AppPage[\s>]/.test(src);
+  const usesPageShell = /<PageShell[\s>]/.test(src);
 
-  if (matches.length === 0 && !usesAppPage) {
-    errors.push(`[layout-guard] Missing AppPage usage or data-layout-root in ${relativePath}`);
+  if (matches.length === 0 && !usesAppPage && !usesPageShell) {
+    errors.push(`[layout-guard] Missing AppPage/PageShell usage or data-layout-root in ${relativePath}`);
     continue;
   }
 
