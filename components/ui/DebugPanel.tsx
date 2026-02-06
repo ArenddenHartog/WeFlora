@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { getTelemetryEvents } from '../../src/agentic/telemetry/telemetry';
 import { getDebugState, getLastError, getLastRpcCall } from '../../utils/safeAction';
@@ -11,7 +11,35 @@ import { UIContext } from '../../contexts/UIContext';
 declare const __BUILD_SHA__: string;
 declare const __BUILD_TIME__: string;
 
-type DebugTab = 'state' | 'telemetry' | 'errors';
+type DebugTab = 'state' | 'backend' | 'telemetry' | 'errors';
+
+/**
+ * List of critical RPCs that must be deployed for the app to function
+ */
+const REQUIRED_RPCS = [
+  { name: 'vault_claim_next_review', description: 'Review queue claim' },
+  { name: 'vault_update_review', description: 'Review updates' },
+  { name: 'planner_bootstrap_intervention', description: 'Planner init' },
+  { name: 'pciv_bootstrap_scope', description: 'PCIV scope init' },
+] as const;
+
+type RpcHealthStatus = 'checking' | 'ok' | 'missing' | 'error';
+
+interface RpcHealth {
+  name: string;
+  description: string;
+  status: RpcHealthStatus;
+  error?: string;
+}
+
+interface BackendInfo {
+  supabaseUrl: string;
+  supabaseHost: string;
+  schemaVersion: string | null;
+  featureFlags: Record<string, boolean>;
+  rpcHealth: RpcHealth[];
+  checkedAt: string | null;
+}
 
 const DebugPanel: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -22,6 +50,28 @@ const DebugPanel: React.FC = () => {
     userId: string | null;
     email: string | null;
   } | null>(null);
+  
+  const [backendInfo, setBackendInfo] = useState<BackendInfo>(() => {
+    // Extract Supabase URL from the client
+    const url = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL || '';
+    const host = url ? new URL(url).host : 'unknown';
+    
+    return {
+      supabaseUrl: url,
+      supabaseHost: host,
+      schemaVersion: null,
+      featureFlags: {
+        DEV: (import.meta as any).env?.DEV ?? false,
+        PROD: (import.meta as any).env?.PROD ?? false,
+      },
+      rpcHealth: REQUIRED_RPCS.map(rpc => ({
+        name: rpc.name,
+        description: rpc.description,
+        status: 'checking' as RpcHealthStatus,
+      })),
+      checkedAt: null,
+    };
+  });
   
   const location = useLocation();
   const params = useParams();
@@ -42,6 +92,77 @@ const DebugPanel: React.FC = () => {
   // Get localStorage session info
   const [lastSessionId, setLastSessionId] = useState<string | null>(null);
   
+  /**
+   * Check if an RPC exists by calling it with invalid params
+   * PGRST202 = function not found
+   * Any other error = function exists but params wrong (which is fine)
+   */
+  const checkRpcExists = useCallback(async (rpcName: string): Promise<{ exists: boolean; error?: string }> => {
+    try {
+      // Call with empty params - we expect it to fail, but HOW it fails tells us if it exists
+      const { error } = await supabase.rpc(rpcName, {});
+      
+      if (error) {
+        // PGRST202 = function not found in schema cache
+        if (error.code === 'PGRST202') {
+          return { exists: false, error: 'Function not deployed' };
+        }
+        // Any other error means the function exists but params are wrong
+        return { exists: true };
+      }
+      
+      // No error means it worked (unlikely with empty params, but ok)
+      return { exists: true };
+    } catch (err) {
+      return { exists: false, error: String(err) };
+    }
+  }, []);
+
+  /**
+   * Check all required RPCs
+   */
+  const checkAllRpcs = useCallback(async () => {
+    const results: RpcHealth[] = [];
+    
+    for (const rpc of REQUIRED_RPCS) {
+      const result = await checkRpcExists(rpc.name);
+      results.push({
+        name: rpc.name,
+        description: rpc.description,
+        status: result.exists ? 'ok' : 'missing',
+        error: result.error,
+      });
+    }
+    
+    setBackendInfo(prev => ({
+      ...prev,
+      rpcHealth: results,
+      checkedAt: new Date().toISOString(),
+    }));
+  }, [checkRpcExists]);
+
+  /**
+   * Fetch schema version from app_meta table (if exists)
+   */
+  const fetchSchemaVersion = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_meta')
+        .select('value')
+        .eq('key', 'schema_version')
+        .single();
+      
+      if (!error && data) {
+        setBackendInfo(prev => ({
+          ...prev,
+          schemaVersion: data.value,
+        }));
+      }
+    } catch {
+      // Table doesn't exist or other error - leave as null
+    }
+  }, []);
+  
   // Check auth status when panel opens
   useEffect(() => {
     if (!open) return;
@@ -61,6 +182,19 @@ const DebugPanel: React.FC = () => {
     
     checkAuth();
   }, [open]);
+  
+  // Check backend health when backend tab is opened
+  useEffect(() => {
+    if (!open || activeTab !== 'backend') return;
+    
+    // Only check if we haven't checked in the last 30 seconds
+    const lastCheck = backendInfo.checkedAt ? new Date(backendInfo.checkedAt).getTime() : 0;
+    const now = Date.now();
+    if (now - lastCheck < 30000) return;
+    
+    checkAllRpcs();
+    fetchSchemaVersion();
+  }, [open, activeTab, backendInfo.checkedAt, checkAllRpcs, fetchSchemaVersion]);
 
   useEffect(() => {
     try {
@@ -100,6 +234,12 @@ const DebugPanel: React.FC = () => {
         isSidebarOpen: uiContext.isSidebarOpen
       } : null,
       auth: authStatus,
+      backend: {
+        supabaseHost: backendInfo.supabaseHost,
+        schemaVersion: backendInfo.schemaVersion,
+        rpcHealth: backendInfo.rpcHealth.map(r => ({ name: r.name, status: r.status })),
+        checkedAt: backendInfo.checkedAt,
+      },
       debug: {
         lastTraceId: debugState.lastTraceId,
         lastError: debugState.lastError,
@@ -146,7 +286,7 @@ const DebugPanel: React.FC = () => {
           {/* Header */}
           <div className="border-b border-slate-200 px-3 py-2 flex items-center justify-between bg-slate-50">
             <div className="flex gap-1">
-              {(['state', 'telemetry', 'errors'] as const).map((tab) => (
+              {(['state', 'backend', 'telemetry', 'errors'] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -342,6 +482,110 @@ const DebugPanel: React.FC = () => {
                       <span className="text-slate-500">Trace ID</span>
                       <span className="font-mono text-slate-700">{debugState.lastTraceId}</span>
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'backend' && (
+              <div className="space-y-3">
+                {/* Supabase Connection */}
+                <div className="rounded-lg border border-slate-200 p-2">
+                  <p className="font-semibold text-slate-700 text-[10px] uppercase tracking-wide mb-2">Supabase Connection</p>
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Host</span>
+                      <span className="font-mono text-slate-700 truncate max-w-[200px]">{backendInfo.supabaseHost}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Schema Version</span>
+                      <span className="font-mono text-slate-700">{backendInfo.schemaVersion || 'unknown'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Feature Flags */}
+                <div className="rounded-lg border border-slate-200 p-2">
+                  <p className="font-semibold text-slate-700 text-[10px] uppercase tracking-wide mb-2">Environment</p>
+                  <div className="flex gap-2">
+                    {Object.entries(backendInfo.featureFlags).map(([flag, enabled]) => (
+                      <span
+                        key={flag}
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                          enabled 
+                            ? 'bg-emerald-100 text-emerald-700' 
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {flag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* RPC Health Checks */}
+                <div className="rounded-lg border border-slate-200 p-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-semibold text-slate-700 text-[10px] uppercase tracking-wide">RPC Health</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBackendInfo(prev => ({ ...prev, checkedAt: null }));
+                        checkAllRpcs();
+                      }}
+                      className="text-[10px] text-slate-500 hover:text-slate-700"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {backendInfo.rpcHealth.map((rpc) => (
+                      <div key={rpc.name} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${
+                            rpc.status === 'ok' ? 'bg-emerald-500' :
+                            rpc.status === 'missing' ? 'bg-rose-500' :
+                            rpc.status === 'checking' ? 'bg-amber-500 animate-pulse' :
+                            'bg-slate-300'
+                          }`} />
+                          <span className="font-mono text-[10px] text-slate-700">{rpc.name}</span>
+                        </div>
+                        <span className={`text-[10px] ${
+                          rpc.status === 'ok' ? 'text-emerald-600' :
+                          rpc.status === 'missing' ? 'text-rose-600' :
+                          'text-slate-500'
+                        }`}>
+                          {rpc.status === 'ok' ? '✓ Deployed' :
+                           rpc.status === 'missing' ? '✗ Missing' :
+                           rpc.status === 'checking' ? 'Checking...' :
+                           'Unknown'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {backendInfo.checkedAt && (
+                    <p className="text-[10px] text-slate-400 mt-2">
+                      Last checked: {new Date(backendInfo.checkedAt).toLocaleTimeString()}
+                    </p>
+                  )}
+                </div>
+
+                {/* Missing RPC Warning */}
+                {backendInfo.rpcHealth.some(r => r.status === 'missing') && (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 p-2">
+                    <p className="font-semibold text-rose-700 text-[10px] uppercase tracking-wide mb-1">⚠️ Backend Mismatch</p>
+                    <p className="text-rose-600 text-[10px]">
+                      Some required RPCs are not deployed. Run migrations or check Supabase project.
+                    </p>
+                    <ul className="mt-1 space-y-0.5">
+                      {backendInfo.rpcHealth
+                        .filter(r => r.status === 'missing')
+                        .map(r => (
+                          <li key={r.name} className="text-[10px] text-rose-700 font-mono">
+                            • {r.name}
+                          </li>
+                        ))}
+                    </ul>
                   </div>
                 )}
               </div>
