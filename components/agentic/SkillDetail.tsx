@@ -86,8 +86,40 @@ const RunTab: React.FC<RunTabProps> = ({
 
   const canRun = !runDisabledReason && !isRunning;
 
+  // SK-3: Guided run stepper state
+  const currentStep = useMemo(() => {
+    if (readiness.status === 'Missing' || readiness.status === 'Blocked') return 1;
+    if (selectedVaultIds.size === 0) return 1;
+    if (!canRun) return 2;
+    return 3;
+  }, [readiness.status, selectedVaultIds.size, canRun]);
+
   return (
     <div className="mt-6 space-y-6">
+      {/* SK-3: Guided run stepper */}
+      <div className="flex items-center gap-2">
+        {[
+          { step: 1, label: '1. Select Vault records' },
+          { step: 2, label: '2. Confirm bindings' },
+          { step: 3, label: '3. Run → Session' },
+        ].map(({ step, label }) => (
+          <div key={step} className="flex items-center gap-2">
+            {step > 1 && <span className="text-slate-300">→</span>}
+            <span
+              className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                currentStep === step
+                  ? 'bg-weflora-teal text-white'
+                  : currentStep > step
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-slate-100 text-slate-400'
+              }`}
+            >
+              {label}
+            </span>
+          </div>
+        ))}
+      </div>
+
       {/* Readiness status banner */}
       <div className={`rounded-xl border p-4 ${
         readiness.status === 'Ready' 
@@ -467,12 +499,13 @@ const SkillDetail: React.FC = () => {
             >
               View required data
             </button>
-            <Link
-              to={`/sessions/new?intent=skill:${profile.id}`}
+            <button
+              type="button"
+              onClick={() => setActiveTab('run')}
               className={btnPrimary}
             >
               Run Skill
-            </Link>
+            </button>
           </>
         }
         tabs={

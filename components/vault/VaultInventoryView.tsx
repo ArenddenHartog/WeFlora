@@ -60,13 +60,13 @@ const STATUS_VALUES: VaultStatus[] = ['draft', 'pending', 'needs_review', 'in_re
  * Hide blocked, draft by default.
  * Accepted records MUST be visible — Vault must never feel empty after review.
  */
-const DEFAULT_VISIBLE_STATUSES: VaultStatus[] = ['pending', 'needs_review', 'in_review', 'accepted'];
+const DEFAULT_VISIBLE_STATUSES: VaultStatus[] = ['accepted', 'pending', 'needs_review', 'in_review', 'blocked'];
 
 /** Named filter presets for the top-right chip bar */
 type FilterPreset = 'all' | 'active' | 'accepted' | 'needs_review' | 'blocked';
 const FILTER_PRESETS: { key: FilterPreset; label: string; statuses: VaultStatus[] | null }[] = [
   { key: 'all', label: 'All', statuses: null },
-  { key: 'active', label: 'Active', statuses: ['pending', 'needs_review', 'in_review', 'accepted'] },
+  { key: 'active', label: 'Active', statuses: ['accepted', 'pending', 'needs_review', 'in_review', 'blocked'] },
   { key: 'accepted', label: 'Accepted', statuses: ['accepted'] },
   { key: 'needs_review', label: 'Needs Review', statuses: ['pending', 'needs_review'] },
   { key: 'blocked', label: 'Blocked', statuses: ['blocked'] },

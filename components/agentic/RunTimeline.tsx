@@ -386,7 +386,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events }) => {
         <section className="rounded-xl border border-slate-200 bg-white p-5">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Evidence</p>
           {analysis.allEvidence.length === 0 ? (
-            <p className={muted}>No evidence captured.</p>
+            <p className={muted}>No evidence recorded. Skill did not produce evidence entries.</p>
           ) : (
             <ul className="space-y-3">
               {analysis.allEvidence.map((ev, i) => (
@@ -504,6 +504,48 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events }) => {
               ))}
             </ul>
           )}
+        </section>
+        {/* 7. TraceId + Step Timing */}
+        <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Diagnostics</p>
+          <div className="space-y-2 text-xs text-slate-600">
+            {orderedEvents.length > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-500">Session ID</span>
+                <span className="font-mono text-slate-700 truncate max-w-[200px]">{orderedEvents[0].session_id}</span>
+              </div>
+            )}
+            {orderedEvents.length > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-500">Run ID</span>
+                <span className="font-mono text-slate-700 truncate max-w-[200px]">{orderedEvents[0].run_id}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-slate-500">Events</span>
+              <span className="font-mono text-slate-700">{orderedEvents.length}</span>
+            </div>
+            {analysis.steps.length > 0 && (
+              <div className="mt-3">
+                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">Step Timing</p>
+                {analysis.steps.map((step, i) => {
+                  const startEvt = orderedEvents.find((e) => e.type === 'step.started' && (e.payload as any).step_id === step.stepId);
+                  const endEvt = orderedEvents.find((e) => e.type === 'step.completed' && (e.payload as any).step_id === step.stepId);
+                  const startTime = startEvt ? new Date(startEvt.at).getTime() : null;
+                  const endTime = endEvt ? new Date(endEvt.at).getTime() : null;
+                  const durationMs = startTime && endTime ? endTime - startTime : null;
+                  return (
+                    <div key={step.stepId} className="flex justify-between py-0.5">
+                      <span className="text-slate-500 truncate max-w-[160px]">{step.title}</span>
+                      <span className="font-mono text-slate-700">
+                        {durationMs != null ? `${(durationMs / 1000).toFixed(1)}s` : '—'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </section>
       </div>
     </div>

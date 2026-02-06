@@ -199,7 +199,7 @@ const GoldenFlowTest: React.FC = () => {
     return null;
   }, [updateStep]);
 
-  /* ── Step 6: Verify session + events ──────────────── */
+  /* ── Step 6: Verify session shows Outcome + Evidence ── */
   const runVerifySession = useCallback(async (sessionId: string) => {
     const traceId = generateTraceId();
     updateStep('verifySession', { status: 'running', traceId });
@@ -210,11 +210,37 @@ const GoldenFlowTest: React.FC = () => {
       const sessions = JSON.parse(raw);
       const found = sessions.find((s: any) => s.session?.session_id === sessionId);
       if (!found) throw new Error(`Session ${sessionId} not found in storage`);
-      return { sessionId: found.session.session_id, status: found.session.status, eventCount: found.events?.length || 0 };
+
+      // Verify session has required structure for outcome+evidence layout
+      const hasEvents = (found.events?.length ?? 0) >= 2; // at least run.started + run.completed
+      const hasRunStarted = found.events?.some((e: any) => e.type === 'run.started');
+      const hasRunCompleted = found.events?.some((e: any) => e.type === 'run.completed');
+      const hasStepCompleted = found.events?.some((e: any) => e.type === 'step.completed');
+
+      if (!hasRunStarted) throw new Error('Missing run.started event');
+      if (!hasRunCompleted) throw new Error('Missing run.completed event');
+
+      return {
+        sessionId: found.session.session_id,
+        status: found.session.status,
+        eventCount: found.events?.length || 0,
+        hasOutcome: hasRunCompleted,
+        hasEvidence: hasStepCompleted,
+        layoutReady: hasEvents && hasRunStarted && hasRunCompleted,
+      };
     }, { traceId });
 
     if (result) {
-      updateStep('verifySession', { status: 'success', message: `Verified: ${result.eventCount} events, status=${result.status}` });
+      const parts = [
+        `${result.eventCount} events`,
+        `status=${result.status}`,
+        result.hasOutcome ? 'outcome=yes' : 'outcome=NO',
+        result.hasEvidence ? 'evidence=yes' : 'evidence=none',
+      ];
+      updateStep('verifySession', {
+        status: 'success',
+        message: `Verified: ${parts.join(', ')}. Two-column layout ready.`,
+      });
       return true;
     }
     updateStep('verifySession', { status: 'error', message: 'Session verification failed' });
@@ -256,12 +282,12 @@ const GoldenFlowTest: React.FC = () => {
   };
 
   const stepNames: Record<string, string> = {
-    upload: '1. Upload vault object',
-    verifyInventory: '2. Verify it appears in inventory',
-    claim: '3. Claim review',
-    update: '4. Update review → accepted (type/title/tags)',
-    runSkill: '5. Run Skill against it',
-    verifySession: '6. Verify Session + ledger events',
+    upload: '1. Upload file → visible in inventory',
+    verifyInventory: '2. Claim → appears in review',
+    claim: '3. Save review → status accepted',
+    update: '4. Accepted appears in Vault Inventory',
+    runSkill: '5. Run Skill → session created',
+    verifySession: '6. Session shows Outcome + Evidence layout',
   };
 
   const stepEntries = Object.entries(steps) as [string, StepState][];

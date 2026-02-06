@@ -368,7 +368,21 @@ const VaultReviewQueueView: React.FC = () => {
     }
   }, [id, loadDetail]);
 
+  /**
+   * R-2: Start Review must always do something.
+   * IF :id exists → already viewing that record (no-op)
+   * ELSE → call vault_claim_next_review()
+   * IF claim returns null → show empty explanation
+   * ELSE → navigate /vault/review/:id
+   * No dead button allowed.
+   */
   const handleStartReview = async () => {
+    // If already viewing a record, do nothing — user is in review
+    if (id && reviewDetail) {
+      showNotification('Already reviewing this record.', 'success');
+      return;
+    }
+
     setIsClaiming(true);
 
     const result = await safeAction(() => claimNextReview(), {
@@ -380,10 +394,10 @@ const VaultReviewQueueView: React.FC = () => {
     setIsClaiming(false);
 
     if (result) {
-      showNotification('Review claimed successfully', 'success');
+      showNotification('Review claimed — status transitioned to in_review.', 'success');
       navigate(`/vault/review/${result.id}`);
     } else {
-      showNotification('No items available to review', 'error');
+      showNotification('No items available to review. Upload data to the Vault first.', 'error');
     }
   };
 
