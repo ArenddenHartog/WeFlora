@@ -21,6 +21,19 @@ const REQUIRED_RPCS = [
   { name: 'vault_update_review', description: 'Review updates' },
   { name: 'planner_bootstrap_intervention', description: 'Planner init' },
   { name: 'pciv_bootstrap_scope', description: 'PCIV scope init' },
+  { name: 'upsert_flow_draft', description: 'Flow draft save' },
+  { name: 'create_session_with_idempotency', description: 'Session create' },
+] as const;
+
+/**
+ * Critical tables that must exist for the app to function.
+ * Used for schema drift detection in the Backend tab.
+ */
+const REQUIRED_TABLES = [
+  'vault_objects',
+  'vault_project_links',
+  'flow_drafts',
+  'agent_runs',
 ] as const;
 
 type RpcHealthStatus = 'checking' | 'ok' | 'missing' | 'error';
@@ -162,6 +175,24 @@ const DebugPanel: React.FC = () => {
       // Table doesn't exist or other error - leave as null
     }
   }, []);
+
+  /**
+   * Schema drift check: verify critical tables exist
+   */
+  const [tableDrift, setTableDrift] = useState<Array<{ name: string; exists: boolean }>>([]);
+  const checkTableDrift = useCallback(async () => {
+    const results: Array<{ name: string; exists: boolean }> = [];
+    for (const table of REQUIRED_TABLES) {
+      try {
+        const { error } = await supabase.from(table).select('*').limit(0);
+        // PGRST116 = table not found
+        results.push({ name: table, exists: !error || error.code !== 'PGRST116' });
+      } catch {
+        results.push({ name: table, exists: false });
+      }
+    }
+    setTableDrift(results);
+  }, []);
   
   // Check auth status when panel opens
   useEffect(() => {
@@ -194,7 +225,8 @@ const DebugPanel: React.FC = () => {
     
     checkAllRpcs();
     fetchSchemaVersion();
-  }, [open, activeTab, backendInfo.checkedAt, checkAllRpcs, fetchSchemaVersion]);
+    checkTableDrift();
+  }, [open, activeTab, backendInfo.checkedAt, checkAllRpcs, fetchSchemaVersion, checkTableDrift]);
 
   useEffect(() => {
     try {
@@ -570,10 +602,34 @@ const DebugPanel: React.FC = () => {
                   )}
                 </div>
 
+                {/* Schema Drift: Table Check */}
+                {tableDrift.length > 0 && (
+                  <div className="rounded-lg border border-slate-200 p-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-semibold text-slate-700 text-[10px] uppercase tracking-wide">Schema Drift</p>
+                      <span className={`text-[10px] font-semibold ${
+                        tableDrift.every(t => t.exists) ? 'text-emerald-600' : 'text-rose-600'
+                      }`}>
+                        {tableDrift.every(t => t.exists) ? 'PASS' : 'FAIL'}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      {tableDrift.map(t => (
+                        <div key={t.name} className="flex items-center justify-between">
+                          <span className="font-mono text-[10px] text-slate-700">{t.name}</span>
+                          <span className={`text-[10px] ${t.exists ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {t.exists ? '✓' : '✗ Missing'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Missing RPC Warning */}
                 {backendInfo.rpcHealth.some(r => r.status === 'missing') && (
                   <div className="rounded-lg border border-rose-200 bg-rose-50 p-2">
-                    <p className="font-semibold text-rose-700 text-[10px] uppercase tracking-wide mb-1">⚠️ Backend Mismatch</p>
+                    <p className="font-semibold text-rose-700 text-[10px] uppercase tracking-wide mb-1">Backend Mismatch</p>
                     <p className="text-rose-600 text-[10px]">
                       Some required RPCs are not deployed. Run migrations or check Supabase project.
                     </p>

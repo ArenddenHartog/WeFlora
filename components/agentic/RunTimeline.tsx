@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { EventRecord, StepCompletedEvent, StepStartedEvent } from '../../src/agentic/contracts/ledger';
 import type { VaultPointer } from '../../src/agentic/contracts/vault';
 import { normalizeEvents } from '../../src/agentic/ledger/normalizeEvents';
+import { extractReasoningGraph, type ReasoningGraph, type EvidenceRecord, type OutcomeRecord } from '../../src/agentic/contracts/reasoning';
 import { isDev } from '@/utils/env';
 import {
   h2,
@@ -50,6 +51,9 @@ const asStepCompleted = (event: EventRecord): event is StepCompletedEvent => eve
  */
 const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events }) => {
   const orderedEvents = useMemo(() => normalizeEvents(events), [events]);
+
+  // Extract the canonical reasoning graph (Event → Evidence → Outcome)
+  const reasoningGraph = useMemo(() => extractReasoningGraph(events), [events]);
 
   // Extract structured data from events
   const analysis = useMemo(() => {
