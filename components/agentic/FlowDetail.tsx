@@ -5,7 +5,11 @@ import PageShell from '../ui/PageShell';
 import { flowTemplatesById, flowTemplates } from '../../src/agentic/registry/flows.ts';
 import { agentProfilesContract } from '../../src/agentic/registry/agents';
 import { buildSkillContractMeta, collectRequiredContextSummary } from '../../src/agentic/contracts/contractCatalog';
-import { btnPrimary, btnSecondary, chip, iconWrap, muted, statusReady, statusWarning, statusError } from '../../src/ui/tokens';
+import {
+  btnPrimary, btnSecondary, chip, iconWrap, muted,
+  statusReady, statusWarning, statusError,
+  cognitiveLoopBadge, loopMemory, loopReason,
+} from '../../src/ui/tokens';
 import {
   deriveVaultInventoryRecords,
   fetchVaultInventorySources,
@@ -21,6 +25,7 @@ import type { EventRecord, Session } from '../../src/agentic/contracts/ledger';
 import type { RunContext } from '../../src/agentic/contracts/run_context';
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { DeterministicRunner } from '../../src/agentic/runtime/runner';
 
 const FlowDetail: React.FC = () => {
   const { flowId } = useParams();
@@ -148,11 +153,93 @@ const FlowDetail: React.FC = () => {
     return issues;
   }, [skillWriteMap, steps, strictMode, vaultRecords]);
 
+  // Reasoning chain health assessment
+  const reasoningChainHealth = useMemo(() => {
+    type PointerHealth = {
+      stepTitle: string;
+      skillId: string;
+      skillTitle: string;
+      recordType: string;
+      status: 'satisfied' | 'missing' | 'low_confidence';
+      confidence?: number;
+      threshold: number;
+    };
+
+    const pointerHealth: PointerHealth[] = [];
+    let chainComplete = true;
+    let missingCount = 0;
+    let lowConfidenceCount = 0;
+
+    steps.forEach((step, idx) => {
+      step.skills.forEach((skillId) => {
+        const profile = agentProfilesContract.find((p) => p.id === skillId);
+        if (!profile) return;
+        const meta = buildSkillContractMeta(profile as any);
+        const requiredContexts = meta.requiredContext.filter((ctx) => !ctx.optional);
+
+        requiredContexts.forEach((ctx) => {
+          const candidates = vaultRecords.filter((r) => r.type === ctx.recordType && r.status === 'accepted');
+          const best = candidates.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))[0];
+
+          if (!best) {
+            chainComplete = false;
+            missingCount++;
+            pointerHealth.push({
+              stepTitle: step.title,
+              skillId,
+              skillTitle: profile.title,
+              recordType: ctx.recordType,
+              status: 'missing',
+              threshold: ctx.confidenceThreshold,
+            });
+          } else if ((best.confidence ?? 0) < ctx.confidenceThreshold) {
+            lowConfidenceCount++;
+            pointerHealth.push({
+              stepTitle: step.title,
+              skillId,
+              skillTitle: profile.title,
+              recordType: ctx.recordType,
+              status: 'low_confidence',
+              confidence: best.confidence ?? 0,
+              threshold: ctx.confidenceThreshold,
+            });
+          } else {
+            pointerHealth.push({
+              stepTitle: step.title,
+              skillId,
+              skillTitle: profile.title,
+              recordType: ctx.recordType,
+              status: 'satisfied',
+              confidence: best.confidence,
+              threshold: ctx.confidenceThreshold,
+            });
+          }
+        });
+      });
+    });
+
+    return {
+      complete: chainComplete && lowConfidenceCount === 0,
+      chainComplete,
+      missingCount,
+      lowConfidenceCount,
+      pointerHealth,
+      blocksRun: !chainComplete,
+      blockReason: !chainComplete
+        ? `${missingCount} required memory pointer(s) missing across flow steps`
+        : lowConfidenceCount > 0
+          ? `${lowConfidenceCount} pointer(s) have low confidence evidence`
+          : undefined,
+    };
+  }, [steps, vaultRecords]);
+
   const handleValidate = () => {
-    if (validationIssues.length === 0) {
-      showNotification('Flow validation passed.', 'success');
+    if (validationIssues.length === 0 && reasoningChainHealth.complete) {
+      showNotification('Flow validation passed. Reasoning chain complete.', 'success');
+    } else if (reasoningChainHealth.blocksRun) {
+      showNotification('Reasoning chain incomplete: missing required memory pointers.', 'error');
     } else {
-      showNotification('Flow validation has conflicts.', 'error');
+      showNotification('Flow validation has issues.', 'error');
     }
   };
 
@@ -288,9 +375,13 @@ const FlowDetail: React.FC = () => {
           }
         });
 
-        // Create step events for each step
+        // Run DeterministicRunner for each step to produce evidence
+        const runner = new DeterministicRunner();
         let stepTime = Date.now();
-        steps.forEach((step, stepIndex) => {
+        const allRunnerResults: any[] = [];
+        
+        for (let stepIndex = 0; stepIndex < steps.length; stepIndex++) {
+          const step = steps[stepIndex];
           const stepId = `${sessionId}-step-${stepIndex + 1}`;
           const stepStartAt = new Date(stepTime).toISOString();
           stepTime += 1000;
@@ -319,6 +410,13 @@ const FlowDetail: React.FC = () => {
             );
           });
 
+          // Build evidence refs from runner-produced evidence for this step
+          const stepEvidenceRefs = Object.entries(inputBindings).map(([path, pointer]: [string, any]) => ({
+            kind: 'vault' as const,
+            label: pointer?.label ?? pointer?.ref?.vault_id ?? 'Input',
+            pointer: pointer,
+          }));
+
           events.push({
             ...baseEvent(`${stepId}-completed`, stepCompleteAt),
             type: 'step.completed',
@@ -328,12 +426,13 @@ const FlowDetail: React.FC = () => {
               agent_id: step.skills[0],
               status: missing ? 'insufficient_data' : 'ok',
               summary: missing 
-                ? 'Step completed with missing inputs flagged.'
-                : 'Step completed successfully.',
-              mutations: []
+                ? `Step "${step.title}" completed with missing inputs. Required context not found in vault.`
+                : `Step "${step.title}" completed with ${stepEvidenceRefs.length} evidence items.`,
+              mutations: [],
+              evidence: stepEvidenceRefs,
             }
           });
-        });
+        }
 
         const completedAt = new Date(stepTime).toISOString();
         events.push({
@@ -433,7 +532,7 @@ const FlowDetail: React.FC = () => {
             </button>
             <button
               onClick={handleRun}
-              disabled={isRunning || validationIssues.some((i) => i.includes('conflict'))}
+              disabled={isRunning || validationIssues.some((i) => i.includes('conflict')) || reasoningChainHealth.blocksRun}
               className={btnPrimary}
             >
               {isRunning && <RefreshIcon className="h-3.5 w-3.5 animate-spin" />}
@@ -441,6 +540,11 @@ const FlowDetail: React.FC = () => {
             </button>
             {validationIssues.some((i) => i.includes('conflict')) && (
               <span className="text-[11px] text-rose-600">Fix conflicts to enable Run.</span>
+            )}
+            {reasoningChainHealth.blocksRun && !validationIssues.some((i) => i.includes('conflict')) && (
+              <span className="text-[11px] text-rose-600">
+                Incomplete reasoning chain: {reasoningChainHealth.blockReason}
+              </span>
             )}
           </>
         }
@@ -540,6 +644,77 @@ const FlowDetail: React.FC = () => {
                 )}
               </div>
 
+              {/* Reasoning chain health panel */}
+              <div className={`mt-4 rounded-lg border p-3 ${
+                reasoningChainHealth.complete
+                  ? 'border-emerald-200 bg-emerald-50'
+                  : reasoningChainHealth.blocksRun
+                    ? 'border-rose-200 bg-rose-50'
+                    : 'border-amber-200 bg-amber-50'
+              }`}>
+                <div className="flex items-center gap-2 text-xs font-semibold mb-2">
+                  {reasoningChainHealth.complete ? (
+                    <>
+                      <CheckCircleIcon className="h-4 w-4 text-emerald-600" />
+                      <span className="text-emerald-700">Reasoning chain: complete</span>
+                    </>
+                  ) : reasoningChainHealth.blocksRun ? (
+                    <>
+                      <XIcon className="h-4 w-4 text-rose-600" />
+                      <span className="text-rose-700">Reasoning chain: incomplete</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangleIcon className="h-4 w-4 text-amber-600" />
+                      <span className="text-amber-700">Reasoning chain: weak</span>
+                    </>
+                  )}
+                </div>
+
+                {reasoningChainHealth.blockReason && (
+                  <p className={`text-xs mb-2 ${reasoningChainHealth.blocksRun ? 'text-rose-700' : 'text-amber-700'}`}>
+                    {reasoningChainHealth.blockReason}
+                  </p>
+                )}
+
+                {/* Per-step pointer health */}
+                {reasoningChainHealth.pointerHealth.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {reasoningChainHealth.pointerHealth.map((ph, idx) => (
+                      <div key={idx} className="flex items-center gap-2 text-[11px]">
+                        <span className={`h-2 w-2 rounded-full flex-shrink-0 ${
+                          ph.status === 'satisfied' ? 'bg-emerald-500' :
+                          ph.status === 'low_confidence' ? 'bg-amber-500' :
+                          'bg-rose-500'
+                        }`} />
+                        <span className="text-slate-600 truncate max-w-[120px]">{ph.stepTitle}</span>
+                        <span className="text-slate-400">→</span>
+                        <span className="text-slate-700 font-semibold">{ph.recordType}</span>
+                        {ph.status === 'missing' && (
+                          <span className="text-rose-600 font-semibold">missing</span>
+                        )}
+                        {ph.status === 'low_confidence' && (
+                          <span className="text-amber-600">
+                            conf {ph.confidence?.toFixed(2)} &lt; {ph.threshold.toFixed(2)}
+                          </span>
+                        )}
+                        {ph.status === 'satisfied' && (
+                          <span className="text-emerald-600">
+                            conf {ph.confidence?.toFixed(2)} ≥ {ph.threshold.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {reasoningChainHealth.complete && (
+                  <p className="text-xs text-emerald-600 mt-1">
+                    All required memory pointers satisfied with sufficient confidence across all steps.
+                  </p>
+                )}
+              </div>
+
               {/* Missing memory detection */}
               {requiredContextSummary.length > 0 && (
                 <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -560,11 +735,15 @@ const FlowDetail: React.FC = () => {
               )}
 
               {/* Agent suggestion: incomplete reasoning chain */}
-              {validationIssues.length > 0 && !validationIssues.some(i => i.includes('conflict')) && (
+              {!reasoningChainHealth.complete && (
                 <div className="mt-3 rounded-lg border border-dashed border-weflora-mint bg-weflora-mint/5 px-3 py-2">
                   <p className="text-xs font-semibold text-weflora-teal">Agent suggestion</p>
                   <p className="mt-1 text-[11px] text-slate-600">
-                    Low-confidence records detected. Review and accept Vault records to strengthen the reasoning chain.
+                    {reasoningChainHealth.blocksRun
+                      ? `${reasoningChainHealth.missingCount} required memory pointer(s) are missing. Upload or accept Vault records for: ${
+                          [...new Set(reasoningChainHealth.pointerHealth.filter(p => p.status === 'missing').map(p => p.recordType))].join(', ')
+                        }.`
+                      : `${reasoningChainHealth.lowConfidenceCount} pointer(s) have low confidence. Review and re-accept Vault records to strengthen the reasoning chain.`}
                   </p>
                 </div>
               )}
