@@ -6,6 +6,7 @@ import LivingRecordRenderer from './RunTimeline';
 import { HistoryIcon } from '../icons';
 import PageShell from '../ui/PageShell';
 import { btnSecondary } from '../../src/ui/tokens';
+import type { RunnerResult } from '../../src/agentic/contracts/reasoning';
 
 const statusBadgeClass = (status: string) => {
   switch (status) {
@@ -27,9 +28,10 @@ const statusBadgeClass = (status: string) => {
  *
  * Uses outcome-first two-column layout (Part 3 mandatory):
  * LEFT: Outcome / Decision / Conclusions / Confidence / Actions / Artifacts
- * RIGHT: Evidence / Vault sources / Input mappings / Steps / Provenance / Mutations
+ * RIGHT: Evidence / Vault sources / Input mappings / Reasoning steps / Provenance / Mutations
  *
  * No tabs. No hiding. Both columns always visible.
+ * On small screens: stacks vertically (Outcome first, Evidence second).
  */
 const RunDetail: React.FC = () => {
   const { runId } = useParams();
@@ -42,8 +44,13 @@ const RunDetail: React.FC = () => {
         status: stored.session.status,
         createdAt: stored.session.created_at,
         events: stored.events,
+        runnerResult: stored.runnerResult,
       }
-    : demoRuns.find((item) => item.id === runId) ?? demoRuns[0];
+    : demoRuns.find((item) => item.id === runId)
+      ? { ...(demoRuns.find((item) => item.id === runId)!), runnerResult: undefined }
+      : demoRuns[0]
+        ? { ...demoRuns[0], runnerResult: undefined }
+        : undefined;
 
   if (!run) {
     return (
@@ -78,7 +85,7 @@ const RunDetail: React.FC = () => {
 
       {/* Two-column outcome-first layout — no tabs, no hiding */}
       <div className="mt-6">
-        <LivingRecordRenderer events={run.events} />
+        <LivingRecordRenderer events={run.events} runnerResult={run.runnerResult} />
       </div>
     </PageShell>
   );
