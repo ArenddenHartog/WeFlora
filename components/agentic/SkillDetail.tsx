@@ -251,27 +251,43 @@ const RunTab: React.FC<RunTabProps> = ({
         )}
       </div>
 
-      {/* Agent assist (optional) */}
-      <section className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4">
-        <div className="flex items-center gap-2 text-xs text-slate-500">
+      {/* Agent intelligence (future-ready) */}
+      <section className="rounded-xl border border-dashed border-weflora-mint bg-weflora-mint/5 p-4">
+        <div className="flex items-center gap-2 text-xs font-semibold text-weflora-teal">
           <SparklesIcon className="h-4 w-4" />
-          <span className="font-semibold">Agent Assist (optional)</span>
+          Agent Intelligence
         </div>
-        <p className="mt-2 text-xs text-slate-500">
-          AI can suggest inputs from your vault, auto-fill mapping, or propose tags. This is assistive only—all values remain editable.
+        <p className="mt-2 text-xs text-slate-600">
+          The system can detect missing context, suggest the best Vault records, and auto-fill input mappings.
+          Future: agents will select Skills dynamically and chain reasoning across Flows.
         </p>
+
+        {/* Agent suggestions — current capabilities */}
+        <div className="mt-3 space-y-2">
+          {readiness.missing.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              <span className="font-semibold">Missing context detected:</span>{' '}
+              {readiness.missing.map((m) => m.recordType).join(', ')}.
+              Upload data to enable this Skill.
+            </div>
+          )}
+          {readiness.status === 'Ready' && selectedVaultIds.size === 0 && (
+            <div className="rounded-lg border border-weflora-mint bg-weflora-mint/10 px-3 py-2 text-xs text-weflora-dark">
+              <span className="font-semibold">Suggestion:</span> Select accepted Vault records above to bind inputs.
+              High-relevance records are recommended.
+            </div>
+          )}
+        </div>
+
         <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white"
-          >
+          <button type="button" className={btnSecondary}>
             Suggest inputs
           </button>
-          <button
-            type="button"
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white"
-          >
+          <button type="button" className={btnSecondary}>
             Auto-fill mapping
+          </button>
+          <button type="button" className={btnSecondary}>
+            Best Skill for evidence
           </button>
         </div>
       </section>

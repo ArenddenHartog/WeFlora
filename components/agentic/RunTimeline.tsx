@@ -9,10 +9,17 @@ import {
   muted,
   body,
   btnSecondary,
+  chip,
   statusReady,
   statusWarning,
   statusError,
   statusNeutral,
+  cognitiveLoopBadge,
+  loopMemory,
+  loopUnderstand,
+  loopReason,
+  loopAct,
+  loopLearn,
 } from '../../src/ui/tokens';
 
 interface RunTimelineProps {
@@ -174,7 +181,23 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events }) => {
     statusClasses[status] ?? statusNeutral;
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+    <div className="space-y-6">
+      {/* ── Cognitive loop indicator ──────────────────── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`${cognitiveLoopBadge} ${loopMemory}`}>Memory</span>
+        <span className="text-slate-300">→</span>
+        <span className={`${cognitiveLoopBadge} ${loopUnderstand}`}>Understand</span>
+        <span className="text-slate-300">→</span>
+        <span className={`${cognitiveLoopBadge} ${loopReason}`}>Reason</span>
+        <span className="text-slate-300">→</span>
+        <span className={`${cognitiveLoopBadge} ${loopAct}`}>Act</span>
+        <span className="text-slate-300">→</span>
+        <span className={`${cognitiveLoopBadge} ${loopLearn}`}>Learn</span>
+        <span className="text-slate-300">→</span>
+        <span className={`${cognitiveLoopBadge} ${loopMemory}`}>Memory</span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
       {/* ════════════ LEFT — OUTCOME (Primary) ════════════ */}
       <div className="space-y-6">
         {/* 1. Decision / Outcome headline */}
@@ -483,6 +506,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events }) => {
           )}
         </section>
       </div>
+    </div>
     </div>
   );
 };

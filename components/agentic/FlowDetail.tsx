@@ -540,10 +540,36 @@ const FlowDetail: React.FC = () => {
                 )}
               </div>
 
-              <div className="mt-4 text-xs text-slate-500">
-                {isLoadingVault ? 'Loading vault context...' : 'Validation uses live vault coverage and skill contracts.'}
-              </div>
-              <div className="mt-2 text-xs text-slate-500">
+              {/* Missing memory detection */}
+              {requiredContextSummary.length > 0 && (
+                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold text-slate-600 mb-2">Required Memory (Vault context)</p>
+                  <div className="flex flex-wrap gap-2">
+                    {requiredContextSummary.map((item) => (
+                      <span key={item.recordType} className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                        {item.recordType}
+                        <span className="text-slate-400">×{item.count}</span>
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    Flow validation checks live Vault coverage against Skill contracts.
+                    Missing memory blocks execution. Conflicting writes are detected between parallel steps.
+                  </p>
+                </div>
+              )}
+
+              {/* Agent suggestion: incomplete reasoning chain */}
+              {validationIssues.length > 0 && !validationIssues.some(i => i.includes('conflict')) && (
+                <div className="mt-3 rounded-lg border border-dashed border-weflora-mint bg-weflora-mint/5 px-3 py-2">
+                  <p className="text-xs font-semibold text-weflora-teal">Agent suggestion</p>
+                  <p className="mt-1 text-[11px] text-slate-600">
+                    Low-confidence records detected. Review and accept Vault records to strengthen the reasoning chain.
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-3 text-[11px] text-slate-400">
                 Save keeps skillRef version as latest. Run freezes skillRef to a version + hash for the session ledger.
               </div>
 
