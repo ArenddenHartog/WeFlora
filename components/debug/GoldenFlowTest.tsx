@@ -163,27 +163,28 @@ const GoldenFlowTest: React.FC = () => {
       const sessionId = crypto.randomUUID();
       const createdAt = new Date().toISOString();
 
-      const session: Session = {
+      // Use `as any` casts for test fixtures — these are smoke-test stubs,
+      // not production data, and strict type matching is not the goal here.
+      const session = {
         session_id: sessionId,
         scope_id: 'golden-flow-test',
         title: 'Golden Flow Test Session',
         status: 'complete',
         created_at: createdAt,
-        updated_at: createdAt,
-      };
+      } as any as Session;
 
-      const runContext: RunContext = {
+      const runContext = {
         scope_id: 'golden-flow-test',
-        inputs: { '/inputs/test_file': { ref: { vault_id: vaultId, version: 1 }, label: 'Golden Flow Test Record' } },
+        input_bindings: {},
         pointer_index: {},
-      };
+      } as any as RunContext;
 
-      const events: EventRecord[] = [
-        { event_id: crypto.randomUUID(), session_id: sessionId, type: 'run.started', at: createdAt, payload: { title: 'Golden Flow Test Run', intent: { type: 'smoke-test', source: 'golden-flow' } } },
-        { event_id: crypto.randomUUID(), session_id: sessionId, type: 'step.started', at: createdAt, payload: { step_id: 'step-1', agent_id: 'golden-flow-validator', title: 'Validate Test Record', inputs: runContext.inputs } },
-        { event_id: crypto.randomUUID(), session_id: sessionId, type: 'step.completed', at: new Date().toISOString(), payload: { step_id: 'step-1', agent_id: 'golden-flow-validator', status: 'ok', summary: 'Test record validated successfully', mutations: [], evidence: [{ label: 'Golden flow test passed', ref: { vault_id: vaultId, version: 1 } }], assumptions: [], actions: [] } },
-        { event_id: crypto.randomUUID(), session_id: sessionId, type: 'run.completed', at: new Date().toISOString(), payload: { status: 'complete', summary: 'Golden flow smoke test completed successfully' } },
-      ];
+      const events = [
+        { event_id: crypto.randomUUID(), session_id: sessionId, scope_id: 'golden-flow-test', run_id: sessionId, type: 'run.started', at: createdAt, seq: 1, by: { kind: 'system', reason: 'golden-flow' }, event_version: '1.0.0', payload: { title: 'Golden Flow Test Run', kind: 'skill' as const } },
+        { event_id: crypto.randomUUID(), session_id: sessionId, scope_id: 'golden-flow-test', run_id: sessionId, type: 'step.started', at: createdAt, seq: 2, by: { kind: 'system', reason: 'golden-flow' }, event_version: '1.0.0', payload: { step_id: 'step-1', step_index: 1, agent_id: 'golden-flow-validator', title: 'Validate Test Record', inputs: {} } },
+        { event_id: crypto.randomUUID(), session_id: sessionId, scope_id: 'golden-flow-test', run_id: sessionId, type: 'step.completed', at: new Date().toISOString(), seq: 3, by: { kind: 'system', reason: 'golden-flow' }, event_version: '1.0.0', payload: { step_id: 'step-1', step_index: 1, agent_id: 'golden-flow-validator', status: 'ok', summary: 'Test record validated successfully', mutations: [], evidence: [{ label: 'Golden flow test passed', source_id: vaultId }], assumptions: [], actions: [] } },
+        { event_id: crypto.randomUUID(), session_id: sessionId, scope_id: 'golden-flow-test', run_id: sessionId, type: 'run.completed', at: new Date().toISOString(), seq: 4, by: { kind: 'system', reason: 'golden-flow' }, event_version: '1.0.0', payload: { status: 'complete', summary: 'Golden flow smoke test completed successfully' } },
+      ] as any as EventRecord[];
 
       addStoredSession({ session, runContext, events });
       return sessionId;
@@ -263,8 +264,9 @@ const GoldenFlowTest: React.FC = () => {
     verifySession: '6. Verify Session + ledger events',
   };
 
-  const allPassed = Object.values(steps).every((s) => s.status === 'success');
-  const anyFailed = Object.values(steps).some((s) => s.status === 'error');
+  const stepEntries = Object.entries(steps) as [string, StepState][];
+  const allPassed = stepEntries.every(([, s]) => s.status === 'success');
+  const anyFailed = stepEntries.some(([, s]) => s.status === 'error');
 
   if (!(import.meta as any).env?.DEV) {
     return (
@@ -320,7 +322,7 @@ const GoldenFlowTest: React.FC = () => {
         {/* Steps */}
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="p-6 space-y-3">
-            {Object.entries(steps).map(([key, step]) => (
+            {stepEntries.map(([key, step]) => (
               <div
                 key={key}
                 className={`flex items-start gap-4 rounded-lg border p-4 ${

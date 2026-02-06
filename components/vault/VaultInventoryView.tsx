@@ -178,7 +178,6 @@ const VaultInventoryView: React.FC = () => {
     } else if (typeParam && RECORD_TYPES.includes(typeParam as ContextRecordType)) {
       setSelectedTypes([typeParam as ContextRecordType]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filteredRecords = useMemo(() => {
