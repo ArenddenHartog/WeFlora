@@ -49,3 +49,20 @@ export class PcivSchemaMismatchError extends Error {
     this.cause = cause;
   }
 }
+
+/**
+ * Thrown when an RPC function is not deployed or doesn't exist.
+ * PostgREST error PGRST202 (function not found).
+ * Indicates a backend mismatch - migrations may need to be run.
+ */
+export class PcivRpcMissingError extends Error {
+  rpcName: string;
+  cause?: unknown;
+  
+  constructor(rpcName: string, cause?: unknown) {
+    super(`Backend mismatch: RPC ${rpcName} not deployed`);
+    this.name = 'PcivRpcMissingError';
+    this.rpcName = rpcName;
+    this.cause = cause;
+  }
+}

@@ -11,6 +11,7 @@ import type { VaultPointer } from '../../src/agentic/contracts/vault';
 import { linkVaultObjectsToProject, uploadToGlobalVault, VaultObject, VaultLink } from '../../services/fileService';
 import { track } from '../../src/agentic/telemetry/telemetry';
 import { supabase } from '../../services/supabaseClient';
+import { rpcSafe } from '../../utils/safeAction';
 import WizardHeader from './wizard/WizardHeader';
 import StepVault, { type VaultUploadItem } from './wizard/StepVault';
 import StepSelectSkills from './wizard/StepSelectSkills';
@@ -142,18 +143,29 @@ const SessionWizard: React.FC<SessionWizardProps> = ({ intent }) => {
     }
     const idempotencyKey = `skill-run:${selectionHash || crypto.randomUUID()}`;
 
-    const { data: sessionRpc, error: sessionError } = await supabase
-      .rpc('create_session_with_idempotency', {
-        p_idempotency_key: idempotencyKey,
-        p_intent: { intent: 'Session Wizard', selection: selectionState }
-      })
-      .single();
+    // Use rpcSafe for mutation - provides clear error if RPC missing
+    let sessionId = crypto.randomUUID();
+    try {
+      const { data: sessionRpc, error: sessionError } = await rpcSafe<{ session_id: string }>(
+        supabase,
+        'create_session_with_idempotency',
+        {
+          p_idempotency_key: idempotencyKey,
+          p_intent: { intent: 'Session Wizard', selection: selectionState }
+        }
+      );
 
-    if (sessionError) {
-      track('session_wizard.idempotency_error', { message: sessionError.message });
+      if (sessionError) {
+        track('session_wizard.idempotency_error', { message: sessionError.message });
+      } else if (sessionRpc) {
+        // Handle both array and single object response
+        const rpcResult = Array.isArray(sessionRpc) ? sessionRpc[0] : sessionRpc;
+        sessionId = rpcResult?.session_id ?? sessionId;
+      }
+    } catch (error) {
+      // RPC might not exist - fall back to client-generated ID
+      track('session_wizard.idempotency_rpc_missing', { message: (error as Error).message });
     }
-
-    const sessionId = sessionRpc?.session_id ?? crypto.randomUUID();
     const createdAt = new Date().toISOString();
     const scopeId = selectedProjectId || 'scope-unknown';
 

@@ -113,22 +113,28 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                 </svg>
               </div>
               <div>
-                <h1 className="text-lg font-bold text-slate-900">Something went wrong</h1>
-                <p className="text-sm text-slate-500">An unexpected error occurred</p>
+                <h1 className="text-lg font-bold text-slate-900">We hit an unexpected issue</h1>
+                <p className="text-sm text-slate-500">Something went wrong while loading this page</p>
               </div>
             </div>
 
             <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 mb-4">
               <p className="text-sm text-rose-700 font-medium">{error?.message || 'Unknown error'}</p>
               {traceId && (
-                <p className="text-xs text-rose-500 mt-1">Trace ID: {traceId}</p>
+                <p className="text-xs text-rose-500 mt-1 font-mono">Trace ID: {traceId}</p>
               )}
             </div>
 
             <div className="flex flex-wrap gap-3">
               <button
-                onClick={this.handleRetry}
+                onClick={() => window.location.reload()}
                 className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition-colors"
+              >
+                Reload
+              </button>
+              <button
+                onClick={this.handleRetry}
+                className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors"
               >
                 Try again
               </button>
@@ -140,16 +146,14 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               </button>
             </div>
 
-            {(import.meta as any).env?.DEV && (
-              <div className="mt-4 pt-4 border-t border-slate-200">
-                <button
-                  onClick={this.handleCopyDebugInfo}
-                  className="w-full px-4 py-2 border border-slate-200 text-slate-500 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors"
-                >
-                  Copy debug info
-                </button>
-              </div>
-            )}
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <button
+                onClick={this.handleCopyDebugInfo}
+                className="w-full px-4 py-2 border border-slate-200 text-slate-500 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors"
+              >
+                Copy debug info
+              </button>
+            </div>
           </div>
         </div>
       );

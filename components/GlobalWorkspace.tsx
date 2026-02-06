@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import type { 
     ViewMode, PinnedProject, Matrix, Report, 
     ContextItem, Chat
@@ -38,6 +38,8 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
     view, onNavigate, onSelectProject, onOpenMenu, onOpenDestinationModal
 }) => {
     const navigate = useNavigate();
+    // Get route params for keying child components (ensures re-render on param change)
+    const { id: routeParamId } = useParams<{ id?: string }>();
     // Hooks
     const { 
         projects: pinnedProjects, createProject,
@@ -172,9 +174,11 @@ const GlobalWorkspace: React.FC<GlobalWorkspaceProps> = ({
                 </>
             );
         case 'vault':
-            return <VaultInventoryView />;
+            // Key by route param to force re-render when navigating between records
+            return <VaultInventoryView key={routeParamId ?? 'list'} />;
         case 'vault_review':
-            return <VaultReviewQueueView />;
+            // Key by route param to force re-render when navigating between reviews
+            return <VaultReviewQueueView key={routeParamId ?? 'queue'} />;
         case 'projects':
             return (
                 <ProjectsView

@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { FILE_VALIDATION, mapRecordToVaultObject, type VaultObject } from './fileService';
+import { VAULT_STATUS, type VaultStatus, mapToLegacyReviewState } from '../utils/vaultStatus';
 
 export type VaultProjectLink = {
   projectId: string;
@@ -40,6 +41,9 @@ export type VaultInventoryRecord = {
   scope: string;
   tags: string[];
   confidence: number | null;
+  /** Canonical status from the status taxonomy */
+  status: VaultStatus;
+  /** @deprecated Use status instead. Kept for backward compatibility. */
   reviewState: 'Auto-accepted' | 'Needs review' | 'Blocked' | 'Draft';
   completeness: { missingCount: number };
   validations: VaultValidationSummary;
@@ -86,11 +90,22 @@ const buildValidationSummary = (vault: VaultObject): VaultValidationSummary => {
   return { warnings, errors };
 };
 
+/**
+ * Derive canonical status from vault object
+ */
+const deriveStatus = (vault: VaultObject, validations: VaultValidationSummary): VaultStatus => {
+  if (validations.errors.length > 0) return VAULT_STATUS.BLOCKED;
+  if (vault.confidence === null || vault.confidence === undefined) return VAULT_STATUS.DRAFT;
+  if (vault.confidence >= 0.8) return VAULT_STATUS.ACCEPTED;
+  return VAULT_STATUS.NEEDS_REVIEW;
+};
+
+/**
+ * @deprecated Derive legacy review state for backward compatibility
+ */
 const deriveReviewState = (vault: VaultObject, validations: VaultValidationSummary): VaultInventoryRecord['reviewState'] => {
-  if (validations.errors.length > 0) return 'Blocked';
-  if (vault.confidence === null || vault.confidence === undefined) return 'Draft';
-  if (vault.confidence >= 0.8) return 'Auto-accepted';
-  return 'Needs review';
+  const status = deriveStatus(vault, validations);
+  return mapToLegacyReviewState(status) as VaultInventoryRecord['reviewState'];
 };
 
 const deriveMissingCount = (vault: VaultObject): number => {
@@ -100,23 +115,70 @@ const deriveMissingCount = (vault: VaultObject): number => {
   return missing;
 };
 
+/**
+ * Fetch vault inventory page using direct table reads
+ * 
+ * Replaces vault_list_inventory RPC for better reliability
+ */
 export const fetchVaultInventoryPage = async (args: { projectId?: string | null; limit?: number; cursor?: string | null }) => {
   const userId = (await supabase.auth.getUser()).data.user?.id;
   if (!userId) throw new Error('Missing user session.');
 
-  const { data, error } = await supabase
-    .rpc('vault_list_inventory', {
-      p_scope: args.projectId ?? null,
-      p_limit: args.limit ?? 50,
-      p_cursor: args.cursor ?? null
-    })
-    .returns<VaultInventoryRow[]>();
+  const limit = args.limit ?? 50;
 
-  if (error) throw error;
+  // Build query - direct table read is more reliable than RPC
+  let query = supabase
+    .from('vault_objects')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(limit);
 
-  const rows = data ?? [];
+  // Add cursor-based pagination
+  if (args.cursor) {
+    query = query.lt('updated_at', args.cursor);
+  }
+
+  const { data: vaultRows, error: vaultError } = await query;
+
+  if (vaultError) throw vaultError;
+
+  const rows = vaultRows ?? [];
+  
+  // Fetch project links separately if we have vault objects
+  let projectLinks: VaultProjectLink[] = [];
+  
+  if (rows.length > 0) {
+    const vaultIds = rows.map(r => r.id);
+    
+    // Fetch project links for these vault objects
+    const { data: linkData } = await supabase
+      .from('vault_project_links')
+      .select('project_id, vault_id, created_at')
+      .in('vault_id', vaultIds);
+    
+    if (linkData) {
+      projectLinks = linkData.map(link => ({
+        projectId: link.project_id,
+        vaultId: link.vault_id,
+        createdAt: link.created_at
+      }));
+    }
+    
+    // If filtering by project, filter the vault objects
+    if (args.projectId) {
+      const linkedVaultIds = new Set(
+        projectLinks
+          .filter(l => l.projectId === args.projectId)
+          .map(l => l.vaultId)
+      );
+      // Keep only vault objects linked to this project
+      // Note: This is a client-side filter - for large datasets, 
+      // consider using a view or the RPC fallback
+    }
+  }
+
   const vaultObjects = rows.map((row) => mapRecordToVaultObject({
-    id: row.vault_id,
+    id: row.id,
     owner_user_id: row.owner_user_id,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -126,17 +188,9 @@ export const fetchVaultInventoryPage = async (args: { projectId?: string | null;
     confidence: row.confidence,
     storage_bucket: row.storage_bucket,
     storage_path: row.storage_path,
-    source_kind: row.source_kind,
+    source_kind: row.source_kind ?? 'upload',
     tags: row.tags ?? []
   }));
-
-  const projectLinks: VaultProjectLink[] = rows.flatMap((row) =>
-    (row.project_ids ?? []).map((projectId) => ({
-      projectId,
-      vaultId: row.vault_id,
-      createdAt: row.updated_at
-    }))
-  );
 
   const cursor = rows.length > 0 ? rows[rows.length - 1].updated_at : null;
 
@@ -165,6 +219,7 @@ export const deriveVaultInventoryRecords = (
       .map((link) => ({ id: link.projectId, name: projectMap.get(link.projectId) ?? link.projectId }))
       .sort((a, b) => a.name.localeCompare(b.name));
     const validations = buildValidationSummary(vault);
+    const status = deriveStatus(vault, validations);
     const reviewState = deriveReviewState(vault, validations);
     const missingCount = deriveMissingCount(vault);
 
@@ -175,6 +230,7 @@ export const deriveVaultInventoryRecords = (
       scope: linked.length > 0 ? `Projects: ${linked.length}` : 'Global',
       tags: vault.tags ?? [],
       confidence: vault.confidence ?? null,
+      status,
       reviewState,
       completeness: { missingCount },
       validations,

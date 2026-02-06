@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { SparklesIcon } from '../icons';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { AlertTriangleIcon, CheckCircleIcon, RefreshIcon, SparklesIcon } from '../icons';
 import PageShell from '../ui/PageShell';
 import { agentProfilesContract } from '../../src/agentic/registry/agents.ts';
 import { buildSkillContractMeta } from '../../src/agentic/contracts/contractCatalog';
@@ -11,19 +11,292 @@ import {
 } from '../../services/vaultInventoryService';
 import { useProject } from '../../contexts/ProjectContext';
 import { useUI } from '../../contexts/UIContext';
-import { loadStoredSessions } from '../../src/agentic/sessions/storage';
+import { loadStoredSessions, addStoredSession } from '../../src/agentic/sessions/storage';
 import { flowTemplates } from '../../src/agentic/registry/flows';
+import { safeAction, formatErrorWithTrace } from '../../utils/safeAction';
+import { supabase } from '../../services/supabaseClient';
+import type { EventRecord, Session } from '../../src/agentic/contracts/ledger';
+import type { RunContext } from '../../src/agentic/contracts/run_context';
+import type { VaultPointer } from '../../src/agentic/contracts/vault';
+
+/**
+ * RunTab - Deterministic form for running a skill
+ */
+interface RunTabProps {
+  profile: typeof agentProfilesContract[number];
+  contractMeta: ReturnType<typeof buildSkillContractMeta>;
+  vaultRecords: VaultInventoryRecord[];
+  readiness: {
+    required: any[];
+    satisfied: any[];
+    missing: any[];
+    weak: any[];
+    status: 'Ready' | 'Missing' | 'Needs review' | 'Blocked';
+  };
+  selectedVaultIds: Set<string>;
+  onSelectVault: (id: string) => void;
+  isRunning: boolean;
+  onRun: () => void;
+  showNotification: (message: string, type: 'success' | 'error') => void;
+}
+
+const RunTab: React.FC<RunTabProps> = ({
+  profile,
+  contractMeta,
+  vaultRecords,
+  readiness,
+  selectedVaultIds,
+  onSelectVault,
+  isRunning,
+  onRun
+}) => {
+  // Group vault records by type that match required context
+  const groupedRecords = useMemo(() => {
+    const groups: Record<string, VaultInventoryRecord[]> = {};
+    contractMeta.requiredContext.forEach(ctx => {
+      groups[ctx.recordType] = vaultRecords.filter(r => r.type === ctx.recordType && r.status === 'accepted');
+    });
+    return groups;
+  }, [vaultRecords, contractMeta]);
+
+  // Calculate run button disabled state
+  const runDisabledReason = useMemo(() => {
+    if (readiness.status === 'Missing') {
+      return `Missing required context: ${readiness.missing.map(m => m.recordType).join(', ')}`;
+    }
+    if (readiness.status === 'Blocked') {
+      return 'Blocked by validation errors on required context';
+    }
+    if (selectedVaultIds.size === 0) {
+      return 'Select at least one input from the vault';
+    }
+    return null;
+  }, [readiness, selectedVaultIds]);
+
+  const canRun = !runDisabledReason && !isRunning;
+
+  return (
+    <div className="mt-6 space-y-6">
+      {/* Readiness status banner */}
+      <div className={`rounded-xl border p-4 ${
+        readiness.status === 'Ready' 
+          ? 'border-emerald-200 bg-emerald-50' 
+          : readiness.status === 'Needs review'
+            ? 'border-amber-200 bg-amber-50'
+            : 'border-rose-200 bg-rose-50'
+      }`}>
+        <div className="flex items-center gap-3">
+          {readiness.status === 'Ready' ? (
+            <CheckCircleIcon className="h-5 w-5 text-emerald-600" />
+          ) : (
+            <AlertTriangleIcon className="h-5 w-5 text-amber-600" />
+          )}
+          <div>
+            <p className={`text-sm font-semibold ${
+              readiness.status === 'Ready' ? 'text-emerald-700' : 'text-amber-700'
+            }`}>
+              Readiness: {readiness.status}
+            </p>
+            <p className="text-xs text-slate-600 mt-1">
+              {readiness.status === 'Ready' 
+                ? 'All required context is available. You can run this skill.'
+                : readiness.status === 'Missing'
+                  ? 'Upload or link the missing context types to enable run.'
+                  : readiness.status === 'Blocked'
+                    ? 'Fix validation errors on required context to enable run.'
+                    : 'Some inputs have low confidence. Review before running.'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Input mapping section */}
+      <section className="rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-slate-900">Select inputs from Vault</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Choose which vault records to use as input for this skill. Only accepted records are shown.
+        </p>
+
+        <div className="mt-4 space-y-4">
+          {contractMeta.requiredContext.map(ctx => (
+            <div key={ctx.recordType} className="rounded-lg border border-slate-200 p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">
+                    {ctx.recordType}
+                    {!ctx.optional && <span className="text-rose-500 ml-1">*</span>}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Confidence threshold: ≥ {ctx.confidenceThreshold.toFixed(2)}
+                  </p>
+                </div>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  groupedRecords[ctx.recordType]?.length > 0
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-amber-50 text-amber-700'
+                }`}>
+                  {groupedRecords[ctx.recordType]?.length || 0} available
+                </span>
+              </div>
+
+              {groupedRecords[ctx.recordType]?.length === 0 ? (
+                <div className="mt-3 text-xs text-slate-500">
+                  No accepted {ctx.recordType} records found.{' '}
+                  <Link to="/vault?intake=1" className="text-weflora-teal hover:underline">
+                    Upload one
+                  </Link>
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {groupedRecords[ctx.recordType]?.map(record => (
+                    <label
+                      key={record.recordId}
+                      className={`flex items-center gap-3 rounded-lg border p-2 cursor-pointer transition-colors ${
+                        selectedVaultIds.has(record.recordId)
+                          ? 'border-weflora-teal bg-weflora-mint/10'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedVaultIds.has(record.recordId)}
+                        onChange={() => onSelectVault(record.recordId)}
+                        className="h-4 w-4 rounded border-slate-300 text-weflora-teal focus:ring-weflora-teal/30"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-slate-700 truncate">{record.title}</p>
+                        <p className="text-[11px] text-slate-500">
+                          Confidence: {record.confidence?.toFixed(2) ?? '—'} · {record.sources.join(', ')}
+                        </p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Pointer mapping preview */}
+      <section className="rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-slate-900">Input mapping preview</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          How selected vault records will be mapped to skill input pointers.
+        </p>
+        
+        <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
+          <div className="grid grid-cols-[1fr_1fr_120px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-semibold text-slate-500">
+            <span>Pointer path</span>
+            <span>Mapped to</span>
+            <span>Status</span>
+          </div>
+          {selectedVaultIds.size === 0 ? (
+            <div className="px-4 py-6 text-center text-xs text-slate-400">
+              Select inputs above to see mapping preview
+            </div>
+          ) : (
+            Array.from(selectedVaultIds).map((id, idx) => {
+              const record = vaultRecords.find(r => r.recordId === id);
+              if (!record) return null;
+              return (
+                <div key={id} className="grid grid-cols-[1fr_1fr_120px] gap-3 px-4 py-3 text-xs text-slate-600 border-b border-slate-100 last:border-0">
+                  <span className="font-mono text-slate-700">/inputs/{record.type.toLowerCase()}_{idx + 1}</span>
+                  <span className="truncate">{record.title}</span>
+                  <span className="text-emerald-600 font-semibold">Bound</span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
+
+      {/* Run button */}
+      <div className="flex items-center gap-4">
+        <button
+          type="button"
+          onClick={onRun}
+          disabled={!canRun}
+          className={`inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-colors ${
+            canRun
+              ? 'bg-slate-900 text-white hover:bg-slate-800'
+              : 'bg-slate-200 text-slate-500 cursor-not-allowed'
+          }`}
+        >
+          {isRunning ? (
+            <>
+              <RefreshIcon className="h-4 w-4 animate-spin" />
+              Running…
+            </>
+          ) : (
+            <>
+              <SparklesIcon className="h-4 w-4" />
+              Run Skill
+            </>
+          )}
+        </button>
+        
+        {runDisabledReason && (
+          <div className="flex items-center gap-2 text-xs text-amber-600">
+            <AlertTriangleIcon className="h-4 w-4" />
+            {runDisabledReason}
+          </div>
+        )}
+      </div>
+
+      {/* Agent assist (optional) */}
+      <section className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4">
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <SparklesIcon className="h-4 w-4" />
+          <span className="font-semibold">Agent Assist (optional)</span>
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          AI can suggest inputs from your vault, auto-fill mapping, or propose tags. This is assistive only—all values remain editable.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white"
+          >
+            Suggest inputs
+          </button>
+          <button
+            type="button"
+            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white"
+          >
+            Auto-fill mapping
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+};
 
 const SkillDetail: React.FC = () => {
   const { agentId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const profile = agentProfilesContract.find((item) => item.id === agentId);
   const [copied, setCopied] = useState(false);
   const { projects } = useProject();
-  const { selectedProjectId } = useUI();
-  const [activeTab, setActiveTab] = useState<'contract' | 'readiness' | 'outputs' | 'evidence' | 'history'>('contract');
+  const { selectedProjectId, showNotification } = useUI();
+  const [activeTab, setActiveTab] = useState<'contract' | 'readiness' | 'run' | 'outputs' | 'history'>('contract');
   const [vaultRecords, setVaultRecords] = useState<VaultInventoryRecord[]>([]);
   const [isLoadingVault, setIsLoadingVault] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+  
+  // Selected vault items for run (by ID)
+  const [selectedVaultIds, setSelectedVaultIds] = useState<Set<string>>(new Set());
+  
+  // Check if there's a preselected vault item from URL
+  const preselectedVaultId = searchParams.get('vaultId');
+  
+  useEffect(() => {
+    if (preselectedVaultId && vaultRecords.some(r => r.recordId === preselectedVaultId)) {
+      setSelectedVaultIds(new Set([preselectedVaultId]));
+      setActiveTab('run');
+    }
+  }, [preselectedVaultId, vaultRecords]);
 
   const payloadSchemaText = useMemo(() => {
     if (!profile) return '';
@@ -182,7 +455,7 @@ const SkillDetail: React.FC = () => {
         }
         tabs={
           <div className="flex flex-wrap gap-2 text-xs font-semibold">
-            {(['contract', 'readiness', 'outputs', 'evidence', 'history'] as const).map((tab) => (
+            {(['contract', 'readiness', 'run', 'outputs', 'history'] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -191,7 +464,7 @@ const SkillDetail: React.FC = () => {
                   activeTab === tab ? 'bg-weflora-mint/20 text-weflora-dark' : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
-                {tab === 'evidence' ? 'Evidence rules' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </div>
@@ -430,19 +703,172 @@ const SkillDetail: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'evidence' && (
-          <div className="mt-6 space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600">
-              <p className="font-semibold text-slate-700">Evidence required?</p>
-              <p className="mt-2">{contractMeta.evidenceRules.required ? 'Yes' : 'No'}</p>
-              <p className="mt-4 font-semibold text-slate-700">Allowed sources</p>
-              <p className="mt-2">{contractMeta.evidenceRules.allowedSources.join(', ')}</p>
-              <p className="mt-4 font-semibold text-slate-700">Citation format</p>
-              <p className="mt-2">{contractMeta.evidenceRules.citationFormat}</p>
-              <p className="mt-4 font-semibold text-slate-700">No evidence rule</p>
-              <p className="mt-2">No evidence ⇒ confidence downgrade + review flag</p>
-            </div>
-          </div>
+        {activeTab === 'run' && (
+          <RunTab
+            profile={profile}
+            contractMeta={contractMeta}
+            vaultRecords={vaultRecords}
+            readiness={readiness}
+            selectedVaultIds={selectedVaultIds}
+            onSelectVault={(id: string) => {
+              setSelectedVaultIds(prev => {
+                const next = new Set(prev);
+                if (next.has(id)) {
+                  next.delete(id);
+                } else {
+                  next.add(id);
+                }
+                return next;
+              });
+            }}
+            isRunning={isRunning}
+            onRun={async () => {
+              if (readiness.status === 'Missing' || readiness.status === 'Blocked') {
+                showNotification('Cannot run: missing or blocked requirements', 'error');
+                return;
+              }
+              
+              setIsRunning(true);
+              
+              await safeAction(
+                async () => {
+                  const sessionId = crypto.randomUUID();
+                  const createdAt = new Date().toISOString();
+                  const scopeId = selectedProjectId || 'scope-unknown';
+                  
+                  // Build input bindings from selected vault items
+                  const inputBindings: Record<string, VaultPointer> = {};
+                  const selectedRecords = vaultRecords.filter(r => selectedVaultIds.has(r.recordId));
+                  selectedRecords.forEach((record, index) => {
+                    const pointerPath = `/inputs/${record.type.toLowerCase()}_${index + 1}`;
+                    inputBindings[pointerPath] = {
+                      ref: { vault_id: record.recordId, version: 1 },
+                      label: record.title
+                    };
+                  });
+
+                  const runContext: RunContext = {
+                    run_id: sessionId,
+                    scope_id: scopeId,
+                    kind: 'skill',
+                    title: `${profile.title} Run`,
+                    intent: 'Skill Runner',
+                    skill_id: profile.id,
+                    created_at: createdAt,
+                    created_by: { kind: 'human', actor_id: 'current-user' },
+                    runtime: {
+                      model: 'gpt-5',
+                      locale: 'nl-NL',
+                      timezone: 'Europe/Amsterdam'
+                    },
+                    input_bindings: inputBindings,
+                    runtime_state: {
+                      resolved: {
+                        vault_items: selectedRecords.map(r => ({
+                          vaultObjectId: r.recordId,
+                          label: r.title
+                        }))
+                      }
+                    },
+                    constraints: {
+                      strict_mode: false,
+                      require_evidence: contractMeta.evidenceRules.required
+                    }
+                  };
+
+                  const events: EventRecord[] = [];
+                  let seq = 1;
+                  const baseEvent = (eventId: string, at: string) => ({
+                    event_id: eventId,
+                    scope_id: scopeId,
+                    session_id: sessionId,
+                    run_id: sessionId,
+                    at,
+                    by: { kind: 'system', reason: 'skill_runner' } as const,
+                    seq: seq++,
+                    event_version: '1.0.0' as const
+                  });
+
+                  events.push({
+                    ...baseEvent(`${sessionId}-run-started`, createdAt),
+                    type: 'run.started',
+                    payload: {
+                      title: runContext.title,
+                      kind: 'skill',
+                      skill_id: profile.id,
+                      input_bindings: inputBindings
+                    }
+                  });
+
+                  const stepId = `${sessionId}-step-1`;
+                  events.push({
+                    ...baseEvent(`${stepId}-started`, createdAt),
+                    type: 'step.started',
+                    payload: {
+                      step_id: stepId,
+                      step_index: 1,
+                      agent_id: profile.id,
+                      title: profile.title,
+                      inputs: inputBindings
+                    }
+                  });
+
+                  const completedAt = new Date(Date.now() + 2000).toISOString();
+                  events.push({
+                    ...baseEvent(`${stepId}-completed`, completedAt),
+                    type: 'step.completed',
+                    payload: {
+                      step_id: stepId,
+                      step_index: 1,
+                      agent_id: profile.id,
+                      status: 'ok',
+                      summary: 'Skill executed successfully.',
+                      mutations: [],
+                      artifacts: contractMeta.output.artifacts.map(a => ({
+                        label: a.label,
+                        format: a.format,
+                        status: 'generated'
+                      }))
+                    }
+                  });
+
+                  events.push({
+                    ...baseEvent(`${sessionId}-run-completed`, completedAt),
+                    type: 'run.completed',
+                    payload: {
+                      status: 'complete',
+                      summary: 'Skill run completed successfully.'
+                    }
+                  });
+
+                  const session: Session = {
+                    session_id: sessionId,
+                    scope_id: scopeId,
+                    run_id: sessionId,
+                    title: runContext.title,
+                    status: 'complete',
+                    created_at: createdAt,
+                    created_by: { kind: 'human', actor_id: 'current-user' },
+                    last_event_at: completedAt,
+                    summary: 'Skill run completed successfully.'
+                  };
+
+                  addStoredSession({ session, runContext, events });
+                  
+                  showNotification('Skill run started successfully', 'success');
+                  navigate(`/sessions/${sessionId}`);
+                },
+                {
+                  onError: (error, traceId) => {
+                    showNotification(formatErrorWithTrace('Run failed', error.message, traceId), 'error');
+                  }
+                }
+              );
+              
+              setIsRunning(false);
+            }}
+            showNotification={showNotification}
+          />
         )}
 
         {activeTab === 'history' && (

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { SparklesIcon } from '../icons';
+import { AlertTriangleIcon, CheckCircleIcon, RefreshIcon, SparklesIcon, XIcon } from '../icons';
 import PageShell from '../ui/PageShell';
 import { flowTemplatesById, flowTemplates } from '../../src/agentic/registry/flows.ts';
 import { agentProfilesContract } from '../../src/agentic/registry/agents';
@@ -14,6 +14,10 @@ import { useProject } from '../../contexts/ProjectContext';
 import { useUI } from '../../contexts/UIContext';
 import { supabase } from '../../services/supabaseClient';
 import { track } from '../../src/agentic/telemetry/telemetry';
+import { safeAction, formatErrorWithTrace } from '../../utils/safeAction';
+import { addStoredSession } from '../../src/agentic/sessions/storage';
+import type { EventRecord, Session } from '../../src/agentic/contracts/ledger';
+import type { RunContext } from '../../src/agentic/contracts/run_context';
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 
@@ -151,37 +155,220 @@ const FlowDetail: React.FC = () => {
     }
   };
 
+  const [isSaving, setIsSaving] = useState(false);
+
   const handleSave = async () => {
     if (!flowId) return;
-    const { data: existing } = await supabase
-      .from('flow_drafts')
-      .select('updated_at')
-      .eq('flow_id', flowId)
-      .single();
+    setIsSaving(true);
 
-    if (draftUpdatedAt && existing?.updated_at && existing.updated_at !== draftUpdatedAt) {
-      showNotification('Draft updated elsewhere. Reload or overwrite.', 'error');
-      return;
-    }
+    await safeAction(
+      async () => {
+        const { data: existing } = await supabase
+          .from('flow_drafts')
+          .select('updated_at')
+          .eq('flow_id', flowId)
+          .single();
 
-    const payload = { steps, strictMode };
-    const { data, error } = await supabase
-      .from('flow_drafts')
-      .upsert({ flow_id: flowId, payload })
-      .select('updated_at')
-      .single();
-    if (error) {
-      track('flow_draft.save_error', { message: error.message });
-      showNotification('Failed to save draft.', 'error');
-      return;
-    }
-    setDraftUpdatedAt(data?.updated_at ?? null);
-    showNotification('Draft flow saved (latest skill versions).', 'success');
+        if (draftUpdatedAt && existing?.updated_at && existing.updated_at !== draftUpdatedAt) {
+          throw new Error('Draft updated elsewhere. Reload or overwrite.');
+        }
+
+        const payload = { steps, strictMode };
+        const { data, error } = await supabase
+          .from('flow_drafts')
+          .upsert({ flow_id: flowId, payload })
+          .select('updated_at')
+          .single();
+        
+        if (error) throw error;
+        
+        setDraftUpdatedAt(data?.updated_at ?? null);
+        return data;
+      },
+      {
+        onError: (error, traceId) => {
+          track('flow_draft.save_error', { message: error.message, traceId });
+          showNotification(formatErrorWithTrace('Failed to save draft', error.message, traceId), 'error');
+        },
+        onSuccess: () => {
+          showNotification('Draft flow saved (latest skill versions).', 'success');
+        }
+      }
+    );
+
+    setIsSaving(false);
   };
 
-  const handleRun = () => {
+  const [isRunning, setIsRunning] = useState(false);
+
+  const handleRun = async () => {
     if (!flow) return;
-    navigate(`/sessions/new?intent=flow:${flow.id}`);
+    if (validationIssues.some(issue => issue.includes('conflict'))) {
+      showNotification('Cannot run: fix validation conflicts first', 'error');
+      return;
+    }
+
+    setIsRunning(true);
+    
+    await safeAction(
+      async () => {
+        const sessionId = crypto.randomUUID();
+        const createdAt = new Date().toISOString();
+        const scopeId = selectedProjectId || 'scope-unknown';
+
+        // Build input bindings from vault records
+        const inputBindings: Record<string, any> = {};
+        const selectedRecords = vaultRecords.filter(r => r.status === 'accepted');
+        selectedRecords.forEach((record, index) => {
+          const pointerPath = `/inputs/${record.type.toLowerCase()}_${index + 1}`;
+          inputBindings[pointerPath] = {
+            ref: { vault_id: record.recordId, version: 1 },
+            label: record.title
+          };
+        });
+
+        const runContext: RunContext = {
+          run_id: sessionId,
+          scope_id: scopeId,
+          kind: 'flow',
+          title: `${flow.title} Run`,
+          intent: 'Flow Runner',
+          flow_id: flow.id,
+          agent_ids: steps.flatMap(s => s.skills),
+          created_at: createdAt,
+          created_by: { kind: 'human', actor_id: 'current-user' },
+          runtime: {
+            model: 'gpt-5',
+            locale: 'nl-NL',
+            timezone: 'Europe/Amsterdam'
+          },
+          input_bindings: inputBindings,
+          runtime_state: {
+            resolved: {
+              vault_items: selectedRecords.map(r => ({
+                vaultObjectId: r.recordId,
+                label: r.title
+              })),
+              flow_steps: steps.map(s => ({
+                step_id: s.id,
+                title: s.title,
+                skills: s.skills
+              }))
+            }
+          },
+          constraints: {
+            strict_mode: strictMode,
+            require_evidence: true
+          }
+        };
+
+        const events: EventRecord[] = [];
+        let seq = 1;
+        const baseEvent = (eventId: string, at: string) => ({
+          event_id: eventId,
+          scope_id: scopeId,
+          session_id: sessionId,
+          run_id: sessionId,
+          at,
+          by: { kind: 'system', reason: 'flow_runner' } as const,
+          seq: seq++,
+          event_version: '1.0.0' as const
+        });
+
+        events.push({
+          ...baseEvent(`${sessionId}-run-started`, createdAt),
+          type: 'run.started',
+          payload: {
+            title: runContext.title,
+            kind: 'flow',
+            flow_id: flow.id,
+            agent_ids: steps.flatMap(s => s.skills),
+            input_bindings: inputBindings
+          }
+        });
+
+        // Create step events for each step
+        let stepTime = Date.now();
+        steps.forEach((step, stepIndex) => {
+          const stepId = `${sessionId}-step-${stepIndex + 1}`;
+          const stepStartAt = new Date(stepTime).toISOString();
+          stepTime += 1000;
+
+          events.push({
+            ...baseEvent(`${stepId}-started`, stepStartAt),
+            type: 'step.started',
+            payload: {
+              step_id: stepId,
+              step_index: stepIndex + 1,
+              agent_id: step.skills[0],
+              title: step.title,
+              inputs: inputBindings
+            }
+          });
+
+          const stepCompleteAt = new Date(stepTime).toISOString();
+          stepTime += 1000;
+
+          const profiles = step.skills.map(id => agentProfilesContract.find(p => p.id === id)).filter(Boolean);
+          const missing = profiles.some(profile => {
+            if (!profile) return false;
+            const meta = buildSkillContractMeta(profile as any);
+            return meta.requiredContext.some(ctx => 
+              !vaultRecords.some(r => r.type === ctx.recordType && r.status === 'accepted')
+            );
+          });
+
+          events.push({
+            ...baseEvent(`${stepId}-completed`, stepCompleteAt),
+            type: 'step.completed',
+            payload: {
+              step_id: stepId,
+              step_index: stepIndex + 1,
+              agent_id: step.skills[0],
+              status: missing ? 'insufficient_data' : 'ok',
+              summary: missing 
+                ? 'Step completed with missing inputs flagged.'
+                : 'Step completed successfully.',
+              mutations: []
+            }
+          });
+        });
+
+        const completedAt = new Date(stepTime).toISOString();
+        events.push({
+          ...baseEvent(`${sessionId}-run-completed`, completedAt),
+          type: 'run.completed',
+          payload: {
+            status: 'complete',
+            summary: 'Flow run completed successfully.'
+          }
+        });
+
+        const session: Session = {
+          session_id: sessionId,
+          scope_id: scopeId,
+          run_id: sessionId,
+          title: runContext.title,
+          status: 'complete',
+          created_at: createdAt,
+          created_by: { kind: 'human', actor_id: 'current-user' },
+          last_event_at: completedAt,
+          summary: 'Flow run completed successfully.'
+        };
+
+        addStoredSession({ session, runContext, events });
+
+        showNotification('Flow run started successfully', 'success');
+        navigate(`/sessions/${sessionId}`);
+      },
+      {
+        onError: (error, traceId) => {
+          showNotification(formatErrorWithTrace('Run failed', error.message, traceId), 'error');
+        }
+      }
+    );
+
+    setIsRunning(false);
   };
 
   const handleDragEnd = (event: any) => {
@@ -237,13 +424,23 @@ const FlowDetail: React.FC = () => {
             >
               {strictMode ? 'Strict mode' : 'Non-strict'}
             </button>
-            <button onClick={handleSave} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+            <button 
+              onClick={handleSave} 
+              disabled={isSaving}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {isSaving && <RefreshIcon className="h-3.5 w-3.5 animate-spin" />}
               Save
             </button>
             <button onClick={handleValidate} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
               Validate
             </button>
-            <button onClick={handleRun} className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+            <button 
+              onClick={handleRun} 
+              disabled={isRunning || validationIssues.some(i => i.includes('conflict'))}
+              className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              {isRunning && <RefreshIcon className="h-3.5 w-3.5 animate-spin" />}
               Run
             </button>
           </>
@@ -300,13 +497,49 @@ const FlowDetail: React.FC = () => {
                 </div>
               </div>
 
-              {validationIssues.length > 0 ? (
-                <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                  {validationIssues.map((issue) => (
-                    <p key={issue}>{issue}</p>
-                  ))}
+              {/* Validation panel */}
+              <div className={`mt-4 rounded-lg border p-3 ${
+                validationIssues.length === 0 
+                  ? 'border-emerald-200 bg-emerald-50' 
+                  : validationIssues.some(i => i.includes('conflict'))
+                    ? 'border-rose-200 bg-rose-50'
+                    : 'border-amber-200 bg-amber-50'
+              }`}>
+                <div className="flex items-center gap-2 text-xs font-semibold mb-2">
+                  {validationIssues.length === 0 ? (
+                    <>
+                      <CheckCircleIcon className="h-4 w-4 text-emerald-600" />
+                      <span className="text-emerald-700">Validation passed</span>
+                    </>
+                  ) : validationIssues.some(i => i.includes('conflict')) ? (
+                    <>
+                      <XIcon className="h-4 w-4 text-rose-600" />
+                      <span className="text-rose-700">Validation failed</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangleIcon className="h-4 w-4 text-amber-600" />
+                      <span className="text-amber-700">Validation warnings</span>
+                    </>
+                  )}
                 </div>
-              ) : null}
+                {validationIssues.length === 0 ? (
+                  <p className="text-xs text-emerald-600">
+                    All steps have required context and no write conflicts detected.
+                  </p>
+                ) : (
+                  <ul className="space-y-1">
+                    {validationIssues.map((issue) => (
+                      <li key={issue} className={`text-xs flex items-start gap-2 ${
+                        issue.includes('conflict') ? 'text-rose-700' : 'text-amber-700'
+                      }`}>
+                        <span className="mt-0.5">•</span>
+                        {issue}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
 
               <div className="mt-4 text-xs text-slate-500">
                 {isLoadingVault ? 'Loading vault context...' : 'Validation uses live vault coverage and skill contracts.'}

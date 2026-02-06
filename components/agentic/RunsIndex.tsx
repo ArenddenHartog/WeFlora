@@ -64,35 +64,54 @@ const RunsIndex: React.FC = () => {
           />
         </div>
 
-        <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {filteredRuns.map((run) => (
-            <div
-              key={run.id}
-              className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
-            >
-              <div className="flex items-start justify-between">
-                <div className="h-10 w-10 rounded-xl bg-weflora-mint/15 text-weflora-teal flex items-center justify-center">
-                  <HistoryIcon className="h-5 w-5" />
-                </div>
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${statusBadgeClass(run.status)}`}>
-                  {run.status}
-                </span>
-              </div>
-              <Link to={`/sessions/${run.id}`} className="mt-4">
-                <h3 className="text-lg font-bold text-slate-800">{run.title}</h3>
-                <p className="mt-2 text-xs text-slate-500">Scope: {run.scopeId}</p>
-                <p className="mt-2 text-xs text-slate-500">{new Date(run.createdAt).toLocaleString()}</p>
+        <div className="mt-8">
+          {filteredRuns.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-10 text-center">
+              <HistoryIcon className="mx-auto h-10 w-10 text-slate-300" />
+              <h3 className="mt-4 text-sm font-semibold text-slate-700">No sessions yet</h3>
+              <p className="mt-2 text-xs text-slate-500">
+                Run a Skill or Flow to create your first session.
+              </p>
+              <Link
+                to="/sessions/new"
+                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+              >
+                <SparklesIcon className="h-4 w-4" />
+                New Session
               </Link>
-              <div className="mt-auto pt-4">
-                <Link
-                  to={`/sessions/${run.id}`}
-                  className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 group-hover:bg-weflora-mint/10"
-                >
-                  Open
-                </Link>
-              </div>
             </div>
-          ))}
+          ) : (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {filteredRuns.map((run) => (
+                <div
+                  key={run.id}
+                  className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="h-10 w-10 rounded-xl bg-weflora-mint/15 text-weflora-teal flex items-center justify-center">
+                      <HistoryIcon className="h-5 w-5" />
+                    </div>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${statusBadgeClass(run.status)}`}>
+                      {run.status}
+                    </span>
+                  </div>
+                  <Link to={`/sessions/${run.id}`} className="mt-4">
+                    <h3 className="text-lg font-bold text-slate-800">{run.title}</h3>
+                    <p className="mt-2 text-xs text-slate-500">Scope: {run.scopeId}</p>
+                    <p className="mt-2 text-xs text-slate-500">{new Date(run.createdAt).toLocaleString()}</p>
+                  </Link>
+                  <div className="mt-auto pt-4">
+                    <Link
+                      to={`/sessions/${run.id}`}
+                      className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 group-hover:bg-weflora-mint/10"
+                    >
+                      Open
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </PageShell>
     </div>
