@@ -44,6 +44,24 @@ import {
 const RECORD_TYPES = ['Policy', 'SpeciesList', 'Site', 'Vision', 'Climate', 'Other'] as const;
 const STATUS_VALUES: VaultStatus[] = ['draft', 'pending', 'needs_review', 'in_review', 'accepted', 'blocked'];
 
+/**
+ * Default status filter: Vault = Living Knowledge (not staging).
+ * Show pending, needs_review, in_review, accepted by default.
+ * Hide blocked, draft by default.
+ * Accepted records MUST be visible — Vault must never feel empty after review.
+ */
+const DEFAULT_VISIBLE_STATUSES: VaultStatus[] = ['pending', 'needs_review', 'in_review', 'accepted'];
+
+/** Named filter presets for the top-right chip bar */
+type FilterPreset = 'all' | 'active' | 'accepted' | 'needs_review' | 'blocked';
+const FILTER_PRESETS: { key: FilterPreset; label: string; statuses: VaultStatus[] | null }[] = [
+  { key: 'all', label: 'All', statuses: null },
+  { key: 'active', label: 'Active', statuses: ['pending', 'needs_review', 'in_review', 'accepted'] },
+  { key: 'accepted', label: 'Accepted', statuses: ['accepted'] },
+  { key: 'needs_review', label: 'Needs Review', statuses: ['pending', 'needs_review'] },
+  { key: 'blocked', label: 'Blocked', statuses: ['blocked'] },
+];
+
 export type ContextRecordType = (typeof RECORD_TYPES)[number];
 
 const statusBadge = (status: VaultStatus) => getStatusBadgeClasses(status);
@@ -70,7 +88,9 @@ const VaultInventoryView: React.FC = () => {
 
   const [search, setSearch] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<ContextRecordType[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<VaultStatus[]>([]);
+  // Default: show living knowledge (accepted visible by default)
+  const [selectedStatuses, setSelectedStatuses] = useState<VaultStatus[]>(DEFAULT_VISIBLE_STATUSES);
+  const [activePreset, setActivePreset] = useState<FilterPreset>('active');
   const [missingOnly, setMissingOnly] = useState(false);
   const [activeTab, setActiveTab] = useState<'fields' | 'evidence' | 'validations' | 'usage' | 'history'>('fields');
   const [isIntakeOpen, setIsIntakeOpen] = useState(false);
@@ -183,7 +203,8 @@ const VaultInventoryView: React.FC = () => {
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
       if (selectedTypes.length && !selectedTypes.includes(record.type)) return false;
-      if (selectedStatuses.length && !selectedStatuses.includes(record.status)) return false;
+      // When selectedStatuses is empty (All preset), show everything
+      if (selectedStatuses.length > 0 && !selectedStatuses.includes(record.status)) return false;
       if (missingOnly && record.completeness.missingCount === 0) return false;
       const needle = search.trim().toLowerCase();
       if (!needle) return true;
@@ -298,15 +319,38 @@ const VaultInventoryView: React.FC = () => {
     >
       {/* ── Search + Filters ──────────────────────────── */}
       <div className="flex flex-col gap-4">
-        <div className="relative max-w-md">
-          <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search context…"
-            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm text-slate-700"
-          />
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="relative max-w-md flex-1">
+            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search context…"
+              className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm text-slate-700"
+            />
+          </div>
+          {/* ── Filter presets (top-right) ──────────────── */}
+          <div className="flex flex-wrap gap-1.5">
+            {FILTER_PRESETS.map((preset) => (
+              <button
+                key={preset.key}
+                type="button"
+                onClick={() => {
+                  setActivePreset(preset.key);
+                  setSelectedStatuses(preset.statuses ?? []);
+                }}
+                className={`${chip} ${
+                  activePreset === preset.key
+                    ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
         </div>
+        {/* ── Type + advanced status chips ──────────────── */}
         <div className="flex flex-wrap gap-2">
           {RECORD_TYPES.map((type) => (
             <button
@@ -322,11 +366,15 @@ const VaultInventoryView: React.FC = () => {
               {type}
             </button>
           ))}
+          <span className="w-px h-5 bg-slate-200 self-center" />
           {STATUS_VALUES.map((status) => (
             <button
               key={status}
               type="button"
-              onClick={() => toggleStatus(status)}
+              onClick={() => {
+                toggleStatus(status);
+                setActivePreset('all'); // clear preset when manually toggling
+              }}
               className={`${chip} ${
                 selectedStatuses.includes(status)
                   ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark'
