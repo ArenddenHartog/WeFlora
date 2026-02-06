@@ -5,7 +5,7 @@ import { findStoredSession } from '../../src/agentic/sessions/storage';
 import LivingRecordRenderer from './RunTimeline';
 import { HistoryIcon } from '../icons';
 import PageShell from '../ui/PageShell';
-import { btnSecondary, chip } from '../../src/ui/tokens';
+import { btnSecondary } from '../../src/ui/tokens';
 
 const statusBadgeClass = (status: string) => {
   switch (status) {
@@ -22,6 +22,15 @@ const statusBadgeClass = (status: string) => {
   }
 };
 
+/**
+ * RunDetail — Session detail view.
+ *
+ * Uses outcome-first two-column layout (Part 3 mandatory):
+ * LEFT: Outcome / Decision / Conclusions / Confidence / Actions / Artifacts
+ * RIGHT: Evidence / Vault sources / Input mappings / Steps / Provenance / Mutations
+ *
+ * No tabs. No hiding. Both columns always visible.
+ */
 const RunDetail: React.FC = () => {
   const { runId } = useParams();
   const stored = runId ? findStoredSession(runId) : undefined;
@@ -51,7 +60,7 @@ const RunDetail: React.FC = () => {
     <PageShell
       icon={<HistoryIcon className="h-5 w-5" />}
       title={run.title}
-      meta={`Scope: ${run.scopeId}`}
+      meta={`Scope: ${run.scopeId} · Created: ${new Date(run.createdAt).toLocaleString()}`}
       actions={
         <>
           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${statusBadgeClass(run.status)}`}>
@@ -67,6 +76,7 @@ const RunDetail: React.FC = () => {
         ← Back to Sessions
       </Link>
 
+      {/* Two-column outcome-first layout — no tabs, no hiding */}
       <div className="mt-6">
         <LivingRecordRenderer events={run.events} />
       </div>
