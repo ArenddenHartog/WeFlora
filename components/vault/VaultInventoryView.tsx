@@ -483,7 +483,8 @@ const VaultInventoryView: React.FC = () => {
 
         <aside className="rounded-2xl border border-slate-200 bg-white p-4 sticky top-4">
           {selectedRecord ? (
-            <div className="space-y-4">
+            // Key by selectedId to force re-render when switching records (prevents stale state)
+            <div key={selectedId} className="space-y-4">
               <div className="border-b border-slate-200 pb-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2 text-xs text-slate-500">
