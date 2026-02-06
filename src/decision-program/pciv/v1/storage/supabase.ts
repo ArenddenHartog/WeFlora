@@ -19,7 +19,7 @@ import {
   type PcivScopeMemberV1,
   type PcivScopeMemberRole
 } from '../schemas.ts';
-import { PcivRlsDeniedError, PcivAuthRequiredError, PcivSchemaMismatchError } from './rls-errors.ts';
+import { PcivRlsDeniedError, PcivAuthRequiredError, PcivSchemaMismatchError, PcivRpcMissingError } from './rls-errors.ts';
 import { invariantPCIVValueColumnsMatchKind } from '../runtimeInvariants.ts';
 
 // ============================================================================
@@ -541,6 +541,15 @@ export const createDraftRun = async (
       });
 
       if (error) {
+        // RPC function not found - clear error, don't mask
+        if (error.code === 'PGRST202') {
+          console.error('[RPC missing] pciv_bootstrap_scope', {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+          });
+          throw new PcivRpcMissingError('pciv_bootstrap_scope', error);
+        }
         // If scope already initialized, fall through to normal insert
         if (error.message?.includes('pciv_scope_already_initialized') || 
             error.code === '23505') {
@@ -553,8 +562,10 @@ export const createDraftRun = async (
         return await fetchRunById(data[0].run_id);
       }
     } catch (error: any) {
-      // Only rethrow auth/RLS errors; scope already initialized is expected
-      if (error instanceof PcivAuthRequiredError || error instanceof PcivRlsDeniedError) {
+      // Rethrow specific error types
+      if (error instanceof PcivAuthRequiredError || 
+          error instanceof PcivRlsDeniedError ||
+          error instanceof PcivRpcMissingError) {
         throw error;
       }
       // For pciv_scope_already_initialized, fall through to normal insert

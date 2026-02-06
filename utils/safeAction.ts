@@ -255,3 +255,63 @@ export const formatErrorWithTrace = (
 ): string => {
   return `${prefix}: ${message} [${traceId}]`;
 };
+
+/**
+ * Error thrown when an RPC function is missing from the database
+ */
+export class RpcMissingError extends Error {
+  rpcName: string;
+  
+  constructor(rpcName: string) {
+    super(`Backend mismatch: RPC ${rpcName} not deployed`);
+    this.name = 'RpcMissingError';
+    this.rpcName = rpcName;
+  }
+}
+
+/**
+ * Safe RPC wrapper that detects missing functions and provides clear errors.
+ * 
+ * Use this ONLY for state mutations (claim, update, create).
+ * For simple reads, use direct table queries instead.
+ * 
+ * Detects PGRST202 error code which indicates the RPC function doesn't exist.
+ * 
+ * Usage:
+ * ```typescript
+ * import { supabase } from './supabaseClient';
+ * import { rpcSafe } from '../utils/safeAction';
+ * 
+ * const result = await rpcSafe(supabase, 'vault_claim_next_review', {});
+ * ```
+ */
+export async function rpcSafe<T = unknown>(
+  supabaseClient: { rpc: (fn: string, params?: Record<string, unknown>) => Promise<{ data: T | null; error: { code: string; message: string; details?: string } | null; status: number }> },
+  name: string,
+  params: Record<string, unknown> = {}
+): Promise<{ data: T | null; error: { code: string; message: string; details?: string } | null; status: number }> {
+  const startTime = Date.now();
+  
+  const result = await supabaseClient.rpc(name, params);
+  
+  // Record the RPC call for debugging
+  recordRpcCall({
+    name,
+    status: result.status,
+    latencyMs: Date.now() - startTime,
+    hasAuthHeader: true,
+    hasApiKey: true,
+  });
+  
+  // Check for PGRST202: function not found
+  if (result.error?.code === 'PGRST202') {
+    console.error(`[RPC missing] ${name}`, {
+      code: result.error.code,
+      message: result.error.message,
+      details: result.error.details,
+    });
+    throw new RpcMissingError(name);
+  }
+  
+  return result;
+}

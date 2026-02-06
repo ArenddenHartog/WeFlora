@@ -1,12 +1,16 @@
 /**
  * Vault Review Service
  * 
- * Handles review queue operations using dedicated RPCs.
+ * Handles review queue operations.
+ * 
+ * Design principles:
+ * - Direct table reads for fetches (fast, deterministic, no schema cache issues)
+ * - RPC only for state mutations (claim, update) wrapped with rpcSafe
  */
 
 import { supabase } from './supabaseClient';
-import { recordRpcCall } from '../utils/safeAction';
-import { VAULT_STATUS, type VaultStatus } from '../utils/vaultStatus';
+import { recordRpcCall, rpcSafe } from '../utils/safeAction';
+import { type VaultStatus } from '../utils/vaultStatus';
 
 /**
  * Queue item returned from vault_review_queue RPC
@@ -64,20 +68,39 @@ function mapRowToQueueItem(row: any): VaultReviewQueueItem {
 }
 
 /**
- * Fetch the review queue
+ * Compute issues for a vault object
+ */
+function computeIssues(row: any): string[] {
+  const issues: string[] = [];
+  if (!row.record_type) issues.push('Missing record type');
+  if (!row.title) issues.push('Missing title');
+  if (!row.description) issues.push('Missing description');
+  if (!row.tags || row.tags.length === 0) issues.push('No tags');
+  if (row.confidence === null || row.confidence === undefined) issues.push('No confidence score');
+  return issues;
+}
+
+/**
+ * Fetch the review queue using direct table read
+ * 
+ * Returns items with status 'pending' or 'needs_review' that are not currently in_review
  */
 export async function fetchReviewQueue(limit = 50): Promise<VaultReviewQueueItem[]> {
   const startTime = Date.now();
   
-  const { data, error, status } = await supabase.rpc('vault_review_queue', {
-    p_limit: limit,
-  });
+  // Direct table query - faster and more reliable than RPC
+  const { data, error, status } = await supabase
+    .from('vault_objects')
+    .select('*')
+    .in('status', ['pending', 'needs_review'])
+    .order('created_at', { ascending: true })
+    .limit(limit);
 
   recordRpcCall({
-    name: 'vault_review_queue',
+    name: 'vault_objects.select (review queue)',
     status,
     latencyMs: Date.now() - startTime,
-    hasAuthHeader: true, // Supabase client includes this
+    hasAuthHeader: true,
     hasApiKey: true,
   });
 
@@ -90,24 +113,24 @@ export async function fetchReviewQueue(limit = 50): Promise<VaultReviewQueueItem
     throw new Error(`Failed to fetch review queue: ${error.message}`);
   }
 
-  return (data ?? []).map(mapRowToQueueItem);
+  // Map rows and compute issues client-side
+  return (data ?? []).map((row) => ({
+    ...mapRowToQueueItem(row),
+    issues: computeIssues(row),
+  }));
 }
 
 /**
- * Claim the next item for review
+ * Claim the next item for review (mutation - uses RPC)
+ * 
+ * This is a state mutation that:
+ * - Finds the next pending/needs_review item
+ * - Atomically updates status to in_review
+ * - Uses FOR UPDATE SKIP LOCKED for concurrency
  */
 export async function claimNextReview(): Promise<VaultReviewQueueItem | null> {
-  const startTime = Date.now();
-
-  const { data, error, status } = await supabase.rpc('vault_claim_next_review');
-
-  recordRpcCall({
-    name: 'vault_claim_next_review',
-    status,
-    latencyMs: Date.now() - startTime,
-    hasAuthHeader: true,
-    hasApiKey: true,
-  });
+  // Use rpcSafe for mutations - provides clear error if RPC is missing
+  const { data, error } = await rpcSafe(supabase, 'vault_claim_next_review', {});
 
   if (error) {
     console.error('[vault-review] claim error', {
@@ -124,21 +147,30 @@ export async function claimNextReview(): Promise<VaultReviewQueueItem | null> {
     return null;
   }
 
-  return mapRowToQueueItem(rows[0]);
+  const row = rows[0] as Record<string, unknown>;
+  return {
+    ...mapRowToQueueItem(row),
+    issues: computeIssues(row),
+  };
 }
 
 /**
- * Get a vault object for review by ID
+ * Get a vault object for review by ID using direct table read
+ * 
+ * Direct query is faster and more reliable than RPC for simple reads
  */
 export async function getVaultForReview(id: string): Promise<VaultReviewDetail | null> {
   const startTime = Date.now();
 
-  const { data, error, status } = await supabase.rpc('vault_get_for_review', {
-    p_id: id,
-  });
+  // Direct table query - never breaks if table exists
+  const { data, error, status } = await supabase
+    .from('vault_objects')
+    .select('*')
+    .eq('id', id)
+    .single();
 
   recordRpcCall({
-    name: 'vault_get_for_review',
+    name: 'vault_objects.select (single)',
     status,
     latencyMs: Date.now() - startTime,
     hasAuthHeader: true,
@@ -146,6 +178,11 @@ export async function getVaultForReview(id: string): Promise<VaultReviewDetail |
   });
 
   if (error) {
+    // PGRST116 = no rows found - this is expected for missing records
+    if (error.code === 'PGRST116') {
+      return null;
+    }
+    
     console.error('[vault-review] get error', {
       statusCode: error.code,
       message: error.message,
@@ -154,15 +191,14 @@ export async function getVaultForReview(id: string): Promise<VaultReviewDetail |
     throw new Error(`Failed to get vault object: ${error.message}`);
   }
 
-  const rows = Array.isArray(data) ? data : data ? [data] : [];
-  if (rows.length === 0) {
+  if (!data) {
     return null;
   }
 
-  const row = rows[0];
   return {
-    ...mapRowToQueueItem(row),
-    sha256: row.sha256 ?? null,
+    ...mapRowToQueueItem(data),
+    issues: computeIssues(data),
+    sha256: data.sha256 ?? null,
   };
 }
 
@@ -180,10 +216,15 @@ export interface UpdateReviewInput {
   status?: 'accepted' | 'blocked' | 'needs_review' | 'draft';
 }
 
+/**
+ * Update review form data (mutation - uses RPC)
+ * 
+ * This is a state mutation that atomically updates review fields
+ * and can transition status based on validation rules.
+ */
 export async function updateReview(input: UpdateReviewInput): Promise<{ success: boolean; error?: string }> {
-  const startTime = Date.now();
-
-  const { data, error, status } = await supabase.rpc('vault_update_review', {
+  // Use rpcSafe for mutations - provides clear error if RPC is missing
+  const { error } = await rpcSafe(supabase, 'vault_update_review', {
     p_id: input.id,
     p_record_type: input.recordType ?? null,
     p_title: input.title ?? null,
@@ -192,14 +233,6 @@ export async function updateReview(input: UpdateReviewInput): Promise<{ success:
     p_confidence: input.confidence ?? null,
     p_relevance: input.relevance ?? null,
     p_status: input.status ?? null,
-  });
-
-  recordRpcCall({
-    name: 'vault_update_review',
-    status,
-    latencyMs: Date.now() - startTime,
-    hasAuthHeader: true,
-    hasApiKey: true,
   });
 
   if (error) {

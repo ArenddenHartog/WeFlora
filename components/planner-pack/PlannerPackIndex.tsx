@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../services/supabaseClient';
 import { getPlanningScopeId } from '../../src/lib/planningScope';
 import { listInterventionsForScope, setGeometry } from '../../src/planner-pack/v1/storage/supabase';
+import { rpcSafe } from '../../utils/safeAction';
 import type { PlannerIntervention } from '../../src/planner-pack/v1/schemas';
 import { plannerPackCompose } from '../../src/planner-pack/v1/workers/plannerPackCompose';
 import { useUI } from '../../contexts/UIContext';
@@ -68,12 +69,17 @@ const PlannerPackIndex: React.FC = () => {
 
   const bootstrapIntervention = useCallback(
     async (args: { scopeId: string; name: string; municipality?: string | null; interventionType: string }) => {
-      const { data, error } = await supabase.rpc('planner_bootstrap_intervention', {
-        p_scope_id: args.scopeId,
-        p_name: args.name,
-        p_municipality: args.municipality ?? null,
-        p_intervention_type: args.interventionType
-      });
+      // Use rpcSafe for mutations - provides clear error if RPC is missing
+      const { data, error } = await rpcSafe<Array<{ intervention_id: string; scope_id: string }>>(
+        supabase,
+        'planner_bootstrap_intervention',
+        {
+          p_scope_id: args.scopeId,
+          p_name: args.name,
+          p_municipality: args.municipality ?? null,
+          p_intervention_type: args.interventionType
+        }
+      );
       if (error) {
         throw new Error(error.message);
       }
