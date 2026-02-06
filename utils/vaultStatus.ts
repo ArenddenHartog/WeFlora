@@ -97,15 +97,22 @@ export const STATUS_META: Record<VaultStatus, StatusMeta> = {
 };
 
 /**
- * Allowed status transitions
+ * Allowed status transitions (spec v1.0)
+ *
+ * draft → pending
+ * pending → needs_review | accepted
+ * needs_review → in_review
+ * in_review → accepted | needs_review | blocked
+ * accepted → blocked (rare/manual)
+ * blocked → needs_review
  */
 export const ALLOWED_TRANSITIONS: Record<VaultStatus, VaultStatus[]> = {
-  draft: ['pending', 'needs_review'],
-  pending: ['needs_review', 'blocked'],
-  needs_review: ['in_review', 'accepted', 'blocked'],
+  draft: ['pending'],
+  pending: ['needs_review', 'accepted'],
+  needs_review: ['in_review'],
   in_review: ['accepted', 'needs_review', 'blocked'],
-  accepted: [], // immutable
-  blocked: ['draft'], // explicit "revive" action only
+  accepted: ['blocked'], // rare/manual
+  blocked: ['needs_review'],
 };
 
 /**
@@ -123,15 +130,20 @@ export function getNextStatuses(current: VaultStatus): VaultStatus[] {
 }
 
 /**
- * View inclusion matrix - which statuses are visible in which views
+ * View inclusion matrix — which statuses are visible in which views (spec v1.0)
+ *
+ * Vault Inventory (default): accepted, pending, needs_review, in_review, blocked
+ * Review Queue: pending, needs_review, draft
+ * Skills Readiness: accepted only
+ * Flow Validation: accepted only
  */
 export const VIEW_STATUSES = {
-  vault_inventory: ['draft', 'pending', 'needs_review', 'in_review', 'accepted', 'blocked'] as VaultStatus[],
-  review_queue: ['pending', 'needs_review'] as VaultStatus[],
+  vault_inventory: ['accepted', 'pending', 'needs_review', 'in_review', 'blocked'] as VaultStatus[],
+  review_queue: ['pending', 'needs_review', 'draft'] as VaultStatus[],
   active_review: ['in_review'] as VaultStatus[],
   skills_inputs: ['accepted'] as VaultStatus[],
   flows_inputs: ['accepted'] as VaultStatus[],
-  sessions: ['draft', 'pending', 'needs_review', 'in_review', 'accepted', 'blocked'] as VaultStatus[], // all, read-only
+  sessions: ['draft', 'pending', 'needs_review', 'in_review', 'accepted', 'blocked'] as VaultStatus[],
 };
 
 /**

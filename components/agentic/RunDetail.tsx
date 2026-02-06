@@ -5,6 +5,7 @@ import { findStoredSession } from '../../src/agentic/sessions/storage';
 import LivingRecordRenderer from './RunTimeline';
 import { HistoryIcon } from '../icons';
 import PageShell from '../ui/PageShell';
+import { btnSecondary } from '../../src/ui/tokens';
 
 const statusBadgeClass = (status: string) => {
   switch (status) {
@@ -21,6 +22,15 @@ const statusBadgeClass = (status: string) => {
   }
 };
 
+/**
+ * RunDetail — Session detail view.
+ *
+ * Uses outcome-first two-column layout (Part 3 mandatory):
+ * LEFT: Outcome / Decision / Conclusions / Confidence / Actions / Artifacts
+ * RIGHT: Evidence / Vault sources / Input mappings / Steps / Provenance / Mutations
+ *
+ * No tabs. No hiding. Both columns always visible.
+ */
 const RunDetail: React.FC = () => {
   const { runId } = useParams();
   const stored = runId ? findStoredSession(runId) : undefined;
@@ -31,51 +41,46 @@ const RunDetail: React.FC = () => {
         title: stored.session.title,
         status: stored.session.status,
         createdAt: stored.session.created_at,
-        events: stored.events
+        events: stored.events,
       }
     : demoRuns.find((item) => item.id === runId) ?? demoRuns[0];
 
   if (!run) {
     return (
-      <div className="bg-white px-4 py-6 md:px-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Session not found</h1>
-        <p className="mt-2 text-sm text-slate-500">Session not found.</p>
+      <PageShell icon={<HistoryIcon className="h-5 w-5" />} title="Session not found">
+        <p className="text-sm text-slate-500">The requested session could not be found.</p>
         <Link to="/sessions" className="mt-4 inline-block text-sm text-weflora-teal underline">
           Back to Sessions
         </Link>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="bg-white" data-layout-root>
-      <PageShell
-        icon={<HistoryIcon className="h-5 w-5" />}
-        title={run.title}
-        meta={`Scope: ${run.scopeId}`}
-        actions={
-          <>
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${statusBadgeClass(run.status)}`}>
-              {run.status}
-            </span>
-            <Link
-              to="/sessions/new"
-              className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-            >
-              Start new session
-            </Link>
-          </>
-        }
-      >
-        <Link to="/sessions" className="text-xs text-slate-500 hover:text-slate-700">
-          ← Back to Sessions
-        </Link>
+    <PageShell
+      icon={<HistoryIcon className="h-5 w-5" />}
+      title={run.title}
+      meta={`Scope: ${run.scopeId} · Created: ${new Date(run.createdAt).toLocaleString()}`}
+      actions={
+        <>
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${statusBadgeClass(run.status)}`}>
+            {run.status}
+          </span>
+          <Link to="/sessions/new" className={btnSecondary}>
+            Start new session
+          </Link>
+        </>
+      }
+    >
+      <Link to="/sessions" className="text-xs text-slate-500 hover:text-slate-700">
+        ← Back to Sessions
+      </Link>
 
-        <div className="mt-6">
-          <LivingRecordRenderer events={run.events} />
-        </div>
-      </PageShell>
-    </div>
+      {/* Two-column outcome-first layout — no tabs, no hiding */}
+      <div className="mt-6">
+        <LivingRecordRenderer events={run.events} />
+      </div>
+    </PageShell>
   );
 };
 

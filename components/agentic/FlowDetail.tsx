@@ -5,6 +5,7 @@ import PageShell from '../ui/PageShell';
 import { flowTemplatesById, flowTemplates } from '../../src/agentic/registry/flows.ts';
 import { agentProfilesContract } from '../../src/agentic/registry/agents';
 import { buildSkillContractMeta, collectRequiredContextSummary } from '../../src/agentic/contracts/contractCatalog';
+import { btnPrimary, btnSecondary, chip, iconWrap, muted, statusReady, statusWarning, statusError } from '../../src/ui/tokens';
 import {
   deriveVaultInventoryRecords,
   fetchVaultInventorySources,
@@ -411,7 +412,6 @@ const FlowDetail: React.FC = () => {
   }
 
   return (
-    <div className="bg-white" data-layout-root>
       <PageShell
         icon={<SparklesIcon className="h-5 w-5" />}
         title={flow.title}
@@ -420,29 +420,28 @@ const FlowDetail: React.FC = () => {
           <>
             <button
               onClick={() => setStrictMode((prev) => !prev)}
-              className={`rounded-lg border px-3 py-2 text-xs font-semibold ${strictMode ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+              className={`${chip} cursor-pointer ${strictMode ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
             >
               {strictMode ? 'Strict mode' : 'Non-strict'}
             </button>
-            <button 
-              onClick={handleSave} 
-              disabled={isSaving}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-            >
+            <button onClick={handleSave} disabled={isSaving} className={btnSecondary}>
               {isSaving && <RefreshIcon className="h-3.5 w-3.5 animate-spin" />}
               Save
             </button>
-            <button onClick={handleValidate} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+            <button onClick={handleValidate} className={btnSecondary}>
               Validate
             </button>
-            <button 
-              onClick={handleRun} 
-              disabled={isRunning || validationIssues.some(i => i.includes('conflict'))}
-              className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+            <button
+              onClick={handleRun}
+              disabled={isRunning || validationIssues.some((i) => i.includes('conflict'))}
+              className={btnPrimary}
             >
               {isRunning && <RefreshIcon className="h-3.5 w-3.5 animate-spin" />}
               Run
             </button>
+            {validationIssues.some((i) => i.includes('conflict')) && (
+              <span className="text-[11px] text-rose-600">Fix conflicts to enable Run.</span>
+            )}
           </>
         }
       >
@@ -541,10 +540,36 @@ const FlowDetail: React.FC = () => {
                 )}
               </div>
 
-              <div className="mt-4 text-xs text-slate-500">
-                {isLoadingVault ? 'Loading vault context...' : 'Validation uses live vault coverage and skill contracts.'}
-              </div>
-              <div className="mt-2 text-xs text-slate-500">
+              {/* Missing memory detection */}
+              {requiredContextSummary.length > 0 && (
+                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold text-slate-600 mb-2">Required Memory (Vault context)</p>
+                  <div className="flex flex-wrap gap-2">
+                    {requiredContextSummary.map((item) => (
+                      <span key={item.recordType} className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                        {item.recordType}
+                        <span className="text-slate-400">×{item.count}</span>
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    Flow validation checks live Vault coverage against Skill contracts.
+                    Missing memory blocks execution. Conflicting writes are detected between parallel steps.
+                  </p>
+                </div>
+              )}
+
+              {/* Agent suggestion: incomplete reasoning chain */}
+              {validationIssues.length > 0 && !validationIssues.some(i => i.includes('conflict')) && (
+                <div className="mt-3 rounded-lg border border-dashed border-weflora-mint bg-weflora-mint/5 px-3 py-2">
+                  <p className="text-xs font-semibold text-weflora-teal">Agent suggestion</p>
+                  <p className="mt-1 text-[11px] text-slate-600">
+                    Low-confidence records detected. Review and accept Vault records to strengthen the reasoning chain.
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-3 text-[11px] text-slate-400">
                 Save keeps skillRef version as latest. Run freezes skillRef to a version + hash for the session ledger.
               </div>
 
@@ -574,7 +599,6 @@ const FlowDetail: React.FC = () => {
             </main>
           </div>
       </PageShell>
-    </div>
   );
 };
 

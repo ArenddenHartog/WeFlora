@@ -5,6 +5,17 @@ import PageShell from '../ui/PageShell';
 import { agentProfilesContract } from '../../src/agentic/registry/agents.ts';
 import { buildSkillContractMeta } from '../../src/agentic/contracts/contractCatalog';
 import {
+  btnPrimary,
+  btnSecondary,
+  h2,
+  muted,
+  body,
+  chip,
+  statusReady,
+  statusWarning,
+  statusError,
+} from '../../src/ui/tokens';
+import {
   deriveVaultInventoryRecords,
   fetchVaultInventorySources,
   type VaultInventoryRecord
@@ -75,8 +86,40 @@ const RunTab: React.FC<RunTabProps> = ({
 
   const canRun = !runDisabledReason && !isRunning;
 
+  // SK-3: Guided run stepper state
+  const currentStep = useMemo(() => {
+    if (readiness.status === 'Missing' || readiness.status === 'Blocked') return 1;
+    if (selectedVaultIds.size === 0) return 1;
+    if (!canRun) return 2;
+    return 3;
+  }, [readiness.status, selectedVaultIds.size, canRun]);
+
   return (
     <div className="mt-6 space-y-6">
+      {/* SK-3: Guided run stepper */}
+      <div className="flex items-center gap-2">
+        {[
+          { step: 1, label: '1. Select Vault records' },
+          { step: 2, label: '2. Confirm bindings' },
+          { step: 3, label: '3. Run → Session' },
+        ].map(({ step, label }) => (
+          <div key={step} className="flex items-center gap-2">
+            {step > 1 && <span className="text-slate-300">→</span>}
+            <span
+              className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                currentStep === step
+                  ? 'bg-weflora-teal text-white'
+                  : currentStep > step
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-slate-100 text-slate-400'
+              }`}
+            >
+              {label}
+            </span>
+          </div>
+        ))}
+      </div>
+
       {/* Readiness status banner */}
       <div className={`rounded-xl border p-4 ${
         readiness.status === 'Ready' 
@@ -217,11 +260,7 @@ const RunTab: React.FC<RunTabProps> = ({
           type="button"
           onClick={onRun}
           disabled={!canRun}
-          className={`inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-colors ${
-            canRun
-              ? 'bg-slate-900 text-white hover:bg-slate-800'
-              : 'bg-slate-200 text-slate-500 cursor-not-allowed'
-          }`}
+          className={btnPrimary}
         >
           {isRunning ? (
             <>
@@ -244,27 +283,43 @@ const RunTab: React.FC<RunTabProps> = ({
         )}
       </div>
 
-      {/* Agent assist (optional) */}
-      <section className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4">
-        <div className="flex items-center gap-2 text-xs text-slate-500">
+      {/* Agent intelligence (future-ready) */}
+      <section className="rounded-xl border border-dashed border-weflora-mint bg-weflora-mint/5 p-4">
+        <div className="flex items-center gap-2 text-xs font-semibold text-weflora-teal">
           <SparklesIcon className="h-4 w-4" />
-          <span className="font-semibold">Agent Assist (optional)</span>
+          Agent Intelligence
         </div>
-        <p className="mt-2 text-xs text-slate-500">
-          AI can suggest inputs from your vault, auto-fill mapping, or propose tags. This is assistive only—all values remain editable.
+        <p className="mt-2 text-xs text-slate-600">
+          The system can detect missing context, suggest the best Vault records, and auto-fill input mappings.
+          Future: agents will select Skills dynamically and chain reasoning across Flows.
         </p>
+
+        {/* Agent suggestions — current capabilities */}
+        <div className="mt-3 space-y-2">
+          {readiness.missing.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              <span className="font-semibold">Missing context detected:</span>{' '}
+              {readiness.missing.map((m) => m.recordType).join(', ')}.
+              Upload data to enable this Skill.
+            </div>
+          )}
+          {readiness.status === 'Ready' && selectedVaultIds.size === 0 && (
+            <div className="rounded-lg border border-weflora-mint bg-weflora-mint/10 px-3 py-2 text-xs text-weflora-dark">
+              <span className="font-semibold">Suggestion:</span> Select accepted Vault records above to bind inputs.
+              High-relevance records are recommended.
+            </div>
+          )}
+        </div>
+
         <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white"
-          >
+          <button type="button" className={btnSecondary}>
             Suggest inputs
           </button>
-          <button
-            type="button"
-            className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white"
-          >
+          <button type="button" className={btnSecondary}>
             Auto-fill mapping
+          </button>
+          <button type="button" className={btnSecondary}>
+            Best Skill for evidence
           </button>
         </div>
       </section>
@@ -415,7 +470,6 @@ const SkillDetail: React.FC = () => {
   }
 
   return (
-    <div className="bg-white" data-layout-root>
       <PageShell
         icon={<SparklesIcon className="h-5 w-5" />}
         title={profile.title}
@@ -434,23 +488,24 @@ const SkillDetail: React.FC = () => {
             <button
               type="button"
               onClick={() => setActiveTab('readiness')}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              className={btnSecondary}
             >
               Check readiness
             </button>
             <button
               type="button"
               onClick={() => navigate(requiredDataLink)}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              className={btnSecondary}
             >
               View required data
             </button>
-            <Link
-              to={`/sessions/new?intent=skill:${profile.id}`}
-              className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+            <button
+              type="button"
+              onClick={() => setActiveTab('run')}
+              className={btnPrimary}
             >
               Run Skill
-            </Link>
+            </button>
           </>
         }
         tabs={
@@ -916,7 +971,6 @@ const SkillDetail: React.FC = () => {
           </div>
         )}
       </PageShell>
-    </div>
   );
 };
 

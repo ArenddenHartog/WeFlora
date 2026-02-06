@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import PageShell from '../ui/PageShell';
 import {
   AlertTriangleIcon,
   CheckCircleIcon,
@@ -7,7 +8,7 @@ import {
   FileTextIcon,
   RefreshIcon,
   SparklesIcon,
-  XIcon
+  XIcon,
 } from '../icons';
 import { useUI } from '../../contexts/UIContext';
 import { safeAction, generateTraceId, formatErrorWithTrace } from '../../utils/safeAction';
@@ -19,32 +20,25 @@ import {
   updateReview,
   getReviewFileUrl,
   type VaultReviewQueueItem,
-  type VaultReviewDetail
+  type VaultReviewDetail,
 } from '../../services/vaultReviewService';
+import {
+  btnPrimary,
+  btnSecondary,
+  btnDanger,
+  chip,
+  h2,
+  muted,
+  body,
+  iconWrap,
+  tableHeaderRow,
+  tableRow,
+  tableRowSelected,
+} from '../../src/ui/tokens';
 
 const RECORD_TYPES = ['Policy', 'SpeciesList', 'Site', 'Vision', 'Climate', 'Other'] as const;
 
-/**
- * Priority badge component
- */
-const PriorityBadge: React.FC<{ issues: string[] }> = ({ issues }) => {
-  const priority = issues.length >= 3 ? 'High' : issues.length >= 1 ? 'Medium' : 'Low';
-  const colorClass = priority === 'High' 
-    ? 'text-rose-600 bg-rose-50' 
-    : priority === 'Medium' 
-      ? 'text-amber-600 bg-amber-50' 
-      : 'text-emerald-600 bg-emerald-50';
-  
-  return (
-    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${colorClass}`}>
-      {priority}
-    </span>
-  );
-};
-
-/**
- * Status badge component using canonical taxonomy
- */
+/* ── Status badge ──────────────────────────────────────── */
 const StatusBadge: React.FC<{ status: VaultStatus }> = ({ status }) => {
   const meta = STATUS_META[status] ?? STATUS_META.pending;
   return (
@@ -55,9 +49,22 @@ const StatusBadge: React.FC<{ status: VaultStatus }> = ({ status }) => {
   );
 };
 
-/**
- * Empty state component with diagnostic info
- */
+/* ── Priority badge ────────────────────────────────────── */
+const PriorityBadge: React.FC<{ issues: string[] }> = ({ issues }) => {
+  const priority = issues.length >= 3 ? 'High' : issues.length >= 1 ? 'Medium' : 'Low';
+  const colorClass =
+    priority === 'High'
+      ? 'text-rose-600 bg-rose-50'
+      : priority === 'Medium'
+        ? 'text-amber-600 bg-amber-50'
+        : 'text-emerald-600 bg-emerald-50';
+
+  return (
+    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${colorClass}`}>{priority}</span>
+  );
+};
+
+/* ── Empty state ───────────────────────────────────────── */
 const EmptyState: React.FC<{
   hasAuthError?: boolean;
   onRefresh: () => void;
@@ -66,9 +73,7 @@ const EmptyState: React.FC<{
   <div className="px-4 py-10 text-center">
     <SparklesIcon className="mx-auto mb-3 h-8 w-8 text-weflora-teal/40" />
     <p className="text-sm font-semibold text-slate-700">No records awaiting review</p>
-    <p className="mt-1 text-xs text-slate-500">
-      All items have been reviewed or there are no pending uploads.
-    </p>
+    <p className={`mt-1 ${muted}`}>Upload data to the Vault to trigger review items.</p>
     {hasAuthError && (
       <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-left text-xs text-amber-700">
         <p className="font-semibold">Possible auth issue detected</p>
@@ -81,28 +86,18 @@ const EmptyState: React.FC<{
       </div>
     )}
     <div className="mt-4 flex justify-center gap-2">
-      <button
-        type="button"
-        onClick={onRefresh}
-        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-      >
+      <button type="button" onClick={onRefresh} className={btnSecondary}>
         <RefreshIcon className="h-3.5 w-3.5" />
         Refresh
       </button>
-      <button
-        type="button"
-        onClick={onCopyDebug}
-        className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50"
-      >
+      <button type="button" onClick={onCopyDebug} className={btnSecondary}>
         Copy debug info
       </button>
     </div>
   </div>
 );
 
-/**
- * Review detail form component
- */
+/* ── Review detail form ────────────────────────────────── */
 const ReviewDetailForm: React.FC<{
   item: VaultReviewDetail;
   onSave: (input: Parameters<typeof updateReview>[0]) => Promise<void>;
@@ -116,9 +111,7 @@ const ReviewDetailForm: React.FC<{
   const [confidence, setConfidence] = useState(item.confidence?.toString() ?? '');
   const [relevance, setRelevance] = useState(item.relevance?.toString() ?? '');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const { showNotification } = useUI();
 
-  // Load preview URL
   useEffect(() => {
     getReviewFileUrl(item)
       .then(setPreviewUrl)
@@ -126,7 +119,10 @@ const ReviewDetailForm: React.FC<{
   }, [item]);
 
   const handleSubmit = async (status: 'accepted' | 'blocked' | 'needs_review') => {
-    const tagsArray = tags.split(',').map(t => t.trim()).filter(Boolean);
+    const tagsArray = tags
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
     await onSave({
       id: item.id,
       recordType: recordType || undefined,
@@ -139,8 +135,10 @@ const ReviewDetailForm: React.FC<{
     });
   };
 
+  const canAccept = recordType && title;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between border-b border-slate-200 pb-4">
         <div>
@@ -148,14 +146,10 @@ const ReviewDetailForm: React.FC<{
             <StatusBadge status={item.status} />
             <PriorityBadge issues={item.issues} />
           </div>
-          <h2 className="mt-2 text-lg font-bold text-slate-900">{title || item.filename}</h2>
-          <p className="mt-1 text-xs text-slate-500 font-mono">ID: {item.id}</p>
+          <h2 className={`mt-2 ${h2}`}>{title || item.filename}</h2>
+          <p className="mt-1 text-[10px] text-slate-400 font-mono">ID: {item.id}</p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-        >
+        <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
           <XIcon className="h-5 w-5" />
         </button>
       </div>
@@ -188,7 +182,9 @@ const ReviewDetailForm: React.FC<{
           >
             <option value="">Select type...</option>
             {RECORD_TYPES.map((type) => (
-              <option key={type} value={type}>{type}</option>
+              <option key={type} value={type}>
+                {type}
+              </option>
             ))}
           </select>
         </div>
@@ -232,7 +228,7 @@ const ReviewDetailForm: React.FC<{
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Confidence (0-1)</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Confidence (0–1)</label>
             <input
               type="number"
               min="0"
@@ -245,7 +241,7 @@ const ReviewDetailForm: React.FC<{
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Relevance (0-1)</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Relevance (0–1)</label>
             <input
               type="number"
               min="0"
@@ -261,19 +257,25 @@ const ReviewDetailForm: React.FC<{
       </div>
 
       {/* File info */}
-      <div className="rounded-lg border border-slate-200 p-3 text-sm">
+      <div className="rounded-lg border border-slate-200 p-3">
         <p className="text-xs font-semibold text-slate-700 mb-2">Source file</p>
         <div className="space-y-1 text-xs text-slate-600">
-          <p><span className="text-slate-500">Filename:</span> {item.filename}</p>
-          <p><span className="text-slate-500">Type:</span> {item.mimeType}</p>
-          <p><span className="text-slate-500">Size:</span> {(item.sizeBytes / 1024).toFixed(1)} KB</p>
+          <p>
+            <span className="text-slate-500">Filename:</span> {item.filename}
+          </p>
+          <p>
+            <span className="text-slate-500">Type:</span> {item.mimeType}
+          </p>
+          <p>
+            <span className="text-slate-500">Size:</span> {(item.sizeBytes / 1024).toFixed(1)} KB
+          </p>
         </div>
         {previewUrl && (
           <a
             href={previewUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-2 inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            className={`mt-2 ${btnSecondary} inline-flex`}
           >
             Preview file
           </a>
@@ -285,26 +287,19 @@ const ReviewDetailForm: React.FC<{
         <button
           type="button"
           onClick={() => handleSubmit('accepted')}
-          disabled={isSaving || !recordType || !title}
-          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+          disabled={isSaving || !canAccept}
+          className={btnPrimary}
         >
           {isSaving ? <RefreshIcon className="h-4 w-4 animate-spin" /> : <CheckCircleIcon className="h-4 w-4" />}
           Accept
         </button>
-        <button
-          type="button"
-          onClick={() => handleSubmit('needs_review')}
-          disabled={isSaving}
-          className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
-        >
+        {!canAccept && (
+          <span className="text-[11px] text-amber-600 self-center">Set Record Type and Title to accept.</span>
+        )}
+        <button type="button" onClick={() => handleSubmit('needs_review')} disabled={isSaving} className={btnSecondary}>
           Needs more review
         </button>
-        <button
-          type="button"
-          onClick={() => handleSubmit('blocked')}
-          disabled={isSaving}
-          className="inline-flex items-center gap-2 rounded-lg border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
-        >
+        <button type="button" onClick={() => handleSubmit('blocked')} disabled={isSaving} className={btnDanger}>
           Block
         </button>
       </div>
@@ -312,14 +307,12 @@ const ReviewDetailForm: React.FC<{
   );
 };
 
-/**
- * Main Review Queue View component
- */
+/* ── Main Review Queue View ────────────────────────────── */
 const VaultReviewQueueView: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { showNotification } = useUI();
-  
+
   const [queueItems, setQueueItems] = useState<VaultReviewQueueItem[]>([]);
   const [reviewDetail, setReviewDetail] = useState<VaultReviewDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -327,47 +320,41 @@ const VaultReviewQueueView: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
 
-  // Load queue
   const loadQueue = useCallback(async () => {
     setIsLoading(true);
     setLastError(null);
-    
-    const result = await safeAction(
-      () => fetchReviewQueue(50),
-      {
-        onError: (error, traceId) => {
-          showNotification(formatErrorWithTrace('Failed to load review queue', error.message, traceId), 'error');
-          setLastError(error.message);
-        }
-      }
-    );
-    
+
+    const result = await safeAction(() => fetchReviewQueue(50), {
+      onError: (error, traceId) => {
+        showNotification(formatErrorWithTrace('Failed to load review queue', error.message, traceId), 'error');
+        setLastError(error.message);
+      },
+    });
+
     if (result) {
       setQueueItems(result);
     }
     setIsLoading(false);
   }, [showNotification]);
 
-  // Load detail when ID changes
-  const loadDetail = useCallback(async (reviewId: string) => {
-    setIsLoading(true);
-    const result = await safeAction(
-      () => getVaultForReview(reviewId),
-      {
+  const loadDetail = useCallback(
+    async (reviewId: string) => {
+      setIsLoading(true);
+      const result = await safeAction(() => getVaultForReview(reviewId), {
         onError: (error, traceId) => {
           showNotification(formatErrorWithTrace('Failed to load review', error.message, traceId), 'error');
-        }
+        },
+      });
+
+      if (result) {
+        setReviewDetail(result);
+      } else {
+        navigate('/vault/review');
       }
-    );
-    
-    if (result) {
-      setReviewDetail(result);
-    } else {
-      // Record not found, go back to queue
-      navigate('/vault/review');
-    }
-    setIsLoading(false);
-  }, [navigate, showNotification]);
+      setIsLoading(false);
+    },
+    [navigate, showNotification],
+  );
 
   useEffect(() => {
     loadQueue();
@@ -381,70 +368,76 @@ const VaultReviewQueueView: React.FC = () => {
     }
   }, [id, loadDetail]);
 
-  // Start review (claim next)
+  /**
+   * R-2: Start Review must always do something.
+   * IF :id exists → already viewing that record (no-op)
+   * ELSE → call vault_claim_next_review()
+   * IF claim returns null → show empty explanation
+   * ELSE → navigate /vault/review/:id
+   * No dead button allowed.
+   */
   const handleStartReview = async () => {
+    // If already viewing a record, do nothing — user is in review
+    if (id && reviewDetail) {
+      showNotification('Already reviewing this record.', 'success');
+      return;
+    }
+
     setIsClaiming(true);
-    
-    const result = await safeAction(
-      () => claimNextReview(),
-      {
-        onError: (error, traceId) => {
-          showNotification(formatErrorWithTrace('Failed to claim review', error.message, traceId), 'error');
-        }
-      }
-    );
-    
+
+    const result = await safeAction(() => claimNextReview(), {
+      onError: (error, traceId) => {
+        showNotification(formatErrorWithTrace('Failed to claim review', error.message, traceId), 'error');
+      },
+    });
+
     setIsClaiming(false);
-    
+
     if (result) {
-      showNotification('Review claimed successfully', 'success');
+      showNotification('Review claimed — status transitioned to in_review.', 'success');
       navigate(`/vault/review/${result.id}`);
     } else {
-      showNotification('No items available to review', 'error');
+      showNotification('No items available to review. Upload data to the Vault first.', 'error');
     }
   };
 
-  // Handle row click
   const handleRowClick = (item: VaultReviewQueueItem) => {
     navigate(`/vault/review/${item.id}`);
   };
 
-  // Handle save review
   const handleSaveReview = async (input: Parameters<typeof updateReview>[0]) => {
     setIsSaving(true);
-    
-    const result = await safeAction(
-      () => updateReview(input),
-      {
-        onError: (error, traceId) => {
-          showNotification(formatErrorWithTrace('Failed to save review', error.message, traceId), 'error');
-        },
-        onSuccess: (res, traceId) => {
-          if (res.success) {
-            showNotification('Review saved successfully', 'success');
-            // Reload queue and go back
-            loadQueue();
-            navigate('/vault/review');
-          } else if (res.error) {
-            showNotification(formatErrorWithTrace('Save failed', res.error, traceId), 'error');
-          }
+
+    await safeAction(() => updateReview(input), {
+      onError: (error, traceId) => {
+        showNotification(formatErrorWithTrace('Failed to save review', error.message, traceId), 'error');
+      },
+      onSuccess: (res, traceId) => {
+        if (res.success) {
+          showNotification('Review saved successfully', 'success');
+          // Remove saved item from local queue immediately (observable update)
+          setQueueItems((prev) => prev.filter((item) => item.id !== input.id));
+          // Reload full queue in background
+          loadQueue();
+          navigate('/vault/review');
+        } else if (res.error) {
+          showNotification(formatErrorWithTrace('Save failed', res.error, traceId), 'error');
         }
-      }
-    );
-    
+      },
+    });
+
     setIsSaving(false);
   };
 
-  // Copy debug info
   const handleCopyDebug = async () => {
     const debugInfo = {
       traceId: generateTraceId(),
       route: window.location.href,
       queueCount: queueItems.length,
       lastError,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-    
+
     try {
       await navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2));
       showNotification('Debug info copied to clipboard', 'success');
@@ -454,46 +447,32 @@ const VaultReviewQueueView: React.FC = () => {
   };
 
   return (
-    <div className="w-full bg-white p-4 md:p-8" data-layout-root>
-      {/* Header */}
-      <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-weflora-mint/15 text-weflora-teal">
-            <DatabaseIcon className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">Review queue</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Validate and complete incoming context records.
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/vault')}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-          >
+    <PageShell
+      icon={<DatabaseIcon className="h-5 w-5" />}
+      title="Review queue"
+      meta="Validate and complete incoming context records."
+      actions={
+        <>
+          <button type="button" onClick={() => navigate('/vault')} className={btnSecondary}>
             Back to inventory
           </button>
           <button
             type="button"
             onClick={handleStartReview}
             disabled={isClaiming || isLoading}
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+            className={btnPrimary}
           >
             {isClaiming && <RefreshIcon className="h-4 w-4 animate-spin" />}
             Start review
           </button>
-        </div>
-      </header>
-
-      {/* Layout: Queue list + Detail panel */}
-      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1fr_480px]">
+        </>
+      }
+    >
+      {/* Split: Queue list + Detail panel */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_480px]">
         {/* Queue list */}
-        <div className="rounded-2xl border border-slate-200 bg-white">
-          {/* Queue header row */}
-          <div className="grid grid-cols-[120px_1.5fr_120px_100px_1fr_140px] gap-3 border-b border-slate-200 px-4 py-3 text-xs font-semibold text-slate-500">
+        <div className="rounded-xl border border-slate-200 bg-white">
+          <div className={`grid grid-cols-[100px_1.5fr_100px_80px_1fr_120px] gap-3 px-4 py-3 ${tableHeaderRow}`}>
             <span>Type</span>
             <span>Title</span>
             <span>Status</span>
@@ -502,78 +481,54 @@ const VaultReviewQueueView: React.FC = () => {
             <span>Created</span>
           </div>
 
-          {/* Queue items */}
-          <div className="divide-y divide-slate-200">
+          <div className="divide-y divide-slate-100">
             {isLoading && queueItems.length === 0 ? (
               <div className="px-4 py-10 text-center text-sm text-slate-400">
                 <RefreshIcon className="mx-auto h-6 w-6 animate-spin text-weflora-teal mb-2" />
                 Loading review queue…
               </div>
             ) : queueItems.length === 0 ? (
-              <EmptyState
-                hasAuthError={Boolean(lastError)}
-                onRefresh={loadQueue}
-                onCopyDebug={handleCopyDebug}
-              />
+              <EmptyState hasAuthError={Boolean(lastError)} onRefresh={loadQueue} onCopyDebug={handleCopyDebug} />
             ) : (
               queueItems.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => handleRowClick(item)}
-                  className={`grid w-full grid-cols-[120px_1.5fr_120px_100px_1fr_140px] items-center gap-3 px-4 py-4 text-left text-sm text-slate-700 hover:bg-slate-50 ${
-                    id === item.id ? 'bg-weflora-mint/10 border-l-2 border-weflora-teal' : ''
+                  className={`grid w-full grid-cols-[100px_1.5fr_100px_80px_1fr_120px] items-center gap-3 px-4 py-3 text-left ${tableRow} ${
+                    id === item.id ? tableRowSelected : ''
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-weflora-mint/20 text-weflora-teal">
-                      <FileTextIcon className="h-4 w-4" />
+                    <div className={`${iconWrap} h-7 w-7 rounded-lg`}>
+                      <FileTextIcon className="h-3.5 w-3.5" />
                     </div>
-                    <span className="text-xs font-semibold text-slate-600">
-                      {item.recordType ?? 'Unset'}
-                    </span>
+                    <span className="text-xs font-semibold text-slate-600">{item.recordType ?? 'Unset'}</span>
                   </div>
                   <div>
-                    <p className="font-semibold text-slate-900 line-clamp-1">
-                      {item.title ?? item.filename}
-                    </p>
+                    <p className="font-semibold text-slate-900 line-clamp-1">{item.title ?? item.filename}</p>
                   </div>
                   <StatusBadge status={item.status} />
                   <PriorityBadge issues={item.issues} />
                   <div className="flex flex-wrap gap-1">
                     {item.issues.slice(0, 2).map((issue) => (
-                      <span
-                        key={issue}
-                        className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500"
-                      >
+                      <span key={issue} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">
                         {issue}
                       </span>
                     ))}
-                    {item.issues.length > 2 && (
-                      <span className="text-[10px] text-slate-400">
-                        +{item.issues.length - 2} more
-                      </span>
-                    )}
+                    {item.issues.length > 2 && <span className="text-[10px] text-slate-400">+{item.issues.length - 2}</span>}
                   </div>
-                  <span className="text-xs text-slate-500">
-                    {new Date(item.createdAt).toLocaleDateString()}
-                  </span>
+                  <span className="text-xs text-slate-500">{new Date(item.createdAt).toLocaleDateString()}</span>
                 </button>
               ))
             )}
           </div>
 
-          {/* Queue footer */}
           <div className="border-t border-slate-200 px-4 py-3 flex justify-between items-center">
-            <span className="text-xs text-slate-500">
+            <span className={muted}>
               {queueItems.length} item{queueItems.length !== 1 ? 's' : ''} in queue
             </span>
-            <button
-              type="button"
-              onClick={loadQueue}
-              disabled={isLoading}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-            >
+            <button type="button" onClick={loadQueue} disabled={isLoading} className={btnSecondary}>
               <RefreshIcon className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
@@ -581,14 +536,9 @@ const VaultReviewQueueView: React.FC = () => {
         </div>
 
         {/* Detail panel */}
-        <aside className="rounded-2xl border border-slate-200 bg-white p-4 sticky top-4">
+        <aside className="rounded-xl border border-slate-200 bg-white p-4 sticky top-16 self-start">
           {id && reviewDetail ? (
-            <ReviewDetailForm
-              item={reviewDetail}
-              onSave={handleSaveReview}
-              onClose={() => navigate('/vault/review')}
-              isSaving={isSaving}
-            />
+            <ReviewDetailForm item={reviewDetail} onSave={handleSaveReview} onClose={() => navigate('/vault/review')} isSaving={isSaving} />
           ) : id && isLoading ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-sm text-slate-500 py-10">
               <RefreshIcon className="h-8 w-8 animate-spin text-weflora-teal" />
@@ -599,12 +549,7 @@ const VaultReviewQueueView: React.FC = () => {
               <SparklesIcon className="h-8 w-8 text-weflora-teal/40" />
               <p>Select a record from the queue to review,</p>
               <p>or click "Start review" to claim the next one.</p>
-              <button
-                type="button"
-                onClick={handleStartReview}
-                disabled={isClaiming}
-                className="mt-2 inline-flex items-center gap-2 rounded-lg bg-weflora-teal px-4 py-2 text-xs font-semibold text-white hover:bg-weflora-dark disabled:opacity-50"
-              >
+              <button type="button" onClick={handleStartReview} disabled={isClaiming} className={`mt-2 ${btnPrimary}`}>
                 {isClaiming && <RefreshIcon className="h-4 w-4 animate-spin" />}
                 Claim next
               </button>
@@ -612,7 +557,7 @@ const VaultReviewQueueView: React.FC = () => {
           )}
         </aside>
       </div>
-    </div>
+    </PageShell>
   );
 };
 

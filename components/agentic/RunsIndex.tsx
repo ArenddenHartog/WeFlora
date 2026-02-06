@@ -1,9 +1,18 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { HistoryIcon, SparklesIcon } from '../icons';
+import { HistoryIcon, SparklesIcon, SearchIcon } from '../icons';
 import PageShell from '../ui/PageShell';
 import { demoRuns } from '../../src/agentic/fixtures/demoRuns.ts';
 import { loadStoredSessions } from '../../src/agentic/sessions/storage';
+import {
+  btnPrimary,
+  btnSecondary,
+  iconWrap,
+  chip,
+  tableHeaderRow,
+  tableRow,
+  muted,
+} from '../../src/ui/tokens';
 
 const statusBadgeClass = (status: string) => {
   switch (status) {
@@ -29,92 +38,82 @@ const RunsIndex: React.FC = () => {
       scopeId: item.session.scope_id,
       title: item.session.title,
       status: item.session.status,
-      createdAt: item.session.created_at
+      createdAt: item.session.created_at,
     }));
     const runs = [...stored, ...demoRuns];
     const needle = search.trim().toLowerCase();
     if (!needle) return runs;
     return runs.filter((run) =>
-      [run.title, run.scopeId, run.status].some((value) => value.toLowerCase().includes(needle))
+      [run.title, run.scopeId, run.status].some((value) => value.toLowerCase().includes(needle)),
     );
   }, [search]);
 
   return (
-    <div className="bg-white" data-layout-root>
-      <PageShell
-        icon={<HistoryIcon className="h-5 w-5" />}
-        title="Sessions"
-        actions={
-          <Link
-            to="/sessions/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-          >
-            <SparklesIcon className="h-4 w-4" />
-            New Session
-          </Link>
-        }
-      >
-        <div className="max-w-md">
-          <label className="text-xs font-semibold text-slate-600">Search sessions</label>
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by title, scope, status"
-            className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700"
-          />
-        </div>
+    <PageShell
+      icon={<HistoryIcon className="h-5 w-5" />}
+      title="Sessions"
+      actions={
+        <Link to="/sessions/new" className={btnPrimary}>
+          <SparklesIcon className="h-4 w-4" />
+          New Session
+        </Link>
+      }
+    >
+      <div className="max-w-md relative">
+        <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search by title, scope, status…"
+          className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm text-slate-700"
+        />
+      </div>
 
-        <div className="mt-8">
-          {filteredRuns.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-10 text-center">
-              <HistoryIcon className="mx-auto h-10 w-10 text-slate-300" />
-              <h3 className="mt-4 text-sm font-semibold text-slate-700">No sessions yet</h3>
-              <p className="mt-2 text-xs text-slate-500">
-                Run a Skill or Flow to create your first session.
-              </p>
-              <Link
-                to="/sessions/new"
-                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-              >
-                <SparklesIcon className="h-4 w-4" />
-                New Session
-              </Link>
+      <div className="mt-8">
+        {filteredRuns.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-10 text-center">
+            <HistoryIcon className="mx-auto h-10 w-10 text-slate-300" />
+            <h3 className="mt-4 text-sm font-semibold text-slate-700">No sessions yet</h3>
+            <p className="mt-2 text-xs text-slate-500">Run a Skill or Flow to create your first session.</p>
+            <Link to="/sessions/new" className={`mt-4 ${btnPrimary}`}>
+              <SparklesIcon className="h-4 w-4" />
+              New Session
+            </Link>
+          </div>
+        ) : (
+          /* Table-like session list */
+          <div className="rounded-xl border border-slate-200 bg-white">
+            <div className={`grid grid-cols-[1.5fr_1fr_100px_160px] gap-3 px-4 py-3 ${tableHeaderRow}`}>
+              <span>Title</span>
+              <span>Scope</span>
+              <span>Status</span>
+              <span>Created</span>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <div className="divide-y divide-slate-100">
               {filteredRuns.map((run) => (
-                <div
+                <Link
                   key={run.id}
-                  className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
+                  to={`/sessions/${run.id}`}
+                  className={`grid grid-cols-[1.5fr_1fr_100px_160px] items-center gap-3 px-4 py-3 ${tableRow}`}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="h-10 w-10 rounded-xl bg-weflora-mint/15 text-weflora-teal flex items-center justify-center">
-                      <HistoryIcon className="h-5 w-5" />
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`${iconWrap} h-8 w-8 rounded-lg flex-shrink-0`}>
+                      <HistoryIcon className="h-4 w-4" />
                     </div>
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${statusBadgeClass(run.status)}`}>
-                      {run.status}
-                    </span>
+                    <span className="font-semibold text-slate-900 truncate">{run.title}</span>
                   </div>
-                  <Link to={`/sessions/${run.id}`} className="mt-4">
-                    <h3 className="text-lg font-bold text-slate-800">{run.title}</h3>
-                    <p className="mt-2 text-xs text-slate-500">Scope: {run.scopeId}</p>
-                    <p className="mt-2 text-xs text-slate-500">{new Date(run.createdAt).toLocaleString()}</p>
-                  </Link>
-                  <div className="mt-auto pt-4">
-                    <Link
-                      to={`/sessions/${run.id}`}
-                      className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 group-hover:bg-weflora-mint/10"
-                    >
-                      Open
-                    </Link>
-                  </div>
-                </div>
+                  <span className={muted}>{run.scopeId}</span>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs w-fit ${statusBadgeClass(run.status)}`}>
+                    {run.status}
+                  </span>
+                  <span className={muted}>{new Date(run.createdAt).toLocaleString()}</span>
+                </Link>
               ))}
             </div>
-          )}
-        </div>
-      </PageShell>
-    </div>
+          </div>
+        )}
+      </div>
+    </PageShell>
   );
 };
 
