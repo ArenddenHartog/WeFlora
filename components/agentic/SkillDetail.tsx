@@ -5,6 +5,17 @@ import PageShell from '../ui/PageShell';
 import { agentProfilesContract } from '../../src/agentic/registry/agents.ts';
 import { buildSkillContractMeta } from '../../src/agentic/contracts/contractCatalog';
 import {
+  btnPrimary,
+  btnSecondary,
+  h2,
+  muted,
+  body,
+  chip,
+  statusReady,
+  statusWarning,
+  statusError,
+} from '../../src/ui/tokens';
+import {
   deriveVaultInventoryRecords,
   fetchVaultInventorySources,
   type VaultInventoryRecord
@@ -217,11 +228,7 @@ const RunTab: React.FC<RunTabProps> = ({
           type="button"
           onClick={onRun}
           disabled={!canRun}
-          className={`inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-colors ${
-            canRun
-              ? 'bg-slate-900 text-white hover:bg-slate-800'
-              : 'bg-slate-200 text-slate-500 cursor-not-allowed'
-          }`}
+          className={btnPrimary}
         >
           {isRunning ? (
             <>
@@ -415,7 +422,6 @@ const SkillDetail: React.FC = () => {
   }
 
   return (
-    <div className="bg-white" data-layout-root>
       <PageShell
         icon={<SparklesIcon className="h-5 w-5" />}
         title={profile.title}
@@ -434,20 +440,20 @@ const SkillDetail: React.FC = () => {
             <button
               type="button"
               onClick={() => setActiveTab('readiness')}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              className={btnSecondary}
             >
               Check readiness
             </button>
             <button
               type="button"
               onClick={() => navigate(requiredDataLink)}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              className={btnSecondary}
             >
               View required data
             </button>
             <Link
               to={`/sessions/new?intent=skill:${profile.id}`}
-              className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+              className={btnPrimary}
             >
               Run Skill
             </Link>
@@ -916,7 +922,6 @@ const SkillDetail: React.FC = () => {
           </div>
         )}
       </PageShell>
-    </div>
   );
 };
 
