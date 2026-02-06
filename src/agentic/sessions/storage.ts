@@ -1,10 +1,13 @@
 import type { EventRecord, Session } from '../contracts/ledger';
 import type { RunContext } from '../contracts/run_context';
+import type { RunnerResult } from '../contracts/reasoning';
 
 export interface StoredSession {
   session: Session;
   runContext: RunContext;
   events: EventRecord[];
+  /** Raw ReasoningGraph from runner (preserves Evidence/Outcome fidelity) */
+  runnerResult?: RunnerResult;
 }
 
 const STORAGE_KEY = 'weflora.sessions.v1';

@@ -14,6 +14,11 @@ import {
   statusReady,
   statusWarning,
   statusError,
+  agentSuggestionBox,
+  agentSuggestionLabel,
+  relevanceHigh,
+  relevanceMedium,
+  relevanceLow,
 } from '../../src/ui/tokens';
 import {
   deriveVaultInventoryRecords,
@@ -29,6 +34,53 @@ import { supabase } from '../../services/supabaseClient';
 import type { EventRecord, Session } from '../../src/agentic/contracts/ledger';
 import type { RunContext } from '../../src/agentic/contracts/run_context';
 import type { VaultPointer } from '../../src/agentic/contracts/vault';
+import type { CandidateScoreBreakdown } from '../../src/agentic/contracts/reasoning';
+import {
+  suggestInputs,
+  autoFillMapping,
+  type PointerIndexEntry,
+  type SuggestionResult,
+  type AutoFillResult,
+  type SkillPointerRequirements,
+} from '../../src/agentic/vault/pointerIndex';
+import { DeterministicRunner } from '../../src/agentic/runtime/runner';
+
+/**
+ * CandidateBreakdownRow — renders a single candidate score breakdown
+ */
+const CandidateBreakdownRow: React.FC<{
+  candidate: CandidateScoreBreakdown;
+  rank: number;
+}> = ({ candidate, rank }) => (
+  <div className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-xs ${
+    candidate.selected ? 'border-weflora-teal bg-weflora-mint/10' : 'border-slate-200'
+  }`}>
+    <span className="text-[10px] font-semibold text-slate-400 w-4">{rank}.</span>
+    <div className="flex-1 min-w-0">
+      <p className="font-semibold text-slate-700 truncate">{candidate.label}</p>
+      <div className="mt-1 flex flex-wrap gap-1">
+        <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-700">
+          rel {candidate.relevance.toFixed(3)}
+        </span>
+        <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700">
+          conf {candidate.confidence.toFixed(3)}
+        </span>
+        <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">
+          cov {candidate.coverage.toFixed(3)}
+        </span>
+        <span className="rounded bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-600">
+          rec {candidate.recency.toFixed(3)}
+        </span>
+      </div>
+    </div>
+    <span className="text-sm font-bold text-slate-800">{candidate.total.toFixed(3)}</span>
+    {candidate.selected && (
+      <span className="rounded-full bg-weflora-teal px-2 py-0.5 text-[10px] font-semibold text-white">
+        selected
+      </span>
+    )}
+  </div>
+);
 
 /**
  * RunTab - Deterministic form for running a skill
@@ -49,6 +101,11 @@ interface RunTabProps {
   isRunning: boolean;
   onRun: () => void;
   showNotification: (message: string, type: 'success' | 'error') => void;
+  pointerIndex: PointerIndexEntry[];
+  suggestions: SuggestionResult[] | null;
+  onSuggestInputs: () => void;
+  autoFillResult: AutoFillResult | null;
+  onAutoFill: () => void;
 }
 
 const RunTab: React.FC<RunTabProps> = ({
@@ -59,7 +116,12 @@ const RunTab: React.FC<RunTabProps> = ({
   selectedVaultIds,
   onSelectVault,
   isRunning,
-  onRun
+  onRun,
+  pointerIndex,
+  suggestions,
+  onSuggestInputs,
+  autoFillResult,
+  onAutoFill,
 }) => {
   // Group vault records by type that match required context
   const groupedRecords = useMemo(() => {
@@ -283,15 +345,15 @@ const RunTab: React.FC<RunTabProps> = ({
         )}
       </div>
 
-      {/* Agent intelligence (future-ready) */}
+      {/* Agent intelligence — real capabilities */}
       <section className="rounded-xl border border-dashed border-weflora-mint bg-weflora-mint/5 p-4">
         <div className="flex items-center gap-2 text-xs font-semibold text-weflora-teal">
           <SparklesIcon className="h-4 w-4" />
           Agent Intelligence
         </div>
         <p className="mt-2 text-xs text-slate-600">
-          The system can detect missing context, suggest the best Vault records, and auto-fill input mappings.
-          Future: agents will select Skills dynamically and chain reasoning across Flows.
+          The system detects missing context, ranks Vault records by semantic memory scoring,
+          and auto-fills input mappings. Scoring: 0.45×relevance + 0.35×confidence + 0.15×coverage + 0.05×recency.
         </p>
 
         {/* Agent suggestions — current capabilities */}
@@ -299,29 +361,102 @@ const RunTab: React.FC<RunTabProps> = ({
           {readiness.missing.length > 0 && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
               <span className="font-semibold">Missing context detected:</span>{' '}
-              {readiness.missing.map((m) => m.recordType).join(', ')}.
+              {readiness.missing.map((m: any) => m.recordType).join(', ')}.
               Upload data to enable this Skill.
             </div>
           )}
           {readiness.status === 'Ready' && selectedVaultIds.size === 0 && (
             <div className="rounded-lg border border-weflora-mint bg-weflora-mint/10 px-3 py-2 text-xs text-weflora-dark">
-              <span className="font-semibold">Suggestion:</span> Select accepted Vault records above to bind inputs.
-              High-relevance records are recommended.
+              <span className="font-semibold">Suggestion:</span> Click "Suggest inputs" to see ranked candidates,
+              or "Auto-fill mapping" to bind the best matches automatically.
             </div>
           )}
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className={btnSecondary}>
+          <button
+            type="button"
+            onClick={onSuggestInputs}
+            className={btnSecondary}
+            disabled={pointerIndex.length === 0}
+          >
+            <SparklesIcon className="h-3.5 w-3.5" />
             Suggest inputs
           </button>
-          <button type="button" className={btnSecondary}>
+          {pointerIndex.length === 0 && (
+            <span className="text-[11px] text-amber-600">No accepted vault records available</span>
+          )}
+          <button
+            type="button"
+            onClick={onAutoFill}
+            className={btnSecondary}
+            disabled={pointerIndex.length === 0}
+          >
             Auto-fill mapping
           </button>
-          <button type="button" className={btnSecondary}>
-            Best Skill for evidence
-          </button>
         </div>
+
+        {/* Suggestion results */}
+        {suggestions && suggestions.length > 0 && (
+          <div className="mt-4 space-y-4">
+            <p className="text-xs font-semibold text-slate-700">Ranked candidates per required pointer</p>
+            {suggestions.map((suggestion) => (
+              <div key={suggestion.pointer} className="rounded-lg border border-slate-200 bg-white p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-mono text-xs text-slate-700">{suggestion.pointer}</span>
+                    {suggestion.required && <span className="ml-1 text-rose-500 text-[10px] font-semibold">required</span>}
+                  </div>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                    suggestion.provenanceAvailable
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    provenance: {suggestion.provenanceAvailable ? 'available' : 'none'}
+                  </span>
+                </div>
+                <div className="mt-2 space-y-1.5">
+                  {suggestion.candidates.length === 0 ? (
+                    <p className="text-xs text-slate-500">No candidates found for this pointer.</p>
+                  ) : (
+                    suggestion.candidates.map((candidate, idx) => (
+                      <CandidateBreakdownRow
+                        key={candidate.object_id}
+                        candidate={candidate}
+                        rank={idx + 1}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Auto-fill result */}
+        {autoFillResult && (
+          <div className="mt-4 rounded-lg border border-weflora-mint bg-white p-3">
+            <p className="text-xs font-semibold text-weflora-teal mb-2">Auto-fill result</p>
+            <p className="text-xs text-slate-600">{autoFillResult.explanation}</p>
+            {autoFillResult.bindings.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {autoFillResult.bindings.map((binding) => (
+                  <div key={binding.pointer} className="flex items-center gap-2 text-xs">
+                    <span className="font-mono text-slate-600">{binding.pointer}</span>
+                    <span className="text-slate-400">→</span>
+                    <span className="text-weflora-teal font-semibold">{binding.label}</span>
+                    <span className="text-[10px] text-slate-500">({binding.score.toFixed(3)})</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {autoFillResult.unbound.length > 0 && (
+              <div className="mt-2 text-xs text-amber-600">
+                Unbound: {autoFillResult.unbound.join(', ')}
+              </div>
+            )}
+          </div>
+        )}
       </section>
     </div>
   );
@@ -343,6 +478,10 @@ const SkillDetail: React.FC = () => {
   // Selected vault items for run (by ID)
   const [selectedVaultIds, setSelectedVaultIds] = useState<Set<string>>(new Set());
   
+  // Agent Intelligence state
+  const [suggestionsResult, setSuggestionsResult] = useState<SuggestionResult[] | null>(null);
+  const [autoFillResult, setAutoFillResult] = useState<AutoFillResult | null>(null);
+  
   // Check if there's a preselected vault item from URL
   const preselectedVaultId = searchParams.get('vaultId');
   
@@ -352,6 +491,64 @@ const SkillDetail: React.FC = () => {
       setActiveTab('run');
     }
   }, [preselectedVaultId, vaultRecords]);
+
+  // Build pointer index from vault records for agent intelligence
+  const pointerIndex: PointerIndexEntry[] = useMemo(() => {
+    if (!contractMeta) return [];
+    return vaultRecords
+      .filter((r) => r.status === 'accepted')
+      .flatMap((record) => {
+        // Create pointer entries for each required context type
+        const entries: PointerIndexEntry[] = [];
+        contractMeta.requiredContext.forEach((ctx) => {
+          if (record.type === ctx.recordType) {
+            const pointer = `/inputs/${ctx.recordType.toLowerCase()}` as `/${string}`;
+            entries.push({
+              object_id: record.recordId,
+              record_type: record.type,
+              status: record.status,
+              pointer,
+              value_type: 'json',
+              confidence: record.confidence ?? 0.5,
+              relevance: (record.confidence ?? 0) >= ctx.confidenceThreshold ? 'high' : (record.confidence ?? 0) >= 0.5 ? 'medium' : 'low',
+              updated_at: record.updatedAt ?? new Date().toISOString(),
+              label: record.title,
+            });
+          }
+        });
+        return entries;
+      });
+  }, [vaultRecords, contractMeta]);
+
+  // Build skill pointer requirements from contract meta
+  const skillRequirements: SkillPointerRequirements | null = useMemo(() => {
+    if (!contractMeta) return null;
+    return {
+      required: contractMeta.requiredContext
+        .filter((ctx) => !ctx.optional)
+        .map((ctx) => `/inputs/${ctx.recordType.toLowerCase()}` as `/${string}`),
+      optional: contractMeta.requiredContext
+        .filter((ctx) => ctx.optional)
+        .map((ctx) => `/inputs/${ctx.recordType.toLowerCase()}` as `/${string}`),
+      allowedRecordTypes: contractMeta.requiredContext.map((ctx) => ctx.recordType),
+      minConfidenceThreshold: Math.min(...contractMeta.requiredContext.map((ctx) => ctx.confidenceThreshold)),
+    };
+  }, [contractMeta]);
+
+  const handleSuggestInputs = useCallback(() => {
+    if (!skillRequirements) return;
+    const result = suggestInputs(skillRequirements, pointerIndex);
+    setSuggestionsResult(result);
+  }, [skillRequirements, pointerIndex]);
+
+  const handleAutoFill = useCallback(() => {
+    if (!skillRequirements) return;
+    const result = autoFillMapping(skillRequirements, pointerIndex);
+    setAutoFillResult(result);
+    // Auto-select the bound vault records
+    const newIds = new Set<string>(result.bindings.map((b) => b.object_id));
+    setSelectedVaultIds(newIds);
+  }, [skillRequirements, pointerIndex]);
 
   const payloadSchemaText = useMemo(() => {
     if (!profile) return '';
@@ -777,6 +974,11 @@ const SkillDetail: React.FC = () => {
               });
             }}
             isRunning={isRunning}
+            pointerIndex={pointerIndex}
+            suggestions={suggestionsResult}
+            onSuggestInputs={handleSuggestInputs}
+            autoFillResult={autoFillResult}
+            onAutoFill={handleAutoFill}
             onRun={async () => {
               if (readiness.status === 'Missing' || readiness.status === 'Blocked') {
                 showNotification('Cannot run: missing or blocked requirements', 'error');
@@ -831,6 +1033,12 @@ const SkillDetail: React.FC = () => {
                     }
                   };
 
+                  // Use the DeterministicRunner to produce a complete ReasoningGraph
+                  const runner = new DeterministicRunner();
+                  const runnerResult = await runner.execute(runContext, pointerIndex);
+
+                  // Convert ReasoningGraph events to ledger EventRecord format
+                  // for backward-compatible session storage
                   const events: EventRecord[] = [];
                   let seq = 1;
                   const baseEvent = (eventId: string, at: string) => ({
@@ -868,6 +1076,17 @@ const SkillDetail: React.FC = () => {
                     }
                   });
 
+                  // Build evidence from runner result
+                  const evidenceRefs = runnerResult.graph.evidence.map((ev) => ({
+                    kind: 'vault' as const,
+                    label: ev.label ?? ev.vault_object_id ?? 'Evidence',
+                    pointer: ev.vault_object_id ? {
+                      ref: { vault_id: ev.vault_object_id, version: 1 },
+                      label: ev.label,
+                    } : undefined,
+                    inline_excerpt: ev.provenance?.quote,
+                  }));
+
                   const completedAt = new Date(Date.now() + 2000).toISOString();
                   events.push({
                     ...baseEvent(`${stepId}-completed`, completedAt),
@@ -876,14 +1095,13 @@ const SkillDetail: React.FC = () => {
                       step_id: stepId,
                       step_index: 1,
                       agent_id: profile.id,
-                      status: 'ok',
-                      summary: 'Skill executed successfully.',
+                      status: runnerResult.status === 'complete' ? 'ok' : 'insufficient_data',
+                      summary: runnerResult.graph.outcomes[0]?.summary ?? 'Skill executed.',
+                      confidence: runnerResult.graph.outcomes[0]?.confidence != null
+                        ? (runnerResult.graph.outcomes[0].confidence >= 0.7 ? 'high' : runnerResult.graph.outcomes[0].confidence >= 0.4 ? 'medium' : 'low')
+                        : undefined,
                       mutations: [],
-                      artifacts: contractMeta.output.artifacts.map(a => ({
-                        label: a.label,
-                        format: a.format,
-                        status: 'generated'
-                      }))
+                      evidence: evidenceRefs,
                     }
                   });
 
@@ -891,8 +1109,8 @@ const SkillDetail: React.FC = () => {
                     ...baseEvent(`${sessionId}-run-completed`, completedAt),
                     type: 'run.completed',
                     payload: {
-                      status: 'complete',
-                      summary: 'Skill run completed successfully.'
+                      status: runnerResult.status === 'complete' ? 'complete' : 'partial',
+                      summary: runnerResult.graph.outcomes[0]?.summary ?? 'Skill run completed.'
                     }
                   });
 
@@ -901,16 +1119,22 @@ const SkillDetail: React.FC = () => {
                     scope_id: scopeId,
                     run_id: sessionId,
                     title: runContext.title,
-                    status: 'complete',
+                    status: runnerResult.status === 'complete' ? 'complete' : 'partial',
                     created_at: createdAt,
                     created_by: { kind: 'human', actor_id: 'current-user' },
                     last_event_at: completedAt,
-                    summary: 'Skill run completed successfully.'
+                    summary: runnerResult.graph.outcomes[0]?.summary ?? 'Skill run completed.'
                   };
 
-                  addStoredSession({ session, runContext, events });
+                  // Store both the session events AND the raw RunnerResult graph
+                  addStoredSession({
+                    session,
+                    runContext,
+                    events,
+                    runnerResult: runnerResult,
+                  });
                   
-                  showNotification('Skill run started successfully', 'success');
+                  showNotification('Skill run completed — view session for evidence', 'success');
                   navigate(`/sessions/${sessionId}`);
                 },
                 {
