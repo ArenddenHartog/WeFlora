@@ -15,7 +15,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { uploadToGlobalVault } from '../../services/fileService';
 import { claimNextReview, updateReview, fetchReviewQueue } from '../../services/vaultReviewService';
 import { fetchVaultInventoryPage, deriveVaultInventoryRecords } from '../../services/vaultInventoryService';
@@ -23,6 +23,7 @@ import { addStoredSession } from '../../src/agentic/sessions/storage';
 import { safeAction, generateTraceId } from '../../utils/safeAction';
 import type { Session, EventRecord } from '../../src/agentic/contracts/ledger';
 import type { RunContext } from '../../src/agentic/contracts/run_context';
+import { DeterministicRunner } from '../../src/agentic/runtime/runner';
 import { CheckCircleIcon, AlertTriangleIcon, RefreshIcon, SparklesIcon } from '../icons';
 import PageShell from '../ui/PageShell';
 import { btnPrimary, btnSecondary, iconWrap, statusReady, statusError, statusWarning, muted } from '../../src/ui/tokens';
@@ -163,30 +164,50 @@ const GoldenFlowTest: React.FC = () => {
       const sessionId = crypto.randomUUID();
       const createdAt = new Date().toISOString();
 
-      // Use `as any` casts for test fixtures — these are smoke-test stubs,
-      // not production data, and strict type matching is not the goal here.
+      // Build RunContext with vault input binding
+      const runContext: RunContext = {
+        run_id: sessionId,
+        scope_id: 'golden-flow-test',
+        kind: 'skill',
+        title: 'Golden Flow Test Session',
+        intent: 'Golden Flow Smoke Test',
+        skill_id: 'golden-flow-validator',
+        created_at: createdAt,
+        created_by: { kind: 'system', reason: 'golden-flow-test' },
+        runtime: { locale: 'en-US' },
+        input_bindings: {
+          '/inputs/test_record': {
+            ref: { vault_id: vaultId, version: 1 },
+            label: 'Golden Flow Test Record',
+          },
+        },
+      };
+
+      // Use DeterministicRunner for full ReasoningGraph
+      const runner = new DeterministicRunner();
+      const runnerResult = await runner.execute(runContext, []);
+
+      // Convert to ledger events for backward compat
+      const events: EventRecord[] = [
+        { event_id: crypto.randomUUID(), session_id: sessionId, scope_id: 'golden-flow-test', run_id: sessionId, type: 'run.started', at: createdAt, seq: 1, by: { kind: 'system', reason: 'golden-flow' }, event_version: '1.0.0', payload: { title: 'Golden Flow Test Run', kind: 'skill' as const, input_bindings: runContext.input_bindings } },
+        { event_id: crypto.randomUUID(), session_id: sessionId, scope_id: 'golden-flow-test', run_id: sessionId, type: 'step.started', at: createdAt, seq: 2, by: { kind: 'system', reason: 'golden-flow' }, event_version: '1.0.0', payload: { step_id: 'step-1', step_index: 1, agent_id: 'golden-flow-validator', title: 'Validate Test Record', inputs: runContext.input_bindings } },
+        { event_id: crypto.randomUUID(), session_id: sessionId, scope_id: 'golden-flow-test', run_id: sessionId, type: 'step.completed', at: new Date().toISOString(), seq: 3, by: { kind: 'system', reason: 'golden-flow' }, event_version: '1.0.0', payload: { step_id: 'step-1', step_index: 1, agent_id: 'golden-flow-validator', status: 'ok', summary: runnerResult.graph.outcomes[0]?.summary ?? 'Test record validated', mutations: [], evidence: [{ kind: 'vault', label: 'Golden flow test passed', pointer: { ref: { vault_id: vaultId, version: 1 }, label: 'Test Record' } }] } },
+        { event_id: crypto.randomUUID(), session_id: sessionId, scope_id: 'golden-flow-test', run_id: sessionId, type: 'run.completed', at: new Date().toISOString(), seq: 4, by: { kind: 'system', reason: 'golden-flow' }, event_version: '1.0.0', payload: { status: 'complete', summary: 'Golden flow smoke test completed with evidence' } },
+      ] as any as EventRecord[];
+
       const session = {
         session_id: sessionId,
         scope_id: 'golden-flow-test',
+        run_id: sessionId,
         title: 'Golden Flow Test Session',
         status: 'complete',
         created_at: createdAt,
-      } as any as Session;
+        created_by: { kind: 'system', reason: 'golden-flow-test' },
+        last_event_at: new Date().toISOString(),
+        summary: 'Golden flow smoke test completed with evidence',
+      } as Session;
 
-      const runContext = {
-        scope_id: 'golden-flow-test',
-        input_bindings: {},
-        pointer_index: {},
-      } as any as RunContext;
-
-      const events = [
-        { event_id: crypto.randomUUID(), session_id: sessionId, scope_id: 'golden-flow-test', run_id: sessionId, type: 'run.started', at: createdAt, seq: 1, by: { kind: 'system', reason: 'golden-flow' }, event_version: '1.0.0', payload: { title: 'Golden Flow Test Run', kind: 'skill' as const } },
-        { event_id: crypto.randomUUID(), session_id: sessionId, scope_id: 'golden-flow-test', run_id: sessionId, type: 'step.started', at: createdAt, seq: 2, by: { kind: 'system', reason: 'golden-flow' }, event_version: '1.0.0', payload: { step_id: 'step-1', step_index: 1, agent_id: 'golden-flow-validator', title: 'Validate Test Record', inputs: {} } },
-        { event_id: crypto.randomUUID(), session_id: sessionId, scope_id: 'golden-flow-test', run_id: sessionId, type: 'step.completed', at: new Date().toISOString(), seq: 3, by: { kind: 'system', reason: 'golden-flow' }, event_version: '1.0.0', payload: { step_id: 'step-1', step_index: 1, agent_id: 'golden-flow-validator', status: 'ok', summary: 'Test record validated successfully', mutations: [], evidence: [{ label: 'Golden flow test passed', source_id: vaultId }], assumptions: [], actions: [] } },
-        { event_id: crypto.randomUUID(), session_id: sessionId, scope_id: 'golden-flow-test', run_id: sessionId, type: 'run.completed', at: new Date().toISOString(), seq: 4, by: { kind: 'system', reason: 'golden-flow' }, event_version: '1.0.0', payload: { status: 'complete', summary: 'Golden flow smoke test completed successfully' } },
-      ] as any as EventRecord[];
-
-      addStoredSession({ session, runContext, events });
+      addStoredSession({ session, runContext, events, runnerResult });
       return sessionId;
     }, { traceId });
 
@@ -216,6 +237,9 @@ const GoldenFlowTest: React.FC = () => {
       const hasRunStarted = found.events?.some((e: any) => e.type === 'run.started');
       const hasRunCompleted = found.events?.some((e: any) => e.type === 'run.completed');
       const hasStepCompleted = found.events?.some((e: any) => e.type === 'step.completed');
+      const hasRunnerResult = !!found.runnerResult;
+      const hasGraphEvidence = (found.runnerResult?.graph?.evidence?.length ?? 0) > 0;
+      const hasGraphOutcome = (found.runnerResult?.graph?.outcomes?.length ?? 0) > 0;
 
       if (!hasRunStarted) throw new Error('Missing run.started event');
       if (!hasRunCompleted) throw new Error('Missing run.completed event');
@@ -226,6 +250,10 @@ const GoldenFlowTest: React.FC = () => {
         eventCount: found.events?.length || 0,
         hasOutcome: hasRunCompleted,
         hasEvidence: hasStepCompleted,
+        hasRunnerResult,
+        hasGraphEvidence,
+        hasGraphOutcome,
+        graphEventCount: found.runnerResult?.graph?.events?.length ?? 0,
         layoutReady: hasEvents && hasRunStarted && hasRunCompleted,
       };
     }, { traceId });
@@ -236,6 +264,9 @@ const GoldenFlowTest: React.FC = () => {
         `status=${result.status}`,
         result.hasOutcome ? 'outcome=yes' : 'outcome=NO',
         result.hasEvidence ? 'evidence=yes' : 'evidence=none',
+        result.hasRunnerResult ? `graph=${result.graphEventCount}evts` : 'no-graph',
+        result.hasGraphEvidence ? 'graph-evidence=yes' : 'graph-evidence=none',
+        result.hasGraphOutcome ? 'graph-outcome=yes' : 'graph-outcome=none',
       ];
       updateStep('verifySession', {
         status: 'success',
@@ -402,7 +433,10 @@ const GoldenFlowTest: React.FC = () => {
           </ul>
         </div>
 
-        <div className="text-center">
+        <div className="text-center space-x-4">
+          <Link to="/debug/cognition-smoke" className="text-sm text-weflora-teal hover:underline">
+            Cognition Smoke Test →
+          </Link>
           <button type="button" onClick={() => navigate('/')} className="text-sm text-slate-500 hover:text-slate-700">
             ← Back to home
           </button>
