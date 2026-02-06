@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageShell from '../ui/PageShell';
 import { useProject } from '../../contexts/ProjectContext';
 import { useUI } from '../../contexts/UIContext';
@@ -76,7 +76,7 @@ const confidenceSegments = (confidence: number) => {
 const VaultInventoryView: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { id: selectedId } = useParams<{ id?: string }>();
   const { projects } = useProject();
   const { selectedProjectId, setSelectedProjectId, showNotification } = useUI();
 
@@ -95,27 +95,21 @@ const VaultInventoryView: React.FC = () => {
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
 
-  // URL-driven selection: Get selected ID from URL
-  const selectedId = searchParams.get('selected');
-  
-  // Derive selectedRecord from URL and records (not component state)
+  // Route-param driven selection: Get selected ID from URL path (/vault/:id)
+  // Derive selectedRecord from URL param and records (not component state)
   const selectedRecord = useMemo(() => {
     if (!selectedId) return null;
     return records.find((record) => record.recordId === selectedId) ?? null;
   }, [selectedId, records]);
 
-  // Function to update selection in URL (deterministic, survives refresh)
+  // Function to update selection via route navigation (deterministic, survives refresh)
   const setSelectedId = useCallback((id: string | null) => {
-    setSearchParams((prev) => {
-      const newParams = new URLSearchParams(prev);
-      if (id) {
-        newParams.set('selected', id);
-      } else {
-        newParams.delete('selected');
-      }
-      return newParams;
-    }, { replace: true });
-  }, [setSearchParams]);
+    if (id) {
+      navigate(`/vault/${id}`, { replace: false });
+    } else {
+      navigate('/vault', { replace: false });
+    }
+  }, [navigate]);
 
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
   const recentProjects = projects.slice(0, 5);

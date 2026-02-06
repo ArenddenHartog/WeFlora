@@ -22,6 +22,7 @@ import FlowsIndex from './agentic/FlowsIndex';
 import FlowDetail from './agentic/FlowDetail';
 import RunDetail from './agentic/RunDetail';
 import SessionWizardRoute from './sessions/SessionWizardRoute';
+import GoldenFlowTest from './debug/GoldenFlowTest';
 import AppLayout from './AppLayout';
 import CanvasLayout from './CanvasLayout';
 import BaseModal from './BaseModal';
@@ -686,9 +687,12 @@ const MainContent: React.FC<MainContentProps> = ({
                                         ))}
                     <Route path="/files" element={<GlobalWorkspace view="knowledge_base" {...sharedProps} />} />
                     <Route path="/vault" element={<GlobalWorkspace view="vault" {...sharedProps} />} />
+                    <Route path="/vault/:id" element={<GlobalWorkspace view="vault" {...sharedProps} />} />
                     <Route path="/vault/review" element={<GlobalWorkspace view="vault_review" {...sharedProps} />} />
                     <Route path="/vault/review/:id" element={<GlobalWorkspace view="vault_review" {...sharedProps} />} />
                     <Route path="/prompts" element={<GlobalWorkspace view="prompts" {...sharedProps} />} />
+                    {/* Debug routes (dev-only) */}
+                    <Route path="/debug/golden-flow" element={<GoldenFlowTest />} />
                 </Route>
                 
                 {/* Canvas Editors (own scroll/zoom/pan) */}
