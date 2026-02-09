@@ -133,8 +133,13 @@ export interface EvidenceRecord {
     confidence: number;
     coverage: number;
     recency: number;
+    /** v1.1: historical outcome contribution component */
+    historical: number;
     total: number;
   };
+
+  /** v1.1: historical reliability of this evidence (avg contribution across past runs) */
+  historical_reliability?: number;
 
   // Tool provenance
   tool?: {
@@ -162,6 +167,20 @@ export type OutcomeKind =
   | 'enum'
   | 'json'
   | 'action';
+
+/**
+ * EvidenceContribution — per-evidence weight in an outcome.
+ *
+ * Enables:
+ * - Explainable reasoning chain (which evidence caused what)
+ * - Memory reinforcement (high-contribution evidence gets boosted)
+ * - Causal graph construction
+ */
+export interface EvidenceContribution {
+  evidence_id: string;
+  /** 0–1: how strongly this evidence contributed to the outcome */
+  weight: number;
+}
 
 /**
  * OutcomeRecord — user-facing results.
@@ -194,6 +213,13 @@ export interface OutcomeRecord {
   explanation?: string;
   evidence_ids?: string[];
 
+  /**
+   * Per-evidence contribution weights (v1.1 — cognitive memory).
+   * Each entry records how strongly an evidence item contributed
+   * to this outcome. Used for memory reinforcement and causal graphs.
+   */
+  evidence_contributions?: EvidenceContribution[];
+
   // Artifact handshake (jump to Worksheets/Reports/etc.)
   artifact?: {
     type: 'draft_matrix' | 'report' | 'memo' | 'export' | 'external_action';
@@ -210,6 +236,8 @@ export interface CandidateScoreBreakdown {
   confidence: number;
   coverage: number;
   recency: number;
+  /** v1.1: historical outcome contribution (0.20 weight) */
+  historical: number;
   total: number;
   selected: boolean;
   reason?: string;

@@ -1,20 +1,24 @@
 /**
- * Vault Pointer Indexing Model v1 (deterministic, no embeddings)
+ * Vault Pointer Indexing Model v1.1 (deterministic, semantic memory)
  *
  * Given an AgentProfile (reads pointers + record types), produces:
  * - readiness (missing fields)
- * - ranked candidates (relevance-based)
+ * - ranked candidates (relevance-based + historical contribution)
  * - explicit mapping suggestions (pointer-level)
  * - explainable score breakdowns per candidate
  *
- * Ranking heuristic (deterministic):
- * score = 0.45 * relevanceWeight
- *       + 0.35 * confidenceNormalized
- *       + 0.15 * pointerCoverage
- *       + 0.05 * recencyBoost
+ * Ranking heuristic (v1.1 — semantic memory):
+ * score = 0.35 * relevanceWeight
+ *       + 0.25 * confidenceNormalized
+ *       + 0.10 * pointerCoverage
+ *       + 0.10 * recencyBoost
+ *       + 0.20 * historical_outcome_contribution
+ *
+ * The historical component makes the system prefer evidence that
+ * historically led to strong outcomes. This is real learning.
  *
  * Enforced explainability:
- * - Every scoring decision emits a breakdown
+ * - Every scoring decision emits a breakdown (6 components)
  * - Top N candidates are always reported
  * - Selection reason is always stated
  */
@@ -22,6 +26,7 @@
 import type { PointerPath, Json } from '../contracts/primitives';
 import type { VaultPointer } from '../contracts/vault';
 import type { CandidateScoreBreakdown } from '../contracts/reasoning';
+import { getHistoricalContributions } from '../runtime/learningLoop';
 
 /* ─── Types ───────────────────────────────────────────── */
 
@@ -102,7 +107,7 @@ export interface AutoFillResult {
   explanation: string;
 }
 
-/* ─── Ranking Heuristic ───────────────────────────────── */
+/* ─── Ranking Heuristic (v1.1 — semantic memory) ─────── */
 
 const RELEVANCE_WEIGHT: Record<RelevanceLevel, number> = {
   high: 1.0,
@@ -111,38 +116,56 @@ const RELEVANCE_WEIGHT: Record<RelevanceLevel, number> = {
 };
 
 /**
+ * v1.1 weight distribution:
+ *   0.35 relevance  (was 0.45)
+ *   0.25 confidence  (was 0.35)
+ *   0.10 coverage   (was 0.15)
+ *   0.10 recency    (was 0.05)
+ *   0.20 historical  (NEW — outcome contribution)
+ *
+ * The historical component means the system prefers evidence
+ * that historically led to strong outcomes: real learning.
+ */
+const W_RELEVANCE  = 0.35;
+const W_CONFIDENCE = 0.25;
+const W_COVERAGE   = 0.10;
+const W_RECENCY    = 0.10;
+const W_HISTORICAL = 0.20;
+
+/**
  * Score a candidate vault object for a Skill.
  *
- * score = 0.45 * relevanceWeight
- *       + 0.35 * confidenceNormalized
- *       + 0.15 * pointerCoverage
- *       + 0.05 * recencyBoost
+ * v1.1: adds historical_outcome_contribution (0.20 weight).
  */
 export function scoreCandidate(
   relevance: RelevanceLevel,
   confidence: number,
   pointerCoverage: number,
   updatedAt: string,
+  historicalContribution: number = 0,
 ): number {
   const relevanceScore = RELEVANCE_WEIGHT[relevance] ?? 0.2;
   const confidenceNorm = Math.max(0, Math.min(1, confidence));
   const coverageNorm = Math.max(0, Math.min(1, pointerCoverage));
+  const historicalNorm = Math.max(0, Math.min(1, historicalContribution));
 
-  // Recency boost: 1.0 if updated in last hour, decaying to 0 over 30 days
   const ageMs = Date.now() - new Date(updatedAt).getTime();
   const ageDays = ageMs / (1000 * 60 * 60 * 24);
   const recencyBoost = Math.max(0, 1 - ageDays / 30);
 
   return (
-    0.45 * relevanceScore +
-    0.35 * confidenceNorm +
-    0.15 * coverageNorm +
-    0.05 * recencyBoost
+    W_RELEVANCE  * relevanceScore +
+    W_CONFIDENCE * confidenceNorm +
+    W_COVERAGE   * coverageNorm +
+    W_RECENCY    * recencyBoost +
+    W_HISTORICAL * historicalNorm
   );
 }
 
 /**
  * Score a candidate with full breakdown for explainability.
+ *
+ * v1.1: includes historical component in breakdown.
  */
 export function scoreCandidateWithBreakdown(
   objectId: string,
@@ -151,10 +174,12 @@ export function scoreCandidateWithBreakdown(
   confidence: number,
   pointerCoverage: number,
   updatedAt: string,
+  historicalContribution: number = 0,
 ): CandidateScoreBreakdown {
   const relevanceScore = RELEVANCE_WEIGHT[relevance] ?? 0.2;
   const confidenceNorm = Math.max(0, Math.min(1, confidence));
   const coverageNorm = Math.max(0, Math.min(1, pointerCoverage));
+  const historicalNorm = Math.max(0, Math.min(1, historicalContribution));
 
   const ageMs = Date.now() - new Date(updatedAt).getTime();
   const ageDays = ageMs / (1000 * 60 * 60 * 24);
@@ -163,15 +188,17 @@ export function scoreCandidateWithBreakdown(
   return {
     object_id: objectId,
     label,
-    relevance: 0.45 * relevanceScore,
-    confidence: 0.35 * confidenceNorm,
-    coverage: 0.15 * coverageNorm,
-    recency: 0.05 * recencyBoost,
+    relevance:   W_RELEVANCE  * relevanceScore,
+    confidence:  W_CONFIDENCE * confidenceNorm,
+    coverage:    W_COVERAGE   * coverageNorm,
+    recency:     W_RECENCY    * recencyBoost,
+    historical:  W_HISTORICAL * historicalNorm,
     total:
-      0.45 * relevanceScore +
-      0.35 * confidenceNorm +
-      0.15 * coverageNorm +
-      0.05 * recencyBoost,
+      W_RELEVANCE  * relevanceScore +
+      W_CONFIDENCE * confidenceNorm +
+      W_COVERAGE   * coverageNorm +
+      W_RECENCY    * recencyBoost +
+      W_HISTORICAL * historicalNorm,
     selected: false,
   };
 }
@@ -203,7 +230,11 @@ export function computePointerReadiness(
   const requiredPointersMissing = requiredPointers.filter((p) => !allPointers.has(p));
   const optionalPointersMissing = optionalPointers.filter((p) => !allPointers.has(p));
 
-  // Score each object with full breakdown
+  // Fetch historical contributions for all candidate objects (v1.1)
+  const objectIds = Array.from(byObject.keys());
+  const historicalMap = getHistoricalContributions(objectIds);
+
+  // Score each object with full breakdown (including historical)
   const candidates: CandidateVaultObject[] = [];
   byObject.forEach((entries, object_id) => {
     const entryPointers = new Set(entries.map((e) => e.pointer));
@@ -222,7 +253,10 @@ export function computePointerReadiness(
     const latestUpdate = entries.reduce((latest, e) =>
       e.updated_at > latest ? e.updated_at : latest, entries[0].updated_at);
 
-    const score = scoreCandidate(bestRelevance, bestConfidence, coverage, latestUpdate);
+    // v1.1: include historical outcome contribution in scoring
+    const historical = historicalMap.get(object_id) ?? 0;
+
+    const score = scoreCandidate(bestRelevance, bestConfidence, coverage, latestUpdate, historical);
     const breakdown = scoreCandidateWithBreakdown(
       object_id,
       entries[0]?.label ?? entries[0]?.record_type ?? object_id,
@@ -230,6 +264,7 @@ export function computePointerReadiness(
       bestConfidence,
       coverage,
       latestUpdate,
+      historical,
     );
 
     candidates.push({
@@ -368,7 +403,7 @@ export function autoFillMapping(
 
   const explanation = unbound.length > 0
     ? `Auto-filled ${bindings.length}/${requirements.required.length} required pointers. ${unbound.length} pointer(s) could not be auto-filled: ${unbound.join(', ')}. No candidates met the minimum confidence threshold of ${minConf}.`
-    : `All ${bindings.length} required pointers auto-filled. Scoring: 0.45*relevance + 0.35*confidence + 0.15*coverage + 0.05*recency.`;
+    : `All ${bindings.length} required pointers auto-filled. Scoring: 0.35*relevance + 0.25*confidence + 0.10*coverage + 0.10*recency + 0.20*historical.`;
 
   return { bindings, unbound, explanation };
 }

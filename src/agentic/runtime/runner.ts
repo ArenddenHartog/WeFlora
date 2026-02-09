@@ -22,6 +22,7 @@ import type {
   ReasoningEvent,
   EvidenceRecord,
   OutcomeRecord,
+  EvidenceContribution,
   ReasoningGraph,
   RunnerResult,
   CandidateScoreBreakdown,
@@ -34,6 +35,10 @@ import {
   type CandidateVaultObject,
   type ReadinessResult,
 } from '../vault/pointerIndex';
+import {
+  computeEvidenceContributions,
+  getHistoricalContribution,
+} from './learningLoop';
 
 /* ─── Runner Interface ────────────────────────────────── */
 
@@ -120,31 +125,38 @@ export class DeterministicRunner implements IRunner {
         pointerIndex
       );
 
-      // Build score breakdowns for explainability
+      // Build score breakdowns for explainability (v1.1: includes historical)
       readinessResult.candidateVaultObjects.forEach((candidate) => {
-        const entries = pointerIndex.filter((e) => e.object_id === candidate.object_id);
-        const latestUpdate = entries.reduce(
-          (latest, e) => (e.updated_at > latest ? e.updated_at : latest),
-          entries[0]?.updated_at ?? ts
-        );
-        const ageMs = Date.now() - new Date(latestUpdate).getTime();
-        const ageDays = ageMs / (1000 * 60 * 60 * 24);
-        const recencyBoost = Math.max(0, 1 - ageDays / 30);
-        const relevanceWeight = candidate.relevance === 'high' ? 1.0 : candidate.relevance === 'medium' ? 0.6 : 0.2;
-        const totalRequired = requiredPointers.length || 1;
-        const coverage = candidate.satisfiedPointers.filter((p) => requiredPointers.includes(p)).length / totalRequired;
+        // Prefer the pre-computed breakdown from pointerIndex (already includes historical)
+        if (candidate.scoreBreakdown) {
+          candidateBreakdowns.push({ ...candidate.scoreBreakdown });
+        } else {
+          const entries = pointerIndex.filter((e) => e.object_id === candidate.object_id);
+          const latestUpdate = entries.reduce(
+            (latest, e) => (e.updated_at > latest ? e.updated_at : latest),
+            entries[0]?.updated_at ?? ts
+          );
+          const ageMs = Date.now() - new Date(latestUpdate).getTime();
+          const ageDays = ageMs / (1000 * 60 * 60 * 24);
+          const recencyBoost = Math.max(0, 1 - ageDays / 30);
+          const relevanceWeight = candidate.relevance === 'high' ? 1.0 : candidate.relevance === 'medium' ? 0.6 : 0.2;
+          const totalRequired = requiredPointers.length || 1;
+          const coverage = candidate.satisfiedPointers.filter((p) => requiredPointers.includes(p)).length / totalRequired;
+          const historical = getHistoricalContribution(candidate.object_id);
 
-        candidateBreakdowns.push({
-          object_id: candidate.object_id,
-          label: entries[0]?.record_type ?? candidate.object_id,
-          relevance: 0.45 * relevanceWeight,
-          confidence: 0.35 * Math.max(0, Math.min(1, candidate.confidence)),
-          coverage: 0.15 * coverage,
-          recency: 0.05 * recencyBoost,
-          total: candidate.score,
-          selected: false,
-          reason: undefined,
-        });
+          candidateBreakdowns.push({
+            object_id: candidate.object_id,
+            label: entries[0]?.record_type ?? candidate.object_id,
+            relevance: 0.35 * relevanceWeight,
+            confidence: 0.25 * Math.max(0, Math.min(1, candidate.confidence)),
+            coverage: 0.10 * coverage,
+            recency: 0.10 * recencyBoost,
+            historical: 0.20 * Math.max(0, Math.min(1, historical)),
+            total: candidate.score,
+            selected: false,
+            reason: undefined,
+          });
+        }
       });
     }
 
@@ -182,6 +194,9 @@ export class DeterministicRunner implements IRunner {
         (e) => e.object_id === vault.ref.vault_id && e.pointer === pointer
       );
 
+      // v1.1: fetch historical reliability for this evidence
+      const historicalReliability = getHistoricalContribution(vault.ref.vault_id);
+
       evidence.push({
         evidence_id: eid,
         run_id,
@@ -199,9 +214,11 @@ export class DeterministicRunner implements IRunner {
               confidence: candidateMatch.confidence,
               coverage: candidateMatch.coverage,
               recency: candidateMatch.recency,
+              historical: candidateMatch.historical,
               total: candidateMatch.total,
             }
           : undefined,
+        historical_reliability: historicalReliability > 0 ? historicalReliability : undefined,
       });
 
       events.push({
@@ -231,10 +248,10 @@ export class DeterministicRunner implements IRunner {
       summary: hasMissingRequired
         ? `Missing required memory pointers: ${missingPointers.join(', ')}. Cannot proceed with full confidence.`
         : candidateBreakdowns.length > 0
-          ? `Selected ${evidenceIds.length} evidence items. Scoring: 0.45*relevance + 0.35*confidence + 0.15*coverage + 0.05*recency. ${candidateBreakdowns.filter((c) => c.selected).map((c) => `${c.label}: ${c.total.toFixed(3)} (selected)`).join('; ')}`
+          ? `Selected ${evidenceIds.length} evidence items. Scoring: 0.35*relevance + 0.25*confidence + 0.10*coverage + 0.10*recency + 0.20*historical. ${candidateBreakdowns.filter((c) => c.selected).map((c) => `${c.label}: ${c.total.toFixed(3)} (selected, hist=${c.historical.toFixed(3)})`).join('; ')}`
           : `Bound ${evidenceIds.length} vault inputs directly from run context.`,
       data: {
-        scoring_formula: '0.45*relevance + 0.35*confidence + 0.15*coverage + 0.05*recency',
+        scoring_formula: '0.35*relevance + 0.25*confidence + 0.10*coverage + 0.10*recency + 0.20*historical',
         candidates_evaluated: candidateBreakdowns.length,
         evidence_bound: evidenceIds.length,
         missing_pointers: missingPointers,
@@ -303,6 +320,9 @@ export class DeterministicRunner implements IRunner {
           ? evidence.reduce((sum, e) => sum + (e.score_snapshot?.total ?? e.confidence ?? 0.5), 0) / evidence.length
           : null;
 
+      // v1.1: compute per-evidence contribution weights
+      const contributions = computeEvidenceContributions(evidence, avgConfidence);
+
       outcomes.push({
         outcome_id: outcomeId,
         run_id,
@@ -318,6 +338,7 @@ export class DeterministicRunner implements IRunner {
           : 'Skill does not output confidence yet',
         explanation: `Deterministic analysis using ${evidence.length} vault sources.`,
         evidence_ids: evidenceIds,
+        evidence_contributions: contributions,
       });
     }
 
