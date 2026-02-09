@@ -230,6 +230,9 @@ const CognitionSmoke: React.FC = () => {
         const hasEvidence = result.graph.evidence.length > 0;
         const hasOutcome = result.graph.outcomes.length > 0;
         const outcomeHasConfidence = result.graph.outcomes[0]?.confidence != null || result.graph.outcomes[0]?.confidence_reason != null;
+        // v1.1 checks
+        const outcomeHasContributions = (result.graph.outcomes[0]?.evidence_contributions?.length ?? 0) > 0;
+        const evidenceHasHistorical = result.graph.evidence.some((e) => e.score_snapshot?.historical != null);
 
         const allRequired = hasRunStarted && hasRunCompleted && hasCandidatesRanked &&
           hasEvidenceBound && hasReasoningStep && hasOutcomeProposed &&
@@ -256,6 +259,8 @@ const CognitionSmoke: React.FC = () => {
               has_evidence: hasEvidence,
               has_outcome: hasOutcome,
               outcome_has_confidence: outcomeHasConfidence,
+              'v1.1_outcome_has_contributions': outcomeHasContributions,
+              'v1.1_evidence_has_historical': evidenceHasHistorical,
             },
           },
         });

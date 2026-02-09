@@ -8,6 +8,7 @@ import {
   type ReasoningGraph,
   type ReasoningEvent,
   type EvidenceRecord,
+  type EvidenceContribution,
   type OutcomeRecord,
   type RunnerResult,
 } from '../../src/agentic/contracts/reasoning';
@@ -51,10 +52,37 @@ const asStepStarted = (event: EventRecord): event is StepStartedEvent => event.t
 const asStepCompleted = (event: EventRecord): event is StepCompletedEvent => event.type === 'step.completed';
 
 /**
- * EvidenceCard — renders a single EvidenceRecord from the ReasoningGraph
+ * ContributionBar — tiny horizontal bar showing contribution weight (0–1).
  */
-const EvidenceCard: React.FC<{ evidence: EvidenceRecord }> = ({ evidence }) => (
+const ContributionBar: React.FC<{ weight: number }> = ({ weight }) => {
+  const pct = Math.round(Math.max(0, Math.min(1, weight)) * 100);
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="h-1.5 w-16 rounded-full bg-slate-200 overflow-hidden">
+        <div
+          className={`h-full rounded-full ${
+            pct >= 60 ? 'bg-weflora-teal' : pct >= 30 ? 'bg-amber-400' : 'bg-slate-400'
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="text-[9px] font-semibold text-slate-600">{pct}%</span>
+    </div>
+  );
+};
+
+/**
+ * EvidenceCard — renders a single EvidenceRecord from the ReasoningGraph.
+ *
+ * v1.1: Shows contribution weight, historical reliability, full score breakdown,
+ * provenance details, and explains *why* this evidence was chosen.
+ */
+const EvidenceCard: React.FC<{
+  evidence: EvidenceRecord;
+  contribution?: EvidenceContribution;
+}> = ({ evidence, contribution }) => (
   <div className="rounded-lg border border-slate-100 p-3">
+    {/* Header: label + kind + badges */}
     <div className="flex items-start justify-between gap-2">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-slate-700">{evidence.label ?? 'Evidence'}</p>
@@ -84,7 +112,24 @@ const EvidenceCard: React.FC<{ evidence: EvidenceRecord }> = ({ evidence }) => (
       </div>
     </div>
 
-    {/* Score snapshot breakdown */}
+    {/* Contribution weight (v1.1: how strongly this evidence contributed) */}
+    {contribution && (
+      <div className="mt-2 flex items-center gap-2">
+        <span className="text-[10px] font-semibold text-slate-500">Contribution:</span>
+        <ContributionBar weight={contribution.weight} />
+      </div>
+    )}
+
+    {/* Historical reliability (v1.1: avg contribution across past runs) */}
+    {evidence.historical_reliability != null && evidence.historical_reliability > 0 && (
+      <div className="mt-1.5 flex items-center gap-2">
+        <span className="text-[10px] font-semibold text-slate-500">Historical reliability:</span>
+        <ContributionBar weight={evidence.historical_reliability} />
+        <span className="text-[9px] text-slate-400">(avg across past runs)</span>
+      </div>
+    )}
+
+    {/* Score snapshot breakdown (v1.1: 6 components including historical) */}
     {evidence.score_snapshot && (
       <div className="mt-2 flex flex-wrap gap-1">
         <span className="rounded bg-blue-50 px-1 py-0.5 text-[9px] text-blue-700">
@@ -99,6 +144,11 @@ const EvidenceCard: React.FC<{ evidence: EvidenceRecord }> = ({ evidence }) => (
         <span className="rounded bg-slate-50 px-1 py-0.5 text-[9px] text-slate-600">
           rec {evidence.score_snapshot.recency.toFixed(3)}
         </span>
+        {evidence.score_snapshot.historical > 0 && (
+          <span className="rounded bg-violet-50 px-1 py-0.5 text-[9px] text-violet-700">
+            hist {evidence.score_snapshot.historical.toFixed(3)}
+          </span>
+        )}
         <span className="rounded bg-weflora-mint/20 px-1 py-0.5 text-[9px] font-bold text-weflora-dark">
           total {evidence.score_snapshot.total.toFixed(3)}
         </span>
@@ -317,6 +367,20 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
     });
     return Array.from(ids);
   }, [analysis.vaultSourceIds, graphEvidence]);
+
+  // Build contribution map from outcomes (v1.1)
+  const contributionMap = useMemo(() => {
+    const map = new Map<string, EvidenceContribution>();
+    graphOutcomes.forEach((outcome) => {
+      outcome.evidence_contributions?.forEach((c) => {
+        const existing = map.get(c.evidence_id);
+        if (!existing || c.weight > existing.weight) {
+          map.set(c.evidence_id, c);
+        }
+      });
+    });
+    return map;
+  }, [graphOutcomes]);
 
   // Get primary outcome from graph
   const primaryOutcome = graphOutcomes[0];
@@ -569,7 +633,11 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
           ) : (
             <div className="space-y-3">
               {graphEvidence.map((ev) => (
-                <EvidenceCard key={ev.evidence_id} evidence={ev} />
+                <EvidenceCard
+                  key={ev.evidence_id}
+                  evidence={ev}
+                  contribution={contributionMap.get(ev.evidence_id)}
+                />
               ))}
             </div>
           )}

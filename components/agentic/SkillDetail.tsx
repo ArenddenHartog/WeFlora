@@ -71,6 +71,11 @@ const CandidateBreakdownRow: React.FC<{
         <span className="rounded bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-600">
           rec {candidate.recency.toFixed(3)}
         </span>
+        {candidate.historical > 0 && (
+          <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-700">
+            hist {candidate.historical.toFixed(3)}
+          </span>
+        )}
       </div>
     </div>
     <span className="text-sm font-bold text-slate-800">{candidate.total.toFixed(3)}</span>
@@ -353,7 +358,8 @@ const RunTab: React.FC<RunTabProps> = ({
         </div>
         <p className="mt-2 text-xs text-slate-600">
           The system detects missing context, ranks Vault records by semantic memory scoring,
-          and auto-fills input mappings. Scoring: 0.45×relevance + 0.35×confidence + 0.15×coverage + 0.05×recency.
+          and auto-fills input mappings. Evidence that historically led to strong outcomes is preferred.
+          Scoring: 0.35×relevance + 0.25×confidence + 0.10×coverage + 0.10×recency + 0.20×historical.
         </p>
 
         {/* Agent suggestions — current capabilities */}
