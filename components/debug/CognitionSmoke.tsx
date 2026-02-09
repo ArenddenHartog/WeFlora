@@ -374,9 +374,11 @@ const CognitionSmoke: React.FC = () => {
           duration: Date.now() - start,
           data: {
             mutationEvents: loopResult.events.length,
+            evidenceUsageRecords: loopResult.evidenceUsageRecords.length,
             persistedCount: loopResult.persistedCount,
             skippedCount: loopResult.skippedCount,
             reasoningEvents: learningEvents.length,
+            'v1.1_usage_persisted': loopResult.evidenceUsageRecords.length > 0,
           },
         });
       } catch (err: any) {
@@ -594,10 +596,18 @@ const CognitionSmoke: React.FC = () => {
           </div>
         )}
 
-        {/* Debug state */}
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
+        {/* Debug state + Schema Drift */}
+        <div className="rounded-xl border border-slate-100 bg-white p-4">
           <p className="text-xs font-semibold text-slate-700 mb-2">Debug State</p>
           <div className="space-y-1 text-[11px] text-slate-600">
+            <div className="flex justify-between">
+              <span>Backend host</span>
+              <span className="font-mono">{typeof window !== 'undefined' ? window.location.origin : '—'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Build stamp</span>
+              <span className="font-mono">{(window as any).__WF_BUILD_STAMP ?? 'dev'}</span>
+            </div>
             <div className="flex justify-between">
               <span>Last trace ID</span>
               <span className="font-mono">{debugState.lastTraceId ?? '—'}</span>
@@ -610,10 +620,20 @@ const CognitionSmoke: React.FC = () => {
               <span>Last RPC</span>
               <span className="font-mono">{debugState.lastRpcCall?.name ?? '—'}</span>
             </div>
-            <div className="flex justify-between">
-              <span>Backend host</span>
-              <span className="font-mono">{typeof window !== 'undefined' ? window.location.origin : '—'}</span>
-            </div>
+            {debugState.lastRpcCall && (
+              <div className="flex justify-between">
+                <span>RPC latency</span>
+                <span className="font-mono">{debugState.lastRpcCall.latencyMs}ms (status {debugState.lastRpcCall.status})</span>
+              </div>
+            )}
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <p className="text-xs font-semibold text-slate-700 mb-1">Schema Drift</p>
+            <p className="text-[11px] text-slate-500">
+              Run <code className="bg-slate-50 px-1 rounded">scripts/schema-drift-check.sql</code> against
+              your Supabase instance for full PASS/FAIL report. Client-side checks
+              available via <code className="bg-slate-50 px-1 rounded">runSchemaDriftChecks()</code>.
+            </p>
           </div>
         </div>
 
