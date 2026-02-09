@@ -531,15 +531,22 @@ export function registerRunner(runner: IRunner): void {
   runners.set(runner.name, runner);
 }
 
+// Lazy registration — avoids module-level initialization ordering issues
+// ("Cannot access 'X' before initialization" errors from circular imports)
+let _defaultsRegistered = false;
+function ensureDefaults(): void {
+  if (_defaultsRegistered) return;
+  _defaultsRegistered = true;
+  runners.set('DeterministicRunner', new DeterministicRunner());
+  runners.set('ModelPlannerRunner', new ModelPlannerRunner());
+  runners.set('MultiAgentRunner', new MultiAgentRunner());
+}
+
 export function getRunner(name?: string): IRunner {
+  ensureDefaults();
   if (name && runners.has(name)) {
     return runners.get(name)!;
   }
   // Default: deterministic
   return new DeterministicRunner();
 }
-
-// Register defaults
-registerRunner(new DeterministicRunner());
-registerRunner(new ModelPlannerRunner());
-registerRunner(new MultiAgentRunner());
