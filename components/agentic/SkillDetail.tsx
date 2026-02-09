@@ -221,7 +221,7 @@ const RunTab: React.FC<RunTabProps> = ({
       </div>
 
       {/* Input mapping section */}
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <section className="rounded-xl border border-slate-100 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">Select inputs from Vault</h2>
         <p className="mt-1 text-xs text-slate-500">
           Choose which vault records to use as input for this skill. Only accepted records are shown.
@@ -289,7 +289,7 @@ const RunTab: React.FC<RunTabProps> = ({
       </section>
 
       {/* Pointer mapping preview */}
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <section className="rounded-xl border border-slate-100 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">Input mapping preview</h2>
         <p className="mt-1 text-xs text-slate-500">
           How selected vault records will be mapped to skill input pointers.
@@ -343,38 +343,50 @@ const RunTab: React.FC<RunTabProps> = ({
         </button>
         
         {runDisabledReason && (
-          <div className="flex items-center gap-2 text-xs text-amber-600">
-            <AlertTriangleIcon className="h-4 w-4" />
-            {runDisabledReason}
+          <div className="flex items-start gap-2 text-xs text-amber-700">
+            <AlertTriangleIcon className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <div>
+              <p>{runDisabledReason}</p>
+              {readiness.missing.length > 0 && (
+                <a
+                  href={`/vault?intake=1&types=${encodeURIComponent(readiness.missing.map((m: any) => m.recordType).join(','))}`}
+                  className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-weflora-teal hover:underline"
+                >
+                  Upload missing data →
+                </a>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Agent intelligence — real capabilities */}
-      <section className="rounded-xl border border-dashed border-weflora-mint bg-weflora-mint/5 p-4">
+      {/* Agent intelligence — compact right-rail module pattern */}
+      <section className="rounded-xl border border-dashed border-weflora-mint/40 bg-weflora-mint/5 p-4">
         <div className="flex items-center gap-2 text-xs font-semibold text-weflora-teal">
           <SparklesIcon className="h-4 w-4" />
-          Agent Intelligence
+          Cognition Controls
         </div>
-        <p className="mt-2 text-xs text-slate-600">
-          The system detects missing context, ranks Vault records by semantic memory scoring,
-          and auto-fills input mappings. Evidence that historically led to strong outcomes is preferred.
-          Scoring: 0.35×relevance + 0.25×confidence + 0.10×coverage + 0.10×recency + 0.20×historical.
+        <p className="mt-1 text-[11px] text-slate-500">
+          Semantic memory scoring: 0.35×rel + 0.25×conf + 0.10×cov + 0.10×rec + 0.20×hist
         </p>
 
-        {/* Agent suggestions — current capabilities */}
+        {/* Contextual alerts */}
         <div className="mt-3 space-y-2">
           {readiness.missing.length > 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-              <span className="font-semibold">Missing context detected:</span>{' '}
-              {readiness.missing.map((m: any) => m.recordType).join(', ')}.
-              Upload data to enable this Skill.
+            <div className="rounded-lg bg-amber-50/60 px-3 py-2 text-xs text-amber-700">
+              <span className="font-semibold">Missing context:</span>{' '}
+              {readiness.missing.map((m: any) => m.recordType).join(', ')}
+              <a
+                href={`/vault?intake=1&types=${encodeURIComponent(readiness.missing.map((m: any) => m.recordType).join(','))}`}
+                className="ml-2 font-semibold text-weflora-teal hover:underline"
+              >
+                Upload →
+              </a>
             </div>
           )}
           {readiness.status === 'Ready' && selectedVaultIds.size === 0 && (
-            <div className="rounded-lg border border-weflora-mint bg-weflora-mint/10 px-3 py-2 text-xs text-weflora-dark">
-              <span className="font-semibold">Suggestion:</span> Click "Suggest inputs" to see ranked candidates,
-              or "Auto-fill mapping" to bind the best matches automatically.
+            <div className="rounded-lg bg-weflora-mint/10 px-3 py-2 text-xs text-weflora-dark">
+              Click "Suggest inputs" to see ranked candidates or "Auto-fill" to bind automatically.
             </div>
           )}
         </div>
@@ -733,14 +745,14 @@ const SkillDetail: React.FC = () => {
           </Link>
 
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="rounded-xl border border-slate-100 bg-white p-4">
               <p className="text-xs font-semibold text-slate-500">Readiness</p>
               <p className="mt-2 text-sm font-semibold text-slate-900">{readiness.status}</p>
               <p className="mt-1 text-xs text-slate-500">
                 {readiness.missing.length > 0 ? `${readiness.missing.length} missing` : 'All required context present'}
               </p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="rounded-xl border border-slate-100 bg-white p-4">
               <p className="text-xs font-semibold text-slate-500">Required Context</p>
               <p className="mt-2 text-sm font-semibold text-slate-900">
                 {contractMeta.requiredContext.map((item) => `${item.recordType}`).join(' · ')}
@@ -749,14 +761,14 @@ const SkillDetail: React.FC = () => {
                 {contractMeta.requiredContext.map((item) => `${item.recordType} (${item.requiredFields.length})`).join(' · ')}
               </p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="rounded-xl border border-slate-100 bg-white p-4">
               <p className="text-xs font-semibold text-slate-500">Provenance</p>
               <p className="mt-2 text-sm font-semibold text-slate-900">
                 {contractMeta.evidenceRules.required ? 'Required' : 'Best-effort'}
               </p>
               <p className="mt-1 text-xs text-slate-500">{contractMeta.evidenceRules.allowedSources.join(' · ')}</p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="rounded-xl border border-slate-100 bg-white p-4">
               <p className="text-xs font-semibold text-slate-500">Artifacts</p>
               <p className="mt-2 text-sm font-semibold text-slate-900">
                 {contractMeta.output.artifacts.map((item) => `${item.label} (${item.format})`).join(' · ')}
@@ -766,7 +778,7 @@ const SkillDetail: React.FC = () => {
 
         {activeTab === 'contract' && (
           <div className="mt-6 space-y-6">
-            <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <section className="rounded-xl border border-slate-100 bg-white p-4">
               <h2 className="text-sm font-semibold text-slate-900">Input pointers</h2>
               <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
                 <div className="grid grid-cols-[1.6fr_140px_120px_200px_1fr] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-semibold text-slate-500">
@@ -788,7 +800,7 @@ const SkillDetail: React.FC = () => {
               </div>
             </section>
 
-            <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <section className="rounded-xl border border-slate-100 bg-white p-4">
               <h2 className="text-sm font-semibold text-slate-900">Required context declaration</h2>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 {contractMeta.requiredContext.map((context) => (
@@ -816,7 +828,7 @@ const SkillDetail: React.FC = () => {
               </div>
             </section>
 
-            <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <section className="rounded-xl border border-slate-100 bg-white p-4">
               <h2 className="text-sm font-semibold text-slate-900">Output contract</h2>
               <div className="mt-3 grid gap-4 md:grid-cols-2">
                 <div className="rounded-lg border border-slate-200 p-3 text-xs text-slate-600">
@@ -840,7 +852,7 @@ const SkillDetail: React.FC = () => {
 
         {activeTab === 'readiness' && (
           <div className="mt-6 space-y-6">
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="rounded-xl border border-slate-100 bg-white p-4">
               <h2 className="text-sm font-semibold text-slate-900">Coverage panel</h2>
               {isLoadingVault ? (
                 <p className="mt-3 text-xs text-slate-500">Loading vault coverage…</p>
@@ -923,7 +935,7 @@ const SkillDetail: React.FC = () => {
 
         {activeTab === 'outputs' && (
           <div className="mt-6 space-y-6">
-            <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <section className="rounded-xl border border-slate-100 bg-white p-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-slate-900">Expected outputs</h2>
                 <button type="button" onClick={handleCopySchema} className="text-xs text-weflora-teal hover:text-weflora-dark">
@@ -935,7 +947,7 @@ const SkillDetail: React.FC = () => {
               </pre>
             </section>
 
-            <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <section className="rounded-xl border border-slate-100 bg-white p-4">
               <h2 className="text-sm font-semibold text-slate-900">Last run outputs</h2>
               {latestStep ? (
                 <div className="mt-3 rounded-lg border border-slate-200 p-3 text-xs text-slate-600">
@@ -950,7 +962,7 @@ const SkillDetail: React.FC = () => {
               )}
             </section>
 
-            <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <section className="rounded-xl border border-slate-100 bg-white p-4">
               <h2 className="text-sm font-semibold text-slate-900">Artifact actions</h2>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">Export memo</button>
@@ -1158,7 +1170,7 @@ const SkillDetail: React.FC = () => {
 
         {activeTab === 'history' && (
           <div className="mt-6 space-y-6">
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="rounded-xl border border-slate-100 bg-white p-4">
               <h2 className="text-sm font-semibold text-slate-900">Past runs</h2>
               <div className="mt-3 space-y-2 text-xs text-slate-600">
                 {runHistory.length === 0 ? (
@@ -1178,12 +1190,12 @@ const SkillDetail: React.FC = () => {
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="rounded-xl border border-slate-100 bg-white p-4">
               <h2 className="text-sm font-semibold text-slate-900">Contract versions</h2>
               <p className="mt-2 text-xs text-slate-500">Spec v{profile.spec_version} · Schema v{profile.schema_version}</p>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="rounded-xl border border-slate-100 bg-white p-4">
               <h2 className="text-sm font-semibold text-slate-900">Referenced by flows</h2>
               <div className="mt-3 space-y-2 text-xs text-slate-600">
                 {flowUsage.length === 0 ? (
