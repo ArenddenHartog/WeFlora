@@ -17,8 +17,17 @@ import {
   h2,
   muted,
   body,
+  label as labelToken,
   btnSecondary,
+  btnLink,
   chip,
+  surface,
+  surfaceBordered,
+  surfaceInset,
+  divider,
+  evidenceRail,
+  railSection,
+  railSectionHeader,
   statusReady,
   statusWarning,
   statusError,
@@ -29,6 +38,7 @@ import {
   loopReason,
   loopAct,
   loopLearn,
+  formatConfidence,
 } from '../../src/ui/tokens';
 
 interface RunTimelineProps {
@@ -385,9 +395,10 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
   // Get primary outcome from graph
   const primaryOutcome = graphOutcomes[0];
 
-  // Confidence: prefer graph outcome, then analysis
-  const displayConfidence = primaryOutcome?.confidence ?? analysis.overallConfidence;
-  const confidenceReason = primaryOutcome?.confidence_reason;
+  // Confidence: prefer graph outcome, then analysis. NEVER render NaN.
+  const rawConfidence = primaryOutcome?.confidence ?? analysis.overallConfidence;
+  const safeConfidence = formatConfidence(rawConfidence);
+  const confidenceReason = primaryOutcome?.confidence_reason ?? (safeConfidence.isReal ? undefined : 'No confidence score reported by agents.');
 
   const statusBadgeFor = (status: string) =>
     statusClasses[status] ?? statusNeutral;
@@ -413,7 +424,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
       {/* ════════════ LEFT — OUTCOME (Primary) ════════════ */}
       <div className="space-y-6">
         {/* 1. Decision / Outcome headline */}
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <section className={`${surfaceBordered} p-5`}>
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Outcome</p>
@@ -434,7 +445,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
 
         {/* 2. Key conclusions (step summaries) */}
         {analysis.steps.length > 0 && (
-          <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <section className="rounded-xl border border-slate-100 bg-white p-5">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Key Conclusions</p>
             <div className="space-y-3">
               {analysis.steps.map((step) => (
@@ -452,27 +463,28 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
           </section>
         )}
 
-        {/* 3. Confidence score + reasoning */}
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Confidence</p>
-          {displayConfidence != null ? (
+        {/* 3. Confidence score + reasoning (NaN-safe) */}
+        <section className={`${surfaceBordered} p-5`}>
+          <p className={`${labelToken} mb-3`}>Confidence</p>
+          {safeConfidence.isReal ? (
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-0.5">
                 {Array.from({ length: 10 }, (_, i) => (
                   <span
                     key={i}
-                    className={`h-3 w-3 rounded-sm ${i < Math.round(displayConfidence * 10) ? 'bg-weflora-teal' : 'bg-slate-200'}`}
+                    className={`h-3 w-3 rounded-sm ${i < Math.round(Number(rawConfidence) * 10) ? 'bg-weflora-teal' : 'bg-slate-100'}`}
                   />
                 ))}
               </div>
-              <span className="text-sm font-semibold text-slate-700">{displayConfidence.toFixed(2)}</span>
+              <span className="text-sm font-semibold text-slate-700">{safeConfidence.display}</span>
             </div>
           ) : (
-            <p className={muted}>
-              {confidenceReason ?? 'No confidence score reported by agents.'}
-            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-bold text-slate-300">{safeConfidence.display}</span>
+              <span className={muted}>{confidenceReason}</span>
+            </div>
           )}
-          {confidenceReason && displayConfidence != null && (
+          {confidenceReason && safeConfidence.isReal && (
             <p className="mt-2 text-xs text-slate-500">{confidenceReason}</p>
           )}
           {analysis.allAssumptions.length > 0 && (
@@ -494,7 +506,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
 
         {/* 4. Suggested actions / recommendations */}
         {analysis.allActions.length > 0 && (
-          <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <section className="rounded-xl border border-slate-100 bg-white p-5">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Recommended Actions</p>
             <ul className="space-y-2">
               {analysis.allActions.map((action) => (
@@ -509,7 +521,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
 
         {/* 5. Generated artifacts / outputs */}
         {analysis.allOutputs.length > 0 && (
-          <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <section className="rounded-xl border border-slate-100 bg-white p-5">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Generated Artifacts</p>
             <ul className="space-y-2">
               {analysis.allOutputs.map((output, i) => (
@@ -522,7 +534,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
         )}
 
         {/* 6. Execution summary (step timeline) */}
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <section className="rounded-xl border border-slate-100 bg-white p-5">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Execution Summary</p>
           <div className="relative">
             <div className="absolute left-2 top-0 h-full w-px bg-slate-200" />
@@ -560,18 +572,18 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
         </section>
       </div>
 
-      {/* ════════════ RIGHT — EVIDENCE (Always visible) ════════════ */}
-      <div className="space-y-6 lg:sticky lg:top-4 lg:self-start">
+      {/* ════════════ RIGHT — EVIDENCE RAIL (Always visible) ══════ */}
+      <div className={evidenceRail}>
         {/* Sticky mini header on small screens */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 lg:hidden">
+        <div className={`${surfaceInset} p-3 lg:hidden`}>
           <p className="text-xs font-semibold text-slate-700">Evidence & Reasoning</p>
           <p className="text-[11px] text-slate-500">
-            {graphEvidence.length} evidence items · {reasoningSteps.length} reasoning steps
+            {graphEvidence.length} evidence · {reasoningSteps.length} reasoning
           </p>
         </div>
 
         {/* 1. Vault sources used */}
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <section className="rounded-xl border border-slate-100 bg-white p-5">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Vault Sources</p>
           {allVaultSourceIds.length === 0 ? (
             <p className={muted}>No vault sources referenced.</p>
@@ -592,7 +604,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
         </section>
 
         {/* 2. Input mappings (JsonPointers) */}
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <section className="rounded-xl border border-slate-100 bg-white p-5">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Input Mappings</p>
           {analysis.allInputs.length === 0 ? (
             <p className={muted}>No input bindings captured.</p>
@@ -612,23 +624,18 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
         </section>
 
         {/* 3. Evidence from ReasoningGraph (real evidence, always shown) */}
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <section className="rounded-xl border border-slate-100 bg-white p-5">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
             Evidence ({graphEvidence.length})
           </p>
           {graphEvidence.length === 0 ? (
-            <div>
-              <p className={muted}>No evidence emitted.</p>
-              {reasoningSteps.length > 0 && (
-                <p className="mt-1 text-[11px] text-amber-600">
-                  Reasoning steps explain why: see below.
-                </p>
-              )}
-              {reasoningSteps.length === 0 && (
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Skill did not produce evidence entries. This may indicate no vault inputs were bound.
-                </p>
-              )}
+            <div className={`${surfaceInset} p-3`}>
+              <p className="text-xs font-semibold text-slate-600">No evidence emitted</p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                {reasoningSteps.length > 0
+                  ? 'The deterministic runner did not produce evidence records. See reasoning steps below for details.'
+                  : 'No vault inputs were bound to this run. Evidence is only emitted when the runner binds vault objects as inputs.'}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -644,12 +651,15 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
         </section>
 
         {/* 4. Reasoning steps (from ReasoningGraph) */}
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <section className="rounded-xl border border-slate-100 bg-white p-5">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
             Reasoning Steps ({reasoningSteps.length})
           </p>
           {reasoningSteps.length === 0 ? (
-            <p className={muted}>No reasoning steps recorded.</p>
+            <div className={`${surfaceInset} p-3`}>
+              <p className="text-xs text-slate-500">No explicit reasoning steps emitted (Mode A deterministic run).</p>
+              <p className="text-[11px] text-slate-400 mt-1">The deterministic runner auto-bound inputs without model-assisted planning.</p>
+            </div>
           ) : (
             <div className="space-y-3">
               {reasoningSteps.map((step) => (
@@ -660,7 +670,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
         </section>
 
         {/* 5. Steps Executed */}
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <section className="rounded-xl border border-slate-100 bg-white p-5">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Steps Executed</p>
           {analysis.steps.length === 0 ? (
             <p className={muted}>No steps recorded.</p>
@@ -680,7 +690,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
         </section>
 
         {/* 6. Provenance (page/line when available) */}
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <section className="rounded-xl border border-slate-100 bg-white p-5">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Provenance</p>
           {graphEvidence.filter((ev) => ev.provenance).length === 0 &&
            analysis.allEvidence.filter((ev) => ev.pointer?.selector || ev.pointer?.ref?.vault_id).length === 0 ? (
@@ -720,7 +730,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
         </section>
 
         {/* 7. Mutations & Outputs */}
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <section className="rounded-xl border border-slate-100 bg-white p-5">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Mutations & Outputs</p>
           {analysis.allMutations.length === 0 && analysis.allOutputs.length === 0 ? (
             <p className={muted}>No mutations or outputs recorded.</p>
@@ -755,7 +765,7 @@ const LivingRecordRenderer: React.FC<RunTimelineProps> = ({ events, runnerResult
         </section>
 
         {/* 8. Diagnostics */}
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <section className="rounded-xl border border-slate-100 bg-white p-5">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Diagnostics</p>
           <div className="space-y-2 text-xs text-slate-600">
             {orderedEvents.length > 0 && (
