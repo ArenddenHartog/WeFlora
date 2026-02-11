@@ -39,6 +39,9 @@ import {
   loopAct,
   loopLearn,
   formatConfidence,
+  relevanceHigh,
+  relevanceMedium,
+  relevanceLow,
 } from '../../src/ui/tokens';
 
 interface RunTimelineProps {
@@ -71,7 +74,7 @@ const ContributionBar: React.FC<{ weight: number }> = ({ weight }) => {
       <div className="h-1.5 w-16 rounded-full bg-slate-200 overflow-hidden">
         <div
           className={`h-full rounded-full ${
-            pct >= 60 ? 'bg-weflora-teal' : pct >= 30 ? 'bg-amber-400' : 'bg-slate-400'
+            pct >= 60 ? 'bg-weflora-teal' : pct >= 30 ? 'bg-weflora-amber' : 'bg-slate-400'
           }`}
           style={{ width: `${pct}%` }}
         />
@@ -106,9 +109,9 @@ const EvidenceCard: React.FC<{
           </span>
           {evidence.relevance && (
             <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-              evidence.relevance === 'high' ? 'bg-emerald-50 text-emerald-700' :
-              evidence.relevance === 'medium' ? 'bg-amber-50 text-amber-700' :
-              'bg-slate-50 text-slate-500'
+              evidence.relevance === 'high' ? relevanceHigh :
+              evidence.relevance === 'medium' ? relevanceMedium :
+              relevanceLow
             }`}>
               {evidence.relevance}
             </span>

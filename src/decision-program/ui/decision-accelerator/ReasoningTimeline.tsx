@@ -2,6 +2,8 @@ import React from 'react';
 import type { EvidenceItem, EvidenceRef, EvidenceSource, ExecutionLogEntry, Phase, TimelineEntry } from '../../types';
 import type { StepperStepViewModel } from './RightSidebarStepper';
 import { buildReasoningTimelineItems, mergeTimelineEntries } from './reasoningUtils';
+import ConsensusBar, { type ConsensusSegment } from '../../../../components/ui/ConsensusBar';
+import KeyClaimsTable, { type KeyClaimRow } from '../../../../components/ui/KeyClaimsTable';
 
 export interface ReasoningTimelineProps {
   steps: StepperStepViewModel[];
@@ -9,8 +11,14 @@ export interface ReasoningTimelineProps {
   evidenceIndex?: Record<string, EvidenceRef[]>;
   evidenceSources?: EvidenceSource[];
   timelineEntries?: TimelineEntry[];
+  /** Optional consensus summary (Strong/Moderate/Weak) */
+  consensusSegments?: ConsensusSegment[];
+  consensusTotalLabel?: string;
+  /** Optional key claims for table display */
+  keyClaims?: KeyClaimRow[];
   onOpenCitations?: (args: { evidence?: EvidenceRef[]; sourceId?: string }) => void;
   onOpenEvidenceMap?: (entryId?: string) => void;
+  onPaperClick?: (paperId: string) => void;
   focusedEntryId?: string | null;
   className?: string;
 }
@@ -23,8 +31,12 @@ const ReasoningTimeline: React.FC<ReasoningTimelineProps> = ({
   evidenceIndex,
   evidenceSources,
   timelineEntries,
+  consensusSegments,
+  consensusTotalLabel,
+  keyClaims,
   onOpenCitations,
   onOpenEvidenceMap,
+  onPaperClick,
   focusedEntryId,
   className
 }) => {
@@ -66,14 +78,28 @@ const ReasoningTimeline: React.FC<ReasoningTimelineProps> = ({
           <button
             type="button"
             onClick={() => onOpenEvidenceMap()}
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-weflora-mint/60 text-weflora-teal hover:bg-weflora-mint/20"
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-weflora-mint/60 text-weflora-teal hover:bg-weflora-mint/20 transition-colors"
           >
             Show evidence map
           </button>
         )}
       </div>
 
-      {items.length === 0 && (
+      {consensusSegments && consensusSegments.length > 0 && (
+        <div className="rounded-xl border border-slate-100 bg-slate-50/30 p-4">
+          <h4 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-3">Evidence consensus</h4>
+          <ConsensusBar segments={consensusSegments} totalLabel={consensusTotalLabel} />
+        </div>
+      )}
+
+      {keyClaims && keyClaims.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Key claims and evidence</h4>
+          <KeyClaimsTable rows={keyClaims} onPaperClick={onPaperClick} />
+        </div>
+      )}
+
+      {items.length === 0 && !consensusSegments?.length && !keyClaims?.length && (
         <div className="text-xs text-slate-400">Findings will appear here as the run progresses.</div>
       )}
 
@@ -84,7 +110,7 @@ const ReasoningTimeline: React.FC<ReasoningTimelineProps> = ({
           return (
             <div key={phase} className="space-y-4" id={`timeline-${phase}`}>
               <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{phase}</h4>
-              <div className="space-y-6 border-l border-slate-200 pl-6">
+              <div className="space-y-6 border-l-2 border-weflora-teal/40 pl-6">
                 {phaseItems.map((item) => {
                   const isEvidenceExpanded = expandedEvidence[item.id];
                   return (

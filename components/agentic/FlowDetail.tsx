@@ -26,6 +26,7 @@ import type { RunContext } from '../../src/agentic/contracts/run_context';
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { DeterministicRunner } from '../../src/agentic/runtime/runner';
+import FlowGraphView from './FlowGraphView';
 
 const FlowDetail: React.FC = () => {
   const { flowId } = useParams();
@@ -41,6 +42,7 @@ const FlowDetail: React.FC = () => {
   const [steps, setSteps] = useState<Array<{ id: string; title: string; skills: string[] }>>([]);
   const [strictMode, setStrictMode] = useState(false);
   const [draftUpdatedAt, setDraftUpdatedAt] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'graph'>('list');
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const skillWriteMap = useMemo(() => {
@@ -583,11 +585,31 @@ const FlowDetail: React.FC = () => {
               </div>
             </aside>
 
-            <main className="rounded-xl border border-slate-200 bg-white p-4">
+            <main className="rounded-xl border border-slate-100 bg-white p-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <h2 className="text-sm font-semibold text-slate-900">Flow canvas</h2>
                   <p className="mt-1 text-xs text-slate-500">Step groups run sequentially. Skills within a step run in parallel.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('list')}
+                    className={`text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                      viewMode === 'list' ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    List
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('graph')}
+                    className={`text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                      viewMode === 'graph' ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    Graph
+                  </button>
                 </div>
                 <div className="text-xs text-slate-500 flex flex-wrap items-center gap-3">
                   <span>{requiredContextSummary.map((item) => `${item.recordType} (${item.count})`).join(' · ') || 'No required context'}</span>
@@ -725,6 +747,11 @@ const FlowDetail: React.FC = () => {
                 Save keeps skillRef version as latest. Run freezes skillRef to a version + hash for the session ledger.
               </div>
 
+              {viewMode === 'graph' ? (
+                <div className="mt-4">
+                  <FlowGraphView steps={steps} />
+                </div>
+              ) : (
               <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
                 <CanvasDropZone>
                   {steps.map((step, index) => (
@@ -748,6 +775,7 @@ const FlowDetail: React.FC = () => {
                   ) : null}
                 </CanvasDropZone>
               </DndContext>
+              )}
             </main>
           </div>
       </PageShell>

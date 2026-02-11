@@ -42,6 +42,8 @@ export const dividerVertical = 'border-l border-slate-100';
 export const surface = 'bg-white rounded-xl';
 /** Surface with very light border (when distinction needed). */
 export const surfaceBordered = 'bg-white rounded-xl border border-slate-100';
+/** Hub tile: subtle border for Skills/Flows index. Keep lining very subtle. */
+export const hubTile = 'bg-white rounded-xl border border-slate-100/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)]';
 /** Inset surface: slightly recessed (for nested content). */
 export const surfaceInset = 'bg-slate-50/50 rounded-lg';
 /** Elevated surface: shadow instead of border (for modals, popovers). */
@@ -59,7 +61,7 @@ export const btnSecondary =
 export const btnGhost =
   'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
 export const btnDanger =
-  'inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
+  'inline-flex items-center gap-2 rounded-lg bg-weflora-rose px-4 py-2 text-xs font-semibold text-white hover:bg-weflora-rose/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
 /** Small link-style action button (for "Fix it" CTAs). */
 export const btnLink =
   'inline-flex items-center gap-1 text-xs font-semibold text-weflora-teal hover:text-weflora-dark hover:underline';
@@ -90,16 +92,34 @@ export const tableRowSelected =
 export const previewArea =
   'min-h-[320px] max-h-[60vh] overflow-auto rounded-lg border border-slate-100 bg-slate-50/50';
 
-/* ─── Status badge helper ─────────────────────────────── */
-export const statusReady = 'bg-emerald-50 text-emerald-700 border border-emerald-100';
-export const statusWarning = 'bg-amber-50 text-amber-700 border border-amber-100';
-export const statusError = 'bg-rose-50 text-rose-700 border border-rose-100';
+/* ─── Status badge helper (muted palette, WeFlora-aligned) ── */
+export const statusReady = 'bg-weflora-emeraldLight text-weflora-emerald border border-weflora-teal/20';
+export const statusWarning = 'bg-weflora-amberLight text-weflora-amberDark border border-weflora-amber/30';
+export const statusError = 'bg-weflora-redLight text-weflora-redDark border border-weflora-red/30';
 export const statusNeutral = 'bg-slate-50 text-slate-600 border border-slate-100';
 
 /* ─── Relevance (decision signal) ─────────────────────── */
 export const relevanceHigh = 'bg-weflora-mint/10 text-weflora-dark border border-weflora-mint/20';
-export const relevanceMedium = 'bg-amber-50 text-amber-700 border border-amber-100';
+export const relevanceMedium = 'bg-weflora-amberLight text-weflora-amberDark border border-weflora-amber/30';
 export const relevanceLow = 'bg-slate-50 text-slate-500 border border-slate-100';
+
+/* ─── Flow / Stepper (vertical timeline) ────────────────── */
+/** Vertical timeline connector line. */
+export const flowLine = 'border-l-2 border-weflora-teal/60';
+/** Completed step: muted, with teal accent. */
+export const flowStepDone = 'bg-slate-50/80 rounded-lg border border-weflora-teal/10';
+/** Active step: primary surface with teal background. */
+export const flowStepActive = 'bg-weflora-teal text-white rounded-lg';
+/** Blocked step: amber accent. */
+export const flowStepBlocked = 'bg-weflora-amberLight border border-weflora-amber/30';
+
+/* ─── Consensus / Evidence strength bars ──────────────── */
+/** Strong evidence segment (e.g. Consensus Meter, Key Claims). */
+export const consensusBarStrong = 'bg-weflora-teal';
+/** Moderate evidence segment. */
+export const consensusBarMedium = 'bg-weflora-amber';
+/** Weak / mixed evidence segment. */
+export const consensusBarWeak = 'bg-slate-300';
 
 /* ─── Memory signals (Vault as cognitive memory) ──────── */
 export const memorySignalLabel = 'text-[10px] font-semibold text-slate-500 uppercase tracking-wide';
@@ -114,10 +134,10 @@ export const agentSuggestionLabel =
 /* ─── Cognitive loop badge ────────────────────────────── */
 export const cognitiveLoopBadge =
   'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold border';
-export const loopMemory = 'bg-blue-50 text-blue-700 border-blue-100';
-export const loopUnderstand = 'bg-amber-50 text-amber-700 border-amber-100';
-export const loopReason = 'bg-violet-50 text-violet-700 border-violet-100';
-export const loopAct = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+export const loopMemory = 'bg-weflora-violetLight text-weflora-violetDark border-weflora-violet/20';
+export const loopUnderstand = 'bg-weflora-amberLight text-weflora-amberDark border-weflora-amber/30';
+export const loopReason = 'bg-weflora-violetLight text-weflora-violetDark border-weflora-violet/20';
+export const loopAct = 'bg-weflora-emeraldLight text-weflora-emerald border-weflora-emerald/20';
 export const loopLearn = 'bg-weflora-mint/10 text-weflora-dark border-weflora-mint/20';
 
 /* ─── IDE-like evidence rail ──────────────────────────── */
@@ -130,9 +150,9 @@ export const railSectionHeader = 'text-[11px] font-semibold text-slate-500 upper
 
 /* ─── Readiness panel (unified for Flows + Skills) ────── */
 export const readinessPanel = 'rounded-lg bg-slate-50/50 p-3';
-export const readinessPassed = 'rounded-lg bg-emerald-50/50 p-3';
-export const readinessBlocked = 'rounded-lg bg-rose-50/50 p-3';
-export const readinessWarning = 'rounded-lg bg-amber-50/50 p-3';
+export const readinessPassed = 'rounded-lg bg-weflora-emeraldLight/50 p-3';
+export const readinessBlocked = 'rounded-lg bg-weflora-redLight/50 p-3';
+export const readinessWarning = 'rounded-lg bg-weflora-amberLight/50 p-3';
 
 /* ─── Confidence display guard ────────────────────────── */
 /**

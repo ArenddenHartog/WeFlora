@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import type { 
     PinnedProject, Chat, ProjectFile, Matrix, Report, 
@@ -16,7 +16,8 @@ import { planningRoutePaths } from './routes/planningRoutePaths';
 import { plannerPackRoutePaths } from './routes/plannerPackRoutePaths';
 import { agenticRoutePaths } from '../src/agentic/routes';
 import SkillsIndex from './agentic/SkillsIndex';
-import SkillDetail from './agentic/SkillDetail';
+// Lazy load to avoid "Cannot access 'A' before initialization" from circular imports
+const SkillDetail = lazy(() => import('./agentic/SkillDetail'));
 import RunsIndex from './agentic/RunsIndex';
 import FlowsIndex from './agentic/FlowsIndex';
 import FlowDetail from './agentic/FlowDetail';
@@ -653,7 +654,15 @@ const MainContent: React.FC<MainContentProps> = ({
                                             <Route
                                                 key={path}
                                                 path={path}
-                                                element={path.includes(':agentId') ? <SkillDetail /> : <SkillsIndex />}
+                                                element={
+                                                    path.includes(':agentId')
+                                                        ? (
+                                                            <Suspense fallback={<div className="p-8 text-center text-slate-500">Loading skill…</div>}>
+                                                                <SkillDetail />
+                                                            </Suspense>
+                                                        )
+                                                        : <SkillsIndex />
+                                                }
                                             />
                                         ))}
                                         {agenticRoutePaths.flows.map((path) => (

@@ -420,7 +420,7 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
     return (
       <AppPage title="Context intake" actions={null}>
         <div className="max-w-md text-center space-y-4">
-          <div className="text-red-600 font-semibold text-lg">Couldn't load context intake</div>
+          <div className="text-weflora-redDark font-semibold text-lg">Couldn't load context intake</div>
           <div className="text-sm text-slate-600">{error}</div>
           <div className="flex gap-2 justify-center">
             <button
@@ -496,14 +496,14 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
               <button
                 type="button"
                 onClick={handleCancelCommit}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-weflora-teal/30"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleRetryCommit}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="px-4 py-2 text-sm font-medium text-white bg-weflora-teal rounded-lg hover:bg-weflora-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-weflora-teal/50"
               >
                 Retry
               </button>
@@ -512,18 +512,18 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
         </div>
       )}
 
-      <div className="border-b border-slate-200 bg-white px-6 py-4 flex flex-col gap-3">
+      <div className="border-b border-slate-100 bg-white px-6 py-4 flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs text-slate-400 uppercase tracking-wide">Context intake</p>
-            <h1 className="text-lg font-semibold text-slate-800">PCIV v1 · Context Intake</h1>
+            <p className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Context intake</p>
+            <h1 className="text-lg font-semibold text-slate-800 tracking-tight">PCIV v1 · Context Intake</h1>
           </div>
           <div className="flex items-center gap-2">
             {onCancel && (
               <button
                 type="button"
                 onClick={onCancel}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
               >
                 Back to planning
               </button>
@@ -532,37 +532,42 @@ const PCIVFlow: React.FC<PCIVFlowProps> = ({ projectId, userId, initialStage, on
               <button
                 type="button"
                 onClick={handleNext}
-                className="text-xs font-semibold px-4 py-2 rounded-lg bg-weflora-teal text-white hover:bg-weflora-dark"
+                className="text-xs font-semibold px-4 py-2 rounded-lg bg-weflora-teal text-white hover:bg-weflora-dark transition-colors"
               >
                 Next
               </button>
             )}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-          <div className="flex items-center gap-2">
-            {STAGES.map((entry) => (
-              <span
-                key={entry.id}
-                className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold ${
-                  entry.id === stage
-                    ? 'bg-weflora-mint/40 border-weflora-teal text-weflora-dark'
-                    : 'border-slate-200 text-slate-400'
-                }`}
-              >
-                {entry.label}
-              </span>
+        {/* Stage progress: vertical timeline style */}
+        <div className="flex flex-wrap items-center gap-4 text-xs">
+          <div className="flex items-center gap-1">
+            {STAGES.map((entry, idx) => (
+              <React.Fragment key={entry.id}>
+                {idx > 0 && <span className="text-slate-200">/</span>}
+                <span
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
+                    entry.id === stage
+                      ? 'bg-weflora-teal text-white'
+                      : STAGES.findIndex((s) => s.id === stage) > idx
+                        ? 'bg-weflora-mint/30 text-weflora-dark border border-weflora-teal/20'
+                        : 'bg-slate-50 text-slate-500 border border-slate-100'
+                  }`}
+                >
+                  {entry.label}
+                </span>
+              </React.Fragment>
             ))}
           </div>
-          <span className="text-slate-400">•</span>
-          <span className="font-semibold text-slate-600" data-testid="pciv-stage">
-            Stage: {stageLabel}
+          <span className="text-slate-400">|</span>
+          <span className="font-medium text-slate-600" data-testid="pciv-stage">
+            {stageLabel}
           </span>
-          <span className="text-slate-400">•</span>
-          <span>Sources: {headerMetrics.sources_count}</span>
-          <span>Fields: {headerMetrics.fields_filled_count}/{headerMetrics.fields_total}</span>
-          <span>Unresolved required: {headerMetrics.required_unresolved_count}</span>
-          <span>Constraints: {headerMetrics.constraints_count}</span>
+          <span className="text-slate-400">|</span>
+          <span className="text-slate-500">Sources: {headerMetrics.sources_count}</span>
+          <span className="text-slate-500">Fields: {headerMetrics.fields_filled_count}/{headerMetrics.fields_total}</span>
+          <span className="text-slate-500">Unresolved: {headerMetrics.required_unresolved_count}</span>
+          <span className="text-slate-500">Constraints: {headerMetrics.constraints_count}</span>
         </div>
       </div>
 
