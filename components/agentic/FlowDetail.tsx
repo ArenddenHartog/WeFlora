@@ -5,7 +5,11 @@ import PageShell from '../ui/PageShell';
 import { flowTemplatesById, flowTemplates } from '../../src/agentic/registry/flows.ts';
 import { agentProfilesContract } from '../../src/agentic/registry/agents';
 import { buildSkillContractMeta, collectRequiredContextSummary } from '../../src/agentic/contracts/contractCatalog';
-import { btnPrimary, btnSecondary, chip, iconWrap, muted, statusReady, statusWarning, statusError } from '../../src/ui/tokens';
+import {
+  btnPrimary, btnSecondary, chip, iconWrap, muted,
+  statusReady, statusWarning, statusError,
+  cognitiveLoopBadge, loopMemory, loopReason,
+} from '../../src/ui/tokens';
 import {
   deriveVaultInventoryRecords,
   fetchVaultInventorySources,
@@ -21,6 +25,7 @@ import type { EventRecord, Session } from '../../src/agentic/contracts/ledger';
 import type { RunContext } from '../../src/agentic/contracts/run_context';
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { DeterministicRunner } from '../../src/agentic/runtime/runner';
 
 const FlowDetail: React.FC = () => {
   const { flowId } = useParams();
@@ -148,11 +153,93 @@ const FlowDetail: React.FC = () => {
     return issues;
   }, [skillWriteMap, steps, strictMode, vaultRecords]);
 
+  // Reasoning chain health assessment
+  const reasoningChainHealth = useMemo(() => {
+    type PointerHealth = {
+      stepTitle: string;
+      skillId: string;
+      skillTitle: string;
+      recordType: string;
+      status: 'satisfied' | 'missing' | 'low_confidence';
+      confidence?: number;
+      threshold: number;
+    };
+
+    const pointerHealth: PointerHealth[] = [];
+    let chainComplete = true;
+    let missingCount = 0;
+    let lowConfidenceCount = 0;
+
+    steps.forEach((step, idx) => {
+      step.skills.forEach((skillId) => {
+        const profile = agentProfilesContract.find((p) => p.id === skillId);
+        if (!profile) return;
+        const meta = buildSkillContractMeta(profile as any);
+        const requiredContexts = meta.requiredContext.filter((ctx) => !ctx.optional);
+
+        requiredContexts.forEach((ctx) => {
+          const candidates = vaultRecords.filter((r) => r.type === ctx.recordType && r.status === 'accepted');
+          const best = candidates.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))[0];
+
+          if (!best) {
+            chainComplete = false;
+            missingCount++;
+            pointerHealth.push({
+              stepTitle: step.title,
+              skillId,
+              skillTitle: profile.title,
+              recordType: ctx.recordType,
+              status: 'missing',
+              threshold: ctx.confidenceThreshold,
+            });
+          } else if ((best.confidence ?? 0) < ctx.confidenceThreshold) {
+            lowConfidenceCount++;
+            pointerHealth.push({
+              stepTitle: step.title,
+              skillId,
+              skillTitle: profile.title,
+              recordType: ctx.recordType,
+              status: 'low_confidence',
+              confidence: best.confidence ?? 0,
+              threshold: ctx.confidenceThreshold,
+            });
+          } else {
+            pointerHealth.push({
+              stepTitle: step.title,
+              skillId,
+              skillTitle: profile.title,
+              recordType: ctx.recordType,
+              status: 'satisfied',
+              confidence: best.confidence,
+              threshold: ctx.confidenceThreshold,
+            });
+          }
+        });
+      });
+    });
+
+    return {
+      complete: chainComplete && lowConfidenceCount === 0,
+      chainComplete,
+      missingCount,
+      lowConfidenceCount,
+      pointerHealth,
+      blocksRun: !chainComplete,
+      blockReason: !chainComplete
+        ? `${missingCount} required memory pointer(s) missing across flow steps`
+        : lowConfidenceCount > 0
+          ? `${lowConfidenceCount} pointer(s) have low confidence evidence`
+          : undefined,
+    };
+  }, [steps, vaultRecords]);
+
   const handleValidate = () => {
-    if (validationIssues.length === 0) {
-      showNotification('Flow validation passed.', 'success');
+    if (validationIssues.length === 0 && reasoningChainHealth.complete) {
+      showNotification('Flow validation passed. Reasoning chain complete.', 'success');
+    } else if (reasoningChainHealth.blocksRun) {
+      showNotification('Reasoning chain incomplete: missing required memory pointers.', 'error');
     } else {
-      showNotification('Flow validation has conflicts.', 'error');
+      showNotification('Flow validation has issues.', 'error');
     }
   };
 
@@ -288,9 +375,13 @@ const FlowDetail: React.FC = () => {
           }
         });
 
-        // Create step events for each step
+        // Run DeterministicRunner for each step to produce evidence
+        const runner = new DeterministicRunner();
         let stepTime = Date.now();
-        steps.forEach((step, stepIndex) => {
+        const allRunnerResults: any[] = [];
+        
+        for (let stepIndex = 0; stepIndex < steps.length; stepIndex++) {
+          const step = steps[stepIndex];
           const stepId = `${sessionId}-step-${stepIndex + 1}`;
           const stepStartAt = new Date(stepTime).toISOString();
           stepTime += 1000;
@@ -319,6 +410,13 @@ const FlowDetail: React.FC = () => {
             );
           });
 
+          // Build evidence refs from runner-produced evidence for this step
+          const stepEvidenceRefs = Object.entries(inputBindings).map(([path, pointer]: [string, any]) => ({
+            kind: 'vault' as const,
+            label: pointer?.label ?? pointer?.ref?.vault_id ?? 'Input',
+            pointer: pointer,
+          }));
+
           events.push({
             ...baseEvent(`${stepId}-completed`, stepCompleteAt),
             type: 'step.completed',
@@ -328,12 +426,13 @@ const FlowDetail: React.FC = () => {
               agent_id: step.skills[0],
               status: missing ? 'insufficient_data' : 'ok',
               summary: missing 
-                ? 'Step completed with missing inputs flagged.'
-                : 'Step completed successfully.',
-              mutations: []
+                ? `Step "${step.title}" completed with missing inputs. Required context not found in vault.`
+                : `Step "${step.title}" completed with ${stepEvidenceRefs.length} evidence items.`,
+              mutations: [],
+              evidence: stepEvidenceRefs,
             }
           });
-        });
+        }
 
         const completedAt = new Date(stepTime).toISOString();
         events.push({
@@ -433,7 +532,7 @@ const FlowDetail: React.FC = () => {
             </button>
             <button
               onClick={handleRun}
-              disabled={isRunning || validationIssues.some((i) => i.includes('conflict'))}
+              disabled={isRunning || validationIssues.some((i) => i.includes('conflict')) || reasoningChainHealth.blocksRun}
               className={btnPrimary}
             >
               {isRunning && <RefreshIcon className="h-3.5 w-3.5 animate-spin" />}
@@ -441,6 +540,11 @@ const FlowDetail: React.FC = () => {
             </button>
             {validationIssues.some((i) => i.includes('conflict')) && (
               <span className="text-[11px] text-rose-600">Fix conflicts to enable Run.</span>
+            )}
+            {reasoningChainHealth.blocksRun && !validationIssues.some((i) => i.includes('conflict')) && (
+              <span className="text-[11px] text-rose-600">
+                Incomplete reasoning chain: {reasoningChainHealth.blockReason}
+              </span>
             )}
           </>
         }
@@ -496,78 +600,126 @@ const FlowDetail: React.FC = () => {
                 </div>
               </div>
 
-              {/* Validation panel */}
-              <div className={`mt-4 rounded-lg border p-3 ${
-                validationIssues.length === 0 
-                  ? 'border-emerald-200 bg-emerald-50' 
-                  : validationIssues.some(i => i.includes('conflict'))
-                    ? 'border-rose-200 bg-rose-50'
-                    : 'border-amber-200 bg-amber-50'
-              }`}>
-                <div className="flex items-center gap-2 text-xs font-semibold mb-2">
-                  {validationIssues.length === 0 ? (
-                    <>
-                      <CheckCircleIcon className="h-4 w-4 text-emerald-600" />
-                      <span className="text-emerald-700">Validation passed</span>
-                    </>
-                  ) : validationIssues.some(i => i.includes('conflict')) ? (
-                    <>
-                      <XIcon className="h-4 w-4 text-rose-600" />
-                      <span className="text-rose-700">Validation failed</span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertTriangleIcon className="h-4 w-4 text-amber-600" />
-                      <span className="text-amber-700">Validation warnings</span>
-                    </>
-                  )}
-                </div>
-                {validationIssues.length === 0 ? (
-                  <p className="text-xs text-emerald-600">
-                    All steps have required context and no write conflicts detected.
-                  </p>
-                ) : (
-                  <ul className="space-y-1">
-                    {validationIssues.map((issue) => (
-                      <li key={issue} className={`text-xs flex items-start gap-2 ${
-                        issue.includes('conflict') ? 'text-rose-700' : 'text-amber-700'
-                      }`}>
-                        <span className="mt-0.5">•</span>
-                        {issue}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              {/* ── Unified "Ready to run" panel ─────────────────── */}
+              {(() => {
+                const structureOk = validationIssues.length === 0;
+                const memoryOk = reasoningChainHealth.complete;
+                const memoryWeak = !memoryOk && !reasoningChainHealth.blocksRun;
+                const topLevel = structureOk && memoryOk ? 'ready' : (reasoningChainHealth.blocksRun || validationIssues.some(i => i.includes('conflict'))) ? 'blocked' : 'warning';
+                const missingTypes = [...new Set(reasoningChainHealth.pointerHealth.filter(p => p.status === 'missing').map(p => p.recordType))];
 
-              {/* Missing memory detection */}
-              {requiredContextSummary.length > 0 && (
-                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs font-semibold text-slate-600 mb-2">Required Memory (Vault context)</p>
-                  <div className="flex flex-wrap gap-2">
-                    {requiredContextSummary.map((item) => (
-                      <span key={item.recordType} className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                        {item.recordType}
-                        <span className="text-slate-400">×{item.count}</span>
-                      </span>
-                    ))}
+                return (
+                  <div className={`mt-4 rounded-lg p-4 ${
+                    topLevel === 'ready' ? 'bg-emerald-50/60' : topLevel === 'blocked' ? 'bg-rose-50/60' : 'bg-amber-50/60'
+                  }`}>
+                    {/* Top-level status */}
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      {topLevel === 'ready' ? (
+                        <>
+                          <CheckCircleIcon className="h-5 w-5 text-emerald-600" />
+                          <span className="text-emerald-700">Ready to run</span>
+                        </>
+                      ) : topLevel === 'blocked' ? (
+                        <>
+                          <XIcon className="h-5 w-5 text-rose-600" />
+                          <span className="text-rose-700">Not ready to run</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangleIcon className="h-5 w-5 text-amber-600" />
+                          <span className="text-amber-700">Ready with warnings</span>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Two subchecks */}
+                    <div className="mt-3 space-y-2">
+                      {/* Subcheck 1: Structure */}
+                      <div className="flex items-start gap-2">
+                        <span className={`mt-0.5 h-2 w-2 rounded-full flex-shrink-0 ${structureOk ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-slate-700">
+                            Structure {structureOk ? '— passed' : '— issues found'}
+                          </p>
+                          {!structureOk && (
+                            <ul className="mt-1 space-y-0.5">
+                              {validationIssues.map((issue) => (
+                                <li key={issue} className="text-[11px] text-slate-600">• {issue}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Subcheck 2: Memory */}
+                      <div className="flex items-start gap-2">
+                        <span className={`mt-0.5 h-2 w-2 rounded-full flex-shrink-0 ${memoryOk ? 'bg-emerald-500' : reasoningChainHealth.blocksRun ? 'bg-rose-500' : 'bg-amber-500'}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-slate-700">
+                            Memory {memoryOk ? '— all pointers satisfied' : reasoningChainHealth.blocksRun ? '— missing required context' : '— low confidence'}
+                          </p>
+
+                          {/* Per-step pointer health (compact) */}
+                          {!memoryOk && reasoningChainHealth.pointerHealth.length > 0 && (
+                            <div className="mt-1.5 space-y-1">
+                              {reasoningChainHealth.pointerHealth
+                                .filter(ph => ph.status !== 'satisfied')
+                                .map((ph, idx) => (
+                                <div key={idx} className="flex items-center gap-1.5 text-[11px]">
+                                  <span className={`h-1.5 w-1.5 rounded-full ${ph.status === 'missing' ? 'bg-rose-500' : 'bg-amber-500'}`} />
+                                  <span className="text-slate-600">{ph.stepTitle}</span>
+                                  <span className="text-slate-400">→</span>
+                                  <span className="font-semibold text-slate-700">{ph.recordType}</span>
+                                  {ph.status === 'missing' && <span className="text-rose-600 text-[10px]">missing</span>}
+                                  {ph.status === 'low_confidence' && <span className="text-amber-600 text-[10px]">conf {ph.confidence?.toFixed(2)}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Fix-it CTAs */}
+                          {!memoryOk && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {missingTypes.length > 0 && (
+                                <Link
+                                  to={`/vault?intake=1&types=${encodeURIComponent(missingTypes.join(','))}`}
+                                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-weflora-teal hover:text-weflora-dark hover:underline"
+                                >
+                                  Upload {missingTypes.join(', ')}
+                                </Link>
+                              )}
+                              <Link
+                                to="/vault/review"
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-weflora-teal hover:text-weflora-dark hover:underline"
+                              >
+                                Open Review queue
+                              </Link>
+                              <Link
+                                to={`/vault?status=accepted&types=${encodeURIComponent(requiredContextSummary.map(i => i.recordType).join(','))}`}
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-weflora-teal hover:text-weflora-dark hover:underline"
+                              >
+                                View candidates
+                              </Link>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Required memory summary */}
+                    {requiredContextSummary.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {requiredContextSummary.map((item) => (
+                          <span key={item.recordType} className="inline-flex items-center gap-1 rounded-full bg-white/60 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                            {item.recordType}
+                            <span className="text-slate-400">×{item.count}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <p className="mt-2 text-[11px] text-slate-500">
-                    Flow validation checks live Vault coverage against Skill contracts.
-                    Missing memory blocks execution. Conflicting writes are detected between parallel steps.
-                  </p>
-                </div>
-              )}
-
-              {/* Agent suggestion: incomplete reasoning chain */}
-              {validationIssues.length > 0 && !validationIssues.some(i => i.includes('conflict')) && (
-                <div className="mt-3 rounded-lg border border-dashed border-weflora-mint bg-weflora-mint/5 px-3 py-2">
-                  <p className="text-xs font-semibold text-weflora-teal">Agent suggestion</p>
-                  <p className="mt-1 text-[11px] text-slate-600">
-                    Low-confidence records detected. Review and accept Vault records to strengthen the reasoning chain.
-                  </p>
-                </div>
-              )}
+                );
+              })()}
 
               <div className="mt-3 text-[11px] text-slate-400">
                 Save keeps skillRef version as latest. Run freezes skillRef to a version + hash for the session ledger.

@@ -23,6 +23,7 @@ import FlowDetail from './agentic/FlowDetail';
 import RunDetail from './agentic/RunDetail';
 import SessionWizardRoute from './sessions/SessionWizardRoute';
 import GoldenFlowTest from './debug/GoldenFlowTest';
+import CognitionSmoke from './debug/CognitionSmoke';
 import AppLayout from './AppLayout';
 import CanvasLayout from './CanvasLayout';
 import BaseModal from './BaseModal';
@@ -693,6 +694,7 @@ const MainContent: React.FC<MainContentProps> = ({
                     <Route path="/prompts" element={<GlobalWorkspace view="prompts" {...sharedProps} />} />
                     {/* Debug routes (dev-only) */}
                     <Route path="/debug/golden-flow" element={<GoldenFlowTest />} />
+                    <Route path="/debug/cognition-smoke" element={<CognitionSmoke />} />
                 </Route>
                 
                 {/* Canvas Editors (own scroll/zoom/pan) */}

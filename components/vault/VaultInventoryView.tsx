@@ -106,9 +106,9 @@ const VaultInventoryView: React.FC = () => {
 
   const [search, setSearch] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<ContextRecordType[]>([]);
-  // Default: show living knowledge (accepted visible by default)
-  const [selectedStatuses, setSelectedStatuses] = useState<VaultStatus[]>(DEFAULT_VISIBLE_STATUSES);
-  const [activePreset, setActivePreset] = useState<FilterPreset>('active');
+  // Default: show accepted records (Vault = validated knowledge ready for Skills/Flows)
+  const [selectedStatuses, setSelectedStatuses] = useState<VaultStatus[]>(['accepted']);
+  const [activePreset, setActivePreset] = useState<FilterPreset>('accepted');
   const [missingOnly, setMissingOnly] = useState(false);
   const [activeTab, setActiveTab] = useState<'fields' | 'evidence' | 'validations' | 'usage' | 'history'>('fields');
   const [isIntakeOpen, setIsIntakeOpen] = useState(false);
@@ -344,7 +344,7 @@ const VaultInventoryView: React.FC = () => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search context…"
-              className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm text-slate-700"
+              className="w-full rounded-lg border border-slate-100 bg-white py-2 pl-9 pr-4 text-sm text-slate-700"
             />
           </div>
           {/* ── Filter presets (top-right) ──────────────── */}
@@ -360,7 +360,7 @@ const VaultInventoryView: React.FC = () => {
                 className={`${chip} ${
                   activePreset === preset.key
                     ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    : 'border-slate-100 text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 {preset.label}
@@ -378,7 +378,7 @@ const VaultInventoryView: React.FC = () => {
               className={`${chip} ${
                 selectedTypes.includes(type)
                   ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark'
-                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  : 'border-slate-100 text-slate-600 hover:bg-slate-50'
               }`}
             >
               {type}
@@ -396,7 +396,7 @@ const VaultInventoryView: React.FC = () => {
               className={`${chip} ${
                 selectedStatuses.includes(status)
                   ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark'
-                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  : 'border-slate-100 text-slate-600 hover:bg-slate-50'
               }`}
             >
               {statusLabel(status)}
@@ -406,7 +406,7 @@ const VaultInventoryView: React.FC = () => {
             type="button"
             onClick={() => setMissingOnly((prev) => !prev)}
             className={`${chip} ${
-              missingOnly ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+              missingOnly ? 'border-weflora-teal bg-weflora-mint/20 text-weflora-dark' : 'border-slate-100 text-slate-600 hover:bg-slate-50'
             }`}
           >
             Has missing fields
@@ -417,7 +417,7 @@ const VaultInventoryView: React.FC = () => {
       {/* ── Split: Table + Detail ─────────────────────── */}
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1fr_380px]">
         {/* ── Table-like inventory list ─────────────── */}
-        <div className="rounded-xl border border-slate-200 bg-white">
+        <div className="rounded-xl border border-slate-100 bg-white">
           <div className={`grid grid-cols-[1.8fr_100px_100px_90px_120px_90px_70px] gap-3 px-4 py-3 ${tableHeaderRow}`}>
             <span>Title</span>
             <span>Type</span>
@@ -474,7 +474,7 @@ const VaultInventoryView: React.FC = () => {
                     </div>
                   </div>
                   {/* Type chip */}
-                  <span className={`${chip} border-slate-200 text-slate-600 inline-block w-fit`}>{record.type}</span>
+                  <span className={`${chip} border-slate-100 text-slate-600 inline-block w-fit`}>{record.type}</span>
                   {/* Status badge */}
                   <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs w-fit ${statusBadge(record.status)}`}>
                     {statusLabel(record.status)}
@@ -517,7 +517,7 @@ const VaultInventoryView: React.FC = () => {
           </div>
 
           {/* Load more */}
-          <div className="border-t border-slate-200 px-4 py-3 text-center">
+          <div className="border-t border-slate-100 px-4 py-3 text-center">
             <button
               type="button"
               onClick={loadMore}
@@ -530,18 +530,18 @@ const VaultInventoryView: React.FC = () => {
         </div>
 
         {/* ── Detail panel (visible when :id present) ─── */}
-        <aside className="rounded-xl border border-slate-200 bg-white p-4 sticky top-16 self-start">
+        <aside className="rounded-xl border border-slate-100 bg-white p-4 sticky top-16 self-start">
           {selectedRecord ? (
             <div key={selectedId} className="space-y-4">
               {/* 1. Header: title, chips, record id */}
-              <div className="border-b border-slate-200 pb-4">
+              <div className="border-b border-slate-100 pb-4">
                 <div className="flex items-start justify-between">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`${chip} ${statusBadge(selectedRecord.status)}`}>
                       {statusLabel(selectedRecord.status)}
                     </span>
-                    <span className={`${chip} border-slate-200 text-slate-600`}>{selectedRecord.type}</span>
-                    <span className={`${chip} border-slate-200 text-slate-500`}>{selectedRecord.scope}</span>
+                    <span className={`${chip} border-slate-100 text-slate-600`}>{selectedRecord.type}</span>
+                    <span className={`${chip} border-slate-100 text-slate-500`}>{selectedRecord.scope}</span>
                   </div>
                   <button
                     type="button"
@@ -588,7 +588,7 @@ const VaultInventoryView: React.FC = () => {
               </div>
 
               {/* 3. Memory signals — Confidence (truth) + Relevance (decision) */}
-              <div className="rounded-lg border border-slate-200 p-3 space-y-3">
+              <div className="rounded-lg border border-slate-100 p-3 space-y-3">
                 <div className="flex items-center gap-2">
                   <span className={`${cognitiveLoopBadge} ${loopMemory}`}>Memory</span>
                   <p className={`${muted} flex-1`}>
@@ -643,7 +643,7 @@ const VaultInventoryView: React.FC = () => {
                           Open PDF in new tab
                         </button>
                         {/* TODO: inline PDF viewer with provenance highlight overlays */}
-                        <div className="mt-4 w-full rounded border border-dashed border-slate-200 p-3 text-[11px] text-slate-400">
+                        <div className="mt-4 w-full rounded border border-dashed border-slate-100 p-3 text-[11px] text-slate-400">
                           Inline PDF viewer with provenance highlights — phase later
                         </div>
                       </div>
@@ -656,7 +656,7 @@ const VaultInventoryView: React.FC = () => {
                           Download / Open file
                         </button>
                         {/* TODO: Provenance highlight overlay structure */}
-                        <div className="mt-4 w-full rounded border border-dashed border-slate-200 p-3 text-[11px] text-slate-400">
+                        <div className="mt-4 w-full rounded border border-dashed border-slate-100 p-3 text-[11px] text-slate-400">
                           Provenance highlight overlay — phase later
                         </div>
                       </div>
@@ -688,7 +688,7 @@ const VaultInventoryView: React.FC = () => {
                       {selectedRecord.completeness.missingCount} required fields missing. Fill now to improve readiness.
                     </div>
                   )}
-                  <div className="rounded-lg border border-slate-200 p-3">
+                  <div className="rounded-lg border border-slate-100 p-3">
                     <div className="space-y-2 text-sm text-slate-700">
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-slate-500">filename</span>
@@ -709,13 +709,13 @@ const VaultInventoryView: React.FC = () => {
 
               {activeTab === 'evidence' && (
                 <div className="space-y-3">
-                  <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-600">
+                  <div className="rounded-lg border border-slate-100 p-3 text-sm text-slate-600">
                     <p className="text-xs font-semibold text-slate-700">Primary source</p>
                     <p className="mt-2 text-xs text-slate-500 font-mono break-all">
                       {selectedRecord.vault.storage.bucket}/{selectedRecord.vault.storage.path}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-600">
+                  <div className="rounded-lg border border-slate-100 p-3 text-sm text-slate-600">
                     <p className="text-xs font-semibold text-slate-700">Linked projects</p>
                     {selectedRecord.linkedProjects.length === 0 ? (
                       <p className="mt-2 text-xs text-slate-500">No project links yet.</p>
@@ -732,7 +732,7 @@ const VaultInventoryView: React.FC = () => {
 
               {activeTab === 'validations' && (
                 <div className="space-y-3">
-                  <div className="rounded-lg border border-slate-200 p-3">
+                  <div className="rounded-lg border border-slate-100 p-3">
                     <p className="text-xs font-semibold text-slate-700">Errors</p>
                     {selectedRecord.validations.errors.length === 0 ? (
                       <p className="mt-2 text-xs text-slate-500">No blocking errors detected.</p>
@@ -744,7 +744,7 @@ const VaultInventoryView: React.FC = () => {
                       </ul>
                     )}
                   </div>
-                  <div className="rounded-lg border border-slate-200 p-3">
+                  <div className="rounded-lg border border-slate-100 p-3">
                     <p className="text-xs font-semibold text-slate-700">Warnings</p>
                     {selectedRecord.validations.warnings.length === 0 ? (
                       <p className="mt-2 text-xs text-slate-500">No warnings detected.</p>
@@ -760,7 +760,7 @@ const VaultInventoryView: React.FC = () => {
               )}
 
               {activeTab === 'usage' && (
-                <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-600">
+                <div className="rounded-lg border border-slate-100 p-3 text-sm text-slate-600">
                   <p className="text-xs font-semibold text-slate-700">Linked projects</p>
                   {selectedRecord.linkedProjects.length === 0 ? (
                     <p className="mt-2 text-xs text-slate-500">No project usage recorded yet.</p>
@@ -795,7 +795,7 @@ const VaultInventoryView: React.FC = () => {
               )}
 
               {activeTab === 'history' && (
-                <div className="rounded-lg border border-slate-200 p-3 text-sm text-slate-600">
+                <div className="rounded-lg border border-slate-100 p-3 text-sm text-slate-600">
                   <p className="text-xs text-slate-500">Created {new Date(selectedRecord.vault.createdAt).toLocaleString()}</p>
                   <p className="mt-2 text-xs text-slate-500">Updated {new Date(selectedRecord.vault.updatedAt).toLocaleString()}</p>
                 </div>
@@ -841,7 +841,7 @@ const VaultInventoryView: React.FC = () => {
               ))}
             </div>
 
-            <div className="mt-6 rounded-xl border border-slate-200 p-4">
+            <div className="mt-6 rounded-xl border border-slate-100 p-4">
               {intakeStep === 1 && (
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center gap-3">
@@ -898,21 +898,21 @@ const VaultInventoryView: React.FC = () => {
                       <button
                         key={type}
                         type="button"
-                        className={`${chip} border-slate-200 text-slate-600 hover:bg-slate-50`}
+                        className={`${chip} border-slate-100 text-slate-600 hover:bg-slate-50`}
                       >
                         {type}
                       </button>
                     ))}
                   </div>
-                  <input placeholder="Title" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700" />
-                  <input placeholder="Tags" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700" />
+                  <input placeholder="Title" className="w-full rounded-lg border border-slate-100 px-3 py-2 text-sm text-slate-700" />
+                  <input placeholder="Tags" className="w-full rounded-lg border border-slate-100 px-3 py-2 text-sm text-slate-700" />
                 </div>
               )}
 
               {intakeStep === 3 && (
                 <div className="space-y-3 text-sm text-slate-600">
                   <p>Extracting…</p>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">Detected fields table placeholder.</div>
+                  <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">Detected fields table placeholder.</div>
                 </div>
               )}
 
@@ -957,7 +957,7 @@ interface ScopeSwitcherProps {
 const ScopeSwitcher: React.FC<ScopeSwitcherProps> = ({ selectedProject, recentProjects, onSelectProject }) => {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className={`${chip} border-slate-200 bg-slate-100 text-slate-700`}>Global</span>
+      <span className={`${chip} border-slate-100 bg-slate-100 text-slate-700`}>Global</span>
       {selectedProject ? (
         <span className={`${chip} border-weflora-mint bg-weflora-mint/20 text-weflora-dark`}>
           Project: {selectedProject.name}
@@ -970,7 +970,7 @@ const ScopeSwitcher: React.FC<ScopeSwitcherProps> = ({ selectedProject, recentPr
         <select
           value={selectedProject?.id ?? ''}
           onChange={(e) => onSelectProject(e.target.value || null)}
-          className="appearance-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 pr-8"
+          className="appearance-none rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs font-semibold text-slate-700 pr-8"
         >
           <option value="">Select project</option>
           {recentProjects.map((project) => (

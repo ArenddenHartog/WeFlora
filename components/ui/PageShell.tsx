@@ -44,7 +44,7 @@ const PageShell: React.FC<PageShellProps> = ({
     <div className={`w-full ${pageBg}`} data-layout-root>
       <div className={pageMax}>
         {/* ── Header ───────────────────────────────────── */}
-        <header className={`sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 ${pageBg} px-4 py-4 md:px-8`}>
+        <header className={`sticky top-0 z-30 flex items-center justify-between border-b border-slate-100 ${pageBg} px-4 py-4 md:px-8`}>
           <div className="flex items-center gap-3 min-w-0">
             {icon ? (
               <div className={iconWrap}>{icon}</div>
@@ -61,7 +61,7 @@ const PageShell: React.FC<PageShellProps> = ({
 
         {/* ── Tabs / Search row ────────────────────────── */}
         {tabs ? (
-          <div className="border-b border-slate-200 px-4 py-2 md:px-8">{tabs}</div>
+          <div className="border-b border-slate-100 px-4 py-2 md:px-8">{tabs}</div>
         ) : null}
 
         {/* ── Body ─────────────────────────────────────── */}
