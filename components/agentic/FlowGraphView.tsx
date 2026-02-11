@@ -30,7 +30,8 @@ const FlowGraphView: React.FC<FlowGraphViewProps> = ({
     const width = compact ? 120 : NODE_WIDTH;
     const height = compact ? 56 : NODE_HEIGHT;
     const gap = compact ? 32 : GAP;
-    return steps.map((_, i) => ({
+    const len = steps.length;
+    return Array.from({ length: len }, (_, i) => ({
       x: 24 + i * (width + gap),
       y: 24,
       width,
