@@ -272,13 +272,13 @@ const EvidenceMap: React.FC<EvidenceMapProps> = ({ graph, isOpen, focusNodeId, o
       >
         <circle
           r="26"
-          className={isSelected ? 'fill-weflora-mint/40 stroke-weflora-teal' : 'fill-white stroke-slate-300'}
-          strokeWidth="2"
+          className={isSelected ? 'fill-weflora-mint/30 stroke-weflora-teal' : 'fill-white stroke-slate-200'}
+          strokeWidth={isSelected ? 3 : 1.5}
         />
         <text x="0" y="2" textAnchor="middle" className="text-[10px] fill-slate-700">
           {node.label.length > 18 ? `${node.label.slice(0, 18)}…` : node.label}
         </text>
-        <text x="0" y="16" textAnchor="middle" className="text-[9px] fill-slate-400">
+        <text x="0" y="16" textAnchor="middle" className={`text-[9px] font-semibold ${isSelected ? 'fill-weflora-teal' : 'fill-slate-500'}`}>
           {formatConfidence(node.confidence)}
         </text>
       </g>
@@ -330,7 +330,7 @@ const EvidenceMap: React.FC<EvidenceMapProps> = ({ graph, isOpen, focusNodeId, o
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-900/70">
-      <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-200">
+      <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-100">
         <div>
           <h2 className="text-sm font-semibold text-slate-800">Evidence map</h2>
           <p className="text-xs text-slate-500">Explore how evidence, constraints, and decisions connect.</p>
@@ -340,10 +340,10 @@ const EvidenceMap: React.FC<EvidenceMapProps> = ({ graph, isOpen, focusNodeId, o
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
-              className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
+              className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
                 viewMode === mode
                   ? 'border-weflora-teal text-weflora-teal bg-weflora-mint/20'
-                  : 'border-slate-200 text-slate-500'
+                  : 'border-slate-200 text-slate-500 hover:border-slate-300'
               }`}
             >
               {viewLabels[mode]}

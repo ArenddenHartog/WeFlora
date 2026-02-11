@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { SparklesIcon, SearchIcon } from '../icons';
 import PageShell from '../ui/PageShell';
 import { flowTemplates } from '../../src/agentic/registry/flows.ts';
-import { btnPrimary, btnSecondary, iconWrap, chip } from '../../src/ui/tokens';
+import { btnPrimary, btnSecondary, iconWrap, chip, hubTile } from '../../src/ui/tokens';
 
 const FlowsIndex: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -51,7 +51,7 @@ const FlowsIndex: React.FC = () => {
           {filtered.map((flow) => (
             <div
               key={flow.id}
-              className="group flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
+              className={`group flex flex-col p-5 transition-all hover:border-weflora-teal/20 ${hubTile}`}
             >
               <div className="flex items-start justify-between">
                 <div className={iconWrap}>
